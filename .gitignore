@@ -1,0 +1,47 @@
+# Compiled output
+out/
+*.js
+*.js.map
+
+# Node modules
+node_modules/
+
+# VS Code extension testing
+.vscode-test/
+
+# Extension packages
+*.vsix
+
+# Internal development files
+internal/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Editor directories and files
+.vscode/settings.json
+.vscode/launch.json
+.vscode/extensions.json
+*.swp
+*.swo
+*~
+
+# Temporary files
+*.tmp
+*.temp

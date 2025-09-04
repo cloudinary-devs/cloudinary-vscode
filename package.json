@@ -1,0 +1,189 @@
+{
+  "name": "cloudinary",
+  "publisher": "Cloudinary",
+  "displayName": "Cloudinary",
+  "description": "Easily find and manage your Cloudinary assets directly from Visual Studio Code.",
+  "version": "0.1.0",
+  "icon": "resources/cloudinary_icon_blue.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cloudinary-devs/cloudinary-vscode.git"
+  },
+  "bugs": {
+    "url": "https://github.com/cloudinary-devs/cloudinary-vscode/issues"
+  },
+  "homepage": "https://github.com/cloudinary-devs/cloudinary-vscode#readme",
+  "engines": {
+    "vscode": "^1.96.0"
+  },
+  "categories": [
+    "Other",
+    "Visualization"
+  ],
+  "galleryBanner": {
+    "color": "#3448C5",
+    "theme": "dark"
+  },
+  "keywords": [
+    "cloudinary",
+    "media",
+    "assets",
+    "images",
+    "videos",
+    "upload",
+    "cloud",
+    "cdn"
+  ],
+  "license": "MIT",
+  "activationEvents": [],
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "cloudinary",
+          "title": "Cloudinary",
+          "icon": "resources/cloudinary_icon_blue.png"
+        }
+      ]
+    },
+    "views": {
+      "cloudinary": [
+        {
+          "id": "cloudinaryMediaLibrary",
+          "name": ""
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "cloudinary.openAsset",
+        "title": "Open Asset"
+      },
+      {
+        "command": "cloudinary.copyUrl",
+        "title": "Copy Asset URL"
+      },
+      {
+        "command": "cloudinary.copyPublicId",
+        "title": "Copy Asset Public ID"
+      },
+      {
+        "command": "cloudinary.copyOptimizedUrl",
+        "title": "Copy Optimized URL"
+      },
+      {
+        "command": "cloudinary.uploadToFolder",
+        "title": "Upload here",
+        "category": "Cloudinary"
+      },
+      {
+        "command": "cloudinary.refresh",
+        "title": "  Refresh"
+      },
+      {
+        "command": "cloudinary.setResourceFilter",
+        "title": " Filter",
+        "category": "Cloudinary"
+      },
+      {
+        "command": "cloudinary.searchAssets",
+        "title": " Search",
+        "category": "Cloudinary"
+      },
+      {
+        "command": "cloudinary.openUploadWidget",
+        "title": " Upload",
+        "category": "Cloudinary"
+      },
+      {
+        "command": "cloudinary.switchEnvironment",
+        "title": "Switch Product Environment",
+        "category": "Cloudinary"
+      },
+      {
+        "command": "cloudinary.openGlobalConfig",
+        "title": "Config",
+        "category": "Cloudinary"
+      },
+      {
+        "command": "cloudinary.openWelcomeScreen",
+        "title": "Open Welcome Guide",
+        "category": "Cloudinary"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "cloudinary.refresh",
+          "when": "view == cloudinaryMediaLibrary",
+          "group": "navigation@1"
+        },
+        {
+          "command": "cloudinary.openUploadWidget",
+          "when": "view == cloudinaryMediaLibrary",
+          "group": "navigation@2"
+        },
+        {
+          "command": "cloudinary.searchAssets",
+          "when": "view == cloudinaryMediaLibrary",
+          "group": "1_search@1"
+        },
+        {
+          "command": "cloudinary.setResourceFilter",
+          "when": "view == cloudinaryMediaLibrary",
+          "group": "1_search@2"
+        },
+        {
+          "command": "cloudinary.openGlobalConfig",
+          "when": "view == cloudinaryMediaLibrary",
+          "group": "2_config@1"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "cloudinary.copyUrl",
+          "when": "view == cloudinaryMediaLibrary && viewItem == 'asset'"
+        },
+        {
+          "command": "cloudinary.copyPublicId",
+          "when": "view == cloudinaryMediaLibrary && viewItem == 'asset'"
+        },
+        {
+          "command": "cloudinary.copyOptimizedUrl",
+          "when": "view == cloudinaryMediaLibrary && viewItem == 'asset'"
+        },
+        {
+          "command": "cloudinary.uploadToFolder",
+          "when": "view == cloudinaryMediaLibrary && viewItem == 'folder'",
+          "group": "inline"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js",
+    "package": "vsce package",
+    "publish": "vsce publish"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.3",
+    "@types/node": "18.x",
+    "@types/vscode": "^1.96.0",
+    "@typescript-eslint/eslint-plugin": "^8.39.1",
+    "@typescript-eslint/parser": "^8.39.1",
+    "@vscode/test-electron": "^2.3.6",
+    "eslint": "^8.52.0",
+    "glob": "^10.3.10",
+    "mocha": "^10.2.0",
+    "typescript": "^5.2.2"
+  },
+  "dependencies": {
+    "cloudinary": "^2.5.1"
+  }
+}
