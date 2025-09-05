@@ -1,4 +1,4 @@
-# Safe exclusions (these shouldn't cause issues)
+
 .vscode/**
 .vscode-test/**
 test/**
@@ -15,14 +15,19 @@ npm-debug.log*
 .DS_Store
 Thumbs.db
 
-# Exclude most of node_modules but keep runtime dependencies
 node_modules/**
 !node_modules/cloudinary/**
 !node_modules/lodash/**
 !node_modules/q/**
 
-# Now we can safely add other exclusions:
 src/**/*.ts
+src/**/test/**
+out/test/**
 **/*.map
 tsconfig.json
 jsconfig.json
+
+*.swp
+*.swo
+*~
+.yarnrc
