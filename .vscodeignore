@@ -1,33 +1,49 @@
 
+# With bundling, we can exclude much more since everything is bundled into dist/extension.js
+
+# Development files
 .vscode/**
 .vscode-test/**
-test/**
-.gitignore
-internal/**
 .github/**
-*.vsix
+esbuild.js
+
+# Source files (now bundled)
+src/**
+out/**
+node_modules/**
+
+# Build configuration
+tsconfig.json
+jsconfig.json
+
+# Test files
+test/**
+
+# Documentation and meta files
 vsc-extension-quickstart.md
 CONTRIBUTING.md
+
+# Logs and temporary files
 *.log
 npm-debug.log*
 *.tmp
 *.temp
+
+# OS files
 .DS_Store
 Thumbs.db
 
-node_modules/**
-!node_modules/cloudinary/**
-!node_modules/lodash/**
-!node_modules/q/**
-
-src/**/*.ts
-src/**/test/**
-out/test/**
-**/*.map
-tsconfig.json
-jsconfig.json
-
+# Editor files
 *.swp
 *.swo
 *~
+
+# Package files
+*.vsix
+
+# Git files
+.gitignore
 .yarnrc
+
+# Internal development
+internal/**

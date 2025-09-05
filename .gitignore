@@ -1,6 +1,10 @@
-# Compiled output
+# Compiled output (old TypeScript output)
 out/
+
+# Bundled output (but keep the build script)
+dist/
 *.js
+!esbuild.js
 *.js.map
 
 # Node modules
