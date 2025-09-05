@@ -8,24 +8,24 @@ import * as path from 'path';
  * @returns Transformed editor name
  */
 function transformAppNameToEditorName(appName: string): string {
-    if (!appName) {return 'VSCode';}
+    if (!appName) { return 'VSCode'; }
 
     // Convert to lowercase for easier matching
     const lowerAppName = appName.toLowerCase();
 
     // Handle special cases and transformations
-    if (lowerAppName.includes('cursor')) {return 'Cursor';}
-    if (lowerAppName.includes('visual studio code')) {return 'VSCode';}
-    if (lowerAppName.includes('windsurf')) {return 'Windsurf';}
-    if (lowerAppName.includes('insiders')) {return 'VSCodeInsiders';}
-    if (lowerAppName.includes('code - oss')) {return 'VSCodeOSS';}
+    if (lowerAppName.includes('cursor')) { return 'Cursor'; }
+    if (lowerAppName.includes('visual studio code')) { return 'VSCode'; }
+    if (lowerAppName.includes('windsurf')) { return 'Windsurf'; }
+    if (lowerAppName.includes('insiders')) { return 'VSCodeInsiders'; }
+    if (lowerAppName.includes('code - oss')) { return 'VSCodeOSS'; }
 
     // Generic transformation: remove special characters, split on whitespace, and camelCase
     const cleanName = appName.replace(/[^\w\s]/g, '').trim();
     const words = cleanName.split(/\s+/);
 
-    if (words.length === 0) {return 'VSCode';}
-    if (words.length === 1) {return words[0];}
+    if (words.length === 0) { return 'VSCode'; }
+    if (words.length === 1) { return words[0]; }
 
     // First word lowercase, subsequent words capitalized
     return words[0].toLowerCase() + words.slice(1).map(word =>
@@ -55,7 +55,7 @@ function detectEditor(): { name: string; version: string } {
 export function generateUserAgent(): string {
     try {
         const extensionManifest = vscode.extensions.getExtension('Cloudinary.cloudinary');
-        const extensionVersion = extensionManifest?.packageJSON?.version || '0.0.7';
+        const extensionVersion = extensionManifest?.packageJSON?.version || '0.1.0';
 
         const editor = detectEditor();
 
