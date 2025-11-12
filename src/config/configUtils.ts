@@ -10,6 +10,37 @@ export interface CloudinaryEnvironment {
 }
 
 /**
+ * Checks if the provided credentials are placeholder values.
+ * @param cloudName - The cloud name to check.
+ * @param apiKey - The API key to check.
+ * @param apiSecret - The API secret to check.
+ * @returns True if any of the credentials are placeholders, false otherwise.
+ */
+export function isPlaceholderConfig(
+  cloudName: string | null,
+  apiKey: string | null,
+  apiSecret: string | null
+): boolean {
+  const placeholderPatterns = [
+    'your-cloud-name',
+    '<your-api-key>',
+    '<your-api-secret>',
+    '<your-default-upload-preset>',
+    'your-api-key',
+    'your-api-secret',
+    'your-default-upload-preset',
+  ];
+
+  const values = [cloudName, apiKey, apiSecret].filter(Boolean) as string[];
+  
+  return values.some(value => 
+    placeholderPatterns.some(pattern => 
+      value.toLowerCase().includes(pattern.toLowerCase())
+    )
+  );
+}
+
+/**
  * Returns the absolute path to the global Cloudinary config file.
  * If it doesn't exist, it creates one with a placeholder template.
  */
