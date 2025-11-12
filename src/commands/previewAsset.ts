@@ -111,6 +111,25 @@ function registerPreview(context: vscode.ExtensionContext) {
           a:hover {
             text-decoration: underline;
           }
+      
+          .copy-btn {
+            background-color: var(--vscode-button-background);
+            color: var(--vscode-button-foreground);
+            border: none;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            margin-left: 0.5rem;
+          }
+      
+          .copy-btn:hover {
+            background-color: var(--vscode-button-hoverBackground);
+          }
+      
+          .copy-btn:active {
+            background-color: var(--vscode-button-activeBackground);
+          }
         </style>
       </head>
       <body>
@@ -125,7 +144,7 @@ function registerPreview(context: vscode.ExtensionContext) {
           </nav>
       
           <div class="tab-content active" id="tab-info">
-            <p><strong>Public ID:</strong> ${asset.public_id}</p>
+            <p><strong>Public ID:</strong> ${asset.public_id} <button class="copy-btn" data-copy="${asset.public_id}">Copy</button></p>
             <p><strong>Original filename:</strong> ${asset.filename}</p>
             <p><strong>Dimensions:</strong> ${asset.width} x ${asset.height}</p>
             <p><strong>Size:</strong> ${(asset.bytes / 1024).toFixed(2)} KB</p>
@@ -156,8 +175,8 @@ function registerPreview(context: vscode.ExtensionContext) {
         </div>
       
           <div class="tab-content" id="tab-urls">
-            <p><strong>Original URL:</strong> <a href="${asset.secure_url}" target="_blank">${asset.secure_url}</a></p>
-            <p><strong>Optimized URL:</strong> <a href="${asset.optimized_url}" target="_blank">${asset.optimized_url}</a></p>
+            <p><strong>Original URL:</strong> <a href="${asset.secure_url}" target="_blank">${asset.secure_url}</a> <button class="copy-btn" data-copy="${asset.secure_url}">Copy</button></p>
+            <p><strong>Optimized URL:</strong> <a href="${asset.optimized_url}" target="_blank">${asset.optimized_url}</a> <button class="copy-btn" data-copy="${asset.optimized_url}">Copy</button></p>
           </div>
         </div>
       
@@ -173,6 +192,21 @@ function registerPreview(context: vscode.ExtensionContext) {
               btn.classList.add("active");
               const target = document.getElementById("tab-" + btn.dataset.tab);
               if (target) target.classList.add("active");
+            });
+          });
+      
+          // Copy button functionality
+          const copyButtons = document.querySelectorAll(".copy-btn");
+          copyButtons.forEach((btn) => {
+            btn.addEventListener("click", () => {
+              const textToCopy = btn.getAttribute("data-copy");
+              navigator.clipboard.writeText(textToCopy).then(() => {
+                const originalText = btn.textContent;
+                btn.textContent = "Copied!";
+                setTimeout(() => {
+                  btn.textContent = originalText;
+                }, 2000);
+              });
             });
           });
         </script>

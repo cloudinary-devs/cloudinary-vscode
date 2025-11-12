@@ -66,7 +66,10 @@ class CloudinaryItem extends vscode.TreeItem {
           : cloudinary.url(data.public_id, {
             resource_type: assetType,
             type: data.type,
-            transformation: [{ fetch_format: 'auto' }, { quality: 'auto' }],
+            transformation: [
+              { fetch_format: assetType === 'video' ? 'auto:video' : 'auto' },
+              { quality: 'auto' }
+            ],
           });
 
       data.optimized_url = optimizedUrl;
@@ -130,7 +133,7 @@ class CloudinaryItem extends vscode.TreeItem {
 }
 
 function truncateLabel(label: string, maxLength: number = 20): string {
-  if (label.length <= maxLength) {return label;}
+  if (label.length <= maxLength) { return label; }
   const extension = label.includes('.') ? label.split('.').pop() : '';
   const nameWithoutExt = extension ? label.slice(0, -(extension.length + 1)) : label;
   const truncatedName = nameWithoutExt.slice(0, maxLength - 3) + '...';
@@ -138,7 +141,7 @@ function truncateLabel(label: string, maxLength: number = 20): string {
 }
 
 function formatFileSize(bytes: number): string {
-  if (bytes === 0) {return '0 B';}
+  if (bytes === 0) { return '0 B'; }
   const k = 1024;
   const sizes = ['B', 'KB', 'MB', 'GB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
