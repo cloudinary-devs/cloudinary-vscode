@@ -6,7 +6,7 @@ import registerLoadMore from "./loadMoreAssets";
 import registerUpload from "./uploadWidget";
 import registerClipboard from "./copyCommands";
 import registerSwitchEnv from "./switchEnvironment";
-import registerClearSearch from "./clearSeach";
+import registerClearSearch from "./clearSearch";
 import registerWelcomeScreen from "./welcomeScreen";
 import { CloudinaryTreeDataProvider } from "../tree/treeDataProvider";
 
