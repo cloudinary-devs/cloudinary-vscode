@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { generateUserAgent } from '../utils/userAgent';
+import { isPlaceholderConfig } from './configUtils';
 
 /**
  * Detects if the cloud supports dynamic folders by making a request to the root folder API.
@@ -15,6 +16,11 @@ export default async function detectFolderMode(
 ): Promise<boolean> {
   if (!cloudName || !apiKey || !apiSecret) {
     vscode.window.showErrorMessage("❌ Cloud name, API key, and API secret are required.");
+    return false;
+  }
+
+  // Don't make API calls with placeholder credentials
+  if (isPlaceholderConfig(cloudName, apiKey, apiSecret)) {
     return false;
   }
 

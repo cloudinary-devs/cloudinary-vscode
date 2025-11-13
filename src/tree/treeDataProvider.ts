@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { v2 as cloudinary } from 'cloudinary';
 import CloudinaryItem from './cloudinaryItem';
 import { handleCloudinaryError } from '../utils/cloudinaryErrorHandler';
+import { isPlaceholderConfig } from '../config/configUtils';
 
 export class CloudinaryTreeDataProvider implements vscode.TreeDataProvider<CloudinaryItem> {
   // Cloudinary credentials
@@ -53,7 +54,11 @@ export class CloudinaryTreeDataProvider implements vscode.TreeDataProvider<Cloud
 
   async getChildren(element?: CloudinaryItem): Promise<CloudinaryItem[]> {
     if (!this.apiKey || !this.apiSecret || !this.cloudName) {
-      vscode.window.showErrorMessage("Cloudinary credentials are not set. Please update your settings.");
+      return [];
+    }
+
+    // Prevent API calls with placeholder credentials
+    if (isPlaceholderConfig(this.cloudName, this.apiKey, this.apiSecret)) {
       return [];
     }
 
@@ -90,7 +95,7 @@ export class CloudinaryTreeDataProvider implements vscode.TreeDataProvider<Cloud
         .max_results(maxResults)
         .with_field(["tags", "context", "metadata"]);
 
-      if (nextCursor) {assetQuery.next_cursor(nextCursor);}
+      if (nextCursor) { assetQuery.next_cursor(nextCursor); }
 
       const [foldersResult, assetsResult] = await Promise.all([
         folderPromise,
@@ -112,8 +117,8 @@ export class CloudinaryTreeDataProvider implements vscode.TreeDataProvider<Cloud
       const filteredAssets = assetsResult.resources.filter((asset: any) => {
         const isRootLoad = folderPath === '' && !this.dynamicFolders;
         const isNestedAsset = asset.public_id.includes('/');
-        if (isRootLoad && isNestedAsset) {return false;}
-        if (this.viewState.resourceTypeFilter === 'all') {return true;}
+        if (isRootLoad && isNestedAsset) { return false; }
+        if (this.viewState.resourceTypeFilter === 'all') { return true; }
         return asset.resource_type?.toLowerCase() === this.viewState.resourceTypeFilter;
       });
 
@@ -168,7 +173,7 @@ export class CloudinaryTreeDataProvider implements vscode.TreeDataProvider<Cloud
         .sort_by('public_id', 'asc')
         .max_results(maxResults);
 
-      if (nextCursor) {searchQuery.next_cursor(nextCursor);}
+      if (nextCursor) { searchQuery.next_cursor(nextCursor); }
 
       const assetsResult = await searchQuery.execute();
 
@@ -245,7 +250,7 @@ export class CloudinaryTreeDataProvider implements vscode.TreeDataProvider<Cloud
 
   public updateLoadMoreItem(folderPath: string, nextCursor: string) {
     const items = this.assetMap.get(folderPath);
-    if (!items) {return;}
+    if (!items) { return; }
 
     const index = items.findIndex(
       (item) =>

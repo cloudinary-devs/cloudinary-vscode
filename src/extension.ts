@@ -4,6 +4,7 @@ import {
   getGlobalConfigPath,
   loadEnvironments,
   CloudinaryEnvironment,
+  isPlaceholderConfig,
 } from "./config/configUtils";
 import detectFolderMode from "./config/detectFolderMode";
 import { registerAllCommands } from "./commands/registerCommands";
@@ -40,6 +41,28 @@ export async function activate(context: vscode.ExtensionContext) {
     vscode.window.showErrorMessage(
       "❌ No Cloudinary environment found in config."
     );
+    return;
+  }
+
+  // Check if credentials are placeholder values
+  if (isPlaceholderConfig(firstCloudName, selectedEnv.apiKey, selectedEnv.apiSecret)) {
+    // Initialize status bar with placeholder indicator (no popup message to avoid scaring new users)
+    statusBar = vscode.window.createStatusBarItem(
+      vscode.StatusBarAlignment.Right,
+      500
+    );
+    statusBar.text = `$(warning) Cloudinary: Not Configured`;
+    statusBar.tooltip = "Click to configure Cloudinary credentials";
+    statusBar.command = "cloudinary.openGlobalConfig";
+    statusBar.show();
+    context.subscriptions.push(statusBar);
+    
+    // Still register the tree view but don't make API calls
+    vscode.window.registerTreeDataProvider(
+      "cloudinaryMediaLibrary",
+      cloudinaryProvider
+    );
+    registerAllCommands(context, cloudinaryProvider, statusBar);
     return;
   }
 
@@ -93,12 +116,23 @@ export async function activate(context: vscode.ExtensionContext) {
 
     const env = updatedEnvs[newCloudName!];
 
+    // Check if updated credentials are still placeholders
+    if (isPlaceholderConfig(newCloudName!, env.apiKey, env.apiSecret)) {
+      statusBar.text = `$(warning) Cloudinary: Not Configured`;
+      statusBar.tooltip = "Click to configure Cloudinary credentials";
+      statusBar.command = "cloudinary.openGlobalConfig";
+      // Don't show message - just update status bar silently
+      return;
+    }
+
     cloudinaryProvider.cloudName = newCloudName;
     cloudinaryProvider.apiKey = env.apiKey;
     cloudinaryProvider.apiSecret = env.apiSecret;
     cloudinaryProvider.uploadPreset = env.uploadPreset;
 
     statusBar.text = `$(cloud) ${newCloudName}`;
+    statusBar.tooltip = "Click to switch Cloudinary environment";
+    statusBar.command = "cloudinary.switchEnvironment";
 
     // Update user platform for analytics
     (cloudinary.utils as any).userPlatform = generateUserAgent();
