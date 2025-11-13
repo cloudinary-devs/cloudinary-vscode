@@ -5,6 +5,18 @@ All notable changes to the Cloudinary VS Code extension will be documented in th
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.2] - 2025-11-13
+
+### Fixed
+- Corrected typo in clearSearch command filename
+- Video optimization now uses `f_auto:video` for proper video format handling
+- Upload widget now correctly uses `asset_folder` parameter in dynamic folders mode to respect preset configuration
+- Prevented API calls with placeholder credentials on first installation
+
+### Added
+- Copy buttons for public ID and URLs in asset preview
+
+
 ## [0.1.1] - 2025-09-05
 
 ### Added
