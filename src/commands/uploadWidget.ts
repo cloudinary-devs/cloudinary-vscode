@@ -467,7 +467,11 @@ function getWebviewContent(
         };
 
         // Add folder configuration if specified
-        ${folderParam ? `baseConfig.folder = "${folderParam.split(':')[1]?.trim().replace(/"/g, '')}";` : ''}
+        ${folderParam ? (() => {
+      const key = folderParam.includes('asset_folder') ? 'asset_folder' : 'folder';
+      const pathValue = folderParam.split(':')[1]?.trim().replace(/"/g, '') || '';
+      return `baseConfig.${key} = "${pathValue}";`;
+    })() : ''}
 
         // Add signed upload configuration if needed
         if (preset.signed) {
