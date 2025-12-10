@@ -1,0 +1,6 @@
+{
+  "cloud-name": "demo",
+  "public-id": "sample.jpg",
+  "prefix-disabled": "https://res.cloudinary.com/demo/image/upload/",
+  "suffix-disabled": "/v0/sample.jpg"
+}

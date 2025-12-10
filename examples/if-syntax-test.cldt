@@ -1,0 +1,27 @@
+# Test if condition syntax highlighting
+$pos_!top!/
+
+# Basic if condition with exclamation string
+if_$pos_eq_!top!/
+  $ftxty_$ftbpad/
+if_else/
+  $ftxty_h_sub_$txtlh_sub_$ftbpad/
+if_end/
+
+# If condition with variable comparison
+if_$foil_eq_!true!/
+  l_$txtl/g_north,y_$ftxty,fl_layer_apply,e_cut_out/
+if_else/
+  l_$txtl/g_north,y_$ftxty,fl_layer_apply/
+if_end/
+
+# If condition with _and_ chaining
+if_$belo_ne_!!_and_$foil_ne_!true!/
+  l_$belo,w_$fwhbelo,e_replace_color:$cobelo/x_$fbelox,y_$fbeloy,g_north_west,fl_layer_apply/
+if_end/
+
+# Multiple and conditions
+if_$belo_ne_!!_and_$foil_eq_!true!/
+  l_$belo,w_$fwhbelo,e_replace_color:$cobelo/x_$fbelox,y_$fbeloy,g_north_west,e_cut_out,fl_layer_apply/
+if_end/
+

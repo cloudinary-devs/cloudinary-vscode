@@ -110,6 +110,18 @@
         "command": "cloudinary.openWelcomeScreen",
         "title": "Open Welcome Guide",
         "category": "Cloudinary"
+      },
+      {
+        "command": "cldt.showPreview",
+        "title": "Open Preview",
+        "category": "CLDT",
+        "icon": "$(open-preview)"
+      },
+      {
+        "command": "cldt.showPreviewToSide",
+        "title": "Open Preview to the Side",
+        "category": "CLDT",
+        "icon": "$(open-preview)"
       }
     ],
     "menus": {
@@ -158,8 +170,70 @@
           "when": "view == cloudinaryMediaLibrary && viewItem == 'folder'",
           "group": "inline"
         }
+      ],
+      "editor/title": [
+        {
+          "command": "cldt.showPreviewToSide",
+          "when": "editorLangId == cldt",
+          "group": "navigation"
+        }
+      ],
+      "editor/title/context": [
+        {
+          "command": "cldt.showPreview",
+          "when": "editorLangId == cldt",
+          "group": "navigation"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "cldt.showPreview",
+          "when": "editorLangId == cldt"
+        },
+        {
+          "command": "cldt.showPreviewToSide",
+          "when": "editorLangId == cldt"
+        }
       ]
-    }
+    },
+    "languages": [
+      {
+        "id": "cldt",
+        "aliases": [
+          "Cloudinary Transformation",
+          "cldt"
+        ],
+        "extensions": [
+          ".cldt"
+        ],
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "light": "./icons/cldt-light.png",
+          "dark": "./icons/cldt-dark.png"
+        }
+      }
+    ],
+    "grammars": [
+      {
+        "language": "cldt",
+        "scopeName": "source.cldt",
+        "path": "./syntaxes/cldt.tmLanguage.json"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "cldt",
+        "path": "./snippets/cldt.json"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "cldt.showPreviewToSide",
+        "key": "ctrl+shift+v",
+        "mac": "cmd+shift+v",
+        "when": "editorLangId == cldt"
+      }
+    ]
   },
   "scripts": {
     "compile": "npm run check-types && node esbuild.js",
