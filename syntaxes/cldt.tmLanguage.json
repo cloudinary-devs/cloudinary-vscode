@@ -1,0 +1,320 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Cloudinary Transformation",
+  "scopeName": "source.cldt",
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#urls"
+    },
+    {
+      "include": "#if-conditions"
+    },
+    {
+      "include": "#keywords"
+    },
+    {
+      "include": "#variables"
+    },
+    {
+      "include": "#exclamation-strings"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "include": "#numbers"
+    },
+    {
+      "include": "#transformations"
+    },
+    {
+      "include": "#parameters"
+    },
+    {
+      "include": "#operators"
+    },
+    {
+      "include": "#constants"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.number-sign.cldt",
+          "match": "#.*$"
+        },
+        {
+          "name": "comment.line.double-slash.cldt",
+          "match": "//.*$"
+        },
+        {
+          "name": "comment.block.cldt",
+          "begin": "/\\*",
+          "end": "\\*/"
+        }
+      ]
+    },
+    "if-conditions": {
+      "patterns": [
+        {
+          "name": "meta.if-condition.cldt",
+          "match": "(if_)(\\$[a-zA-Z][a-zA-Z0-9]*)(_(?:eq|ne|gt|lt|gte|lte)_)(![^!]*!)",
+          "captures": {
+            "1": {
+              "name": "keyword.control.cldt"
+            },
+            "2": {
+              "name": "variable.other.readwrite.cldt"
+            },
+            "3": {
+              "name": "keyword.control.cldt"
+            },
+            "4": {
+              "name": "string.quoted.other"
+            }
+          }
+        },
+        {
+          "name": "meta.if-condition.cldt",
+          "match": "(if_)(\\$[a-zA-Z][a-zA-Z0-9]*)(_(?:eq|ne|gt|lt|gte|lte)_)([^,/\\s]+)",
+          "captures": {
+            "1": {
+              "name": "keyword.control.cldt"
+            },
+            "2": {
+              "name": "variable.other.readwrite.cldt"
+            },
+            "3": {
+              "name": "keyword.control.cldt"
+            },
+            "4": {
+              "name": "string.unquoted"
+            }
+          }
+        },
+        {
+          "name": "meta.if-condition-and.cldt",
+          "match": "(_and_)(\\$[a-zA-Z][a-zA-Z0-9]*)(_(?:eq|ne|gt|lt|gte|lte)_)(![^!]*!)",
+          "captures": {
+            "1": {
+              "name": "keyword.control.cldt"
+            },
+            "2": {
+              "name": "variable.other.readwrite.cldt"
+            },
+            "3": {
+              "name": "keyword.control.cldt"
+            },
+            "4": {
+              "name": "string.quoted.other"
+            }
+          }
+        },
+        {
+          "name": "meta.if-condition-and.cldt",
+          "match": "(_and_)(\\$[a-zA-Z][a-zA-Z0-9]*)(_(?:eq|ne|gt|lt|gte|lte)_)([^,/\\s]+)",
+          "captures": {
+            "1": {
+              "name": "keyword.control.cldt"
+            },
+            "2": {
+              "name": "variable.other.readwrite.cldt"
+            },
+            "3": {
+              "name": "keyword.control.cldt"
+            },
+            "4": {
+              "name": "string.unquoted"
+            }
+          }
+        }
+      ]
+    },
+    "urls": {
+      "patterns": [
+        {
+          "name": "markup.underline.link",
+          "match": "https?://[^\\s]+"
+        }
+      ]
+    },
+    "variables": {
+      "patterns": [
+        {
+          "name": "meta.variable.assignment.cldt",
+          "match": "(\\$[a-zA-Z][a-zA-Z0-9]*)(_)([^,/\\s]+)",
+          "captures": {
+            "1": {
+              "name": "variable.other.readwrite.cldt"
+            },
+            "2": {
+              "name": "keyword.operator.assignment"
+            },
+            "3": {
+              "name": "string.unquoted"
+            }
+          }
+        },
+        {
+          "name": "variable.other.readwrite.cldt",
+          "match": "\\$\\([a-zA-Z][a-zA-Z0-9]*\\)"
+        },
+        {
+          "name": "variable.other.readwrite.cldt",
+          "match": "\\$[a-zA-Z][a-zA-Z0-9]*(?!_|\\()"
+        }
+      ]
+    },
+    "exclamation-strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.other",
+          "match": "![^!]*!"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "name": "constant.character.escape",
+              "match": "\\\\."
+            }
+          ]
+        },
+        {
+          "name": "string.quoted.single",
+          "begin": "'",
+          "end": "'",
+          "patterns": [
+            {
+              "name": "constant.character.escape",
+              "match": "\\\\."
+            }
+          ]
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.cldt",
+          "match": "\\b\\d+(\\.\\d+)?\\b"
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.cldt",
+          "match": "\\b(if_isndef|if_else|if_end|if_eq|if_ne|if_gt|if_lt|if_gte|if_lte)(?=_)"
+        },
+        {
+          "name": "keyword.control.cldt",
+          "match": "\\b(if|else|for|while|return|break|continue|end)\\b"
+        },
+        {
+          "name": "storage.type.cldt",
+          "match": "\\b(transformation|layer|overlay|underlay|effect)\\b"
+        }
+      ]
+    },
+    "transformations": {
+      "patterns": [
+        {
+          "name": "support.function",
+          "match": "\\b(width|height|crop|gravity|quality|format|angle|border|radius|effect|opacity|overlay|underlay|fetch_format|dpr|flags|color|background|zoom|aspect_ratio|page|delay|density|color_space|default_image|if|end_if|else|variable|if_else)\\b"
+        },
+        {
+          "name": "support.function",
+          "match": "\\b(blur|pixelate|sepia|grayscale|oil_paint|vignette|cartoonify|brightness|contrast|saturation|hue|gamma|sharpen|improve|auto_brightness|auto_contrast|auto_color|red|green|blue|negate|screen|multiply|overlay|make_transparent|trim|shadow|distort|shear|displace|gradient_fade|vectorize|outline|background_removal|generative_fill|generative_replace|generative_remove)\\b"
+        },
+        {
+          "name": "support.function",
+          "match": "\\b(scale|fit|limit|mfit|fill|lfill|fill_pad|crop|thumb|auto|imagga_crop|imagga_scale)\\b"
+        },
+        {
+          "name": "entity.name.type",
+          "match": "\\b(north_west|north|north_east|west|center|east|south_west|south|south_east|auto|face|faces|body|ocr_text|adv_face|adv_faces|adv_eyes|liquid|xy_center|auto:subject|auto:classic|auto:faces)\\b"
+        }
+      ]
+    },
+    "parameters": {
+      "patterns": [
+        {
+          "name": "meta.text-layer.cldt",
+          "match": "(?<=^|/|,)(l_text|l_subtitles)(:)([^,/]+)",
+          "captures": {
+            "1": {
+              "name": "support.function"
+            },
+            "2": {
+              "name": "punctuation.separator"
+            },
+            "3": {
+              "name": "string.unquoted"
+            }
+          }
+        },
+        {
+          "name": "meta.layer.cldt",
+          "match": "(?<=^|/|,)(l)(_)([^,/]+)",
+          "captures": {
+            "1": {
+              "name": "entity.name.function"
+            },
+            "2": {
+              "name": "punctuation.separator"
+            },
+            "3": {
+              "name": "constant.other"
+            }
+          }
+        },
+        {
+          "name": "meta.parameter.cldt",
+          "match": "(?<=^|/|,)([a-z]{1,4})(_)([^,/]+)",
+          "captures": {
+            "1": {
+              "name": "entity.name.function"
+            },
+            "2": {
+              "name": "punctuation.separator"
+            },
+            "3": {
+              "name": "constant.other"
+            }
+          }
+        }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        {
+          "name": "keyword.operator",
+          "match": "(=|:|,|/|\\|)"
+        }
+      ]
+    },
+    "constants": {
+      "patterns": [
+        {
+          "name": "constant.language.boolean",
+          "match": "\\b(true|false)\\b"
+        },
+        {
+          "name": "constant.language.null",
+          "match": "\\b(null|undefined)\\b"
+        }
+      ]
+    }
+  }
+}

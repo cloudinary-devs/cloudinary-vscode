@@ -1,0 +1,6 @@
+# Test file for invalid variable assignment (should trigger error hint)
+https://res.cloudinary.com/demo/image/upload/
+$titlerand_!hellllo,
+w_300/
+sample.jpg
+

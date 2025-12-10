@@ -1,0 +1,18 @@
+https://res.cloudinary.com/demo/image/upload/
+$city_!MEXICO%20CITY!/
+l_text:                     # Text overlay starts
+  Rubik_                    # Font family
+  999_                      # Font size in pixels
+  alignment_center_         # Text alignment for multi-lines
+  weight_900_               # Font weight
+  letter_spacing_-20_       # Letter spacing in pixels
+  line_spacing_-150:        # Line spacing/height in pixels
+  $(city),                  # City Text
+co_$co,                     # Font color
+w_$fwtext,h_$fhtext,c_limit/# Set text as big as possible with given bounding box
+$txtl_current,              # Save current image (city text) buffer as $txtl (Text Layer)
+o_0,                        # Make it disappear, because it needs to be repositioned
+fl_layer_apply/             # Close the layer
+
+sample.jpg
+

@@ -1,0 +1,16 @@
+// Test file for hover anchor links
+// Hover over any parameter to see the documentation link with anchor
+// Examples now show URL format (e.g., w_300 instead of width: 300)
+
+url: "sample.jpg"
+width: 400
+height: 300
+crop: fill
+gravity: auto
+quality: auto
+effect: blur:300
+format: webp
+radius: 20
+opacity: 80
+angle: 45
+

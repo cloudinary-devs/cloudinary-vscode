@@ -1,0 +1,7 @@
+# Test file for undefined variable usage (should trigger error hint)
+# Using $txtlh before it's defined
+https://res.cloudinary.com/demo/image/upload/
+w_300,
+h_$txtlh/
+sample.jpg
+

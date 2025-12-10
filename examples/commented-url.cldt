@@ -1,0 +1,155 @@
+https://res.cloudinary.com/elukas/image/upload/
+###
+# User-Definable Variables
+# All the values are relative to the fixed postcard dimension: 2560 x 3755 px
+###
+$city_!MEXICO%0ACITY!,            # Name of the City/Destination
+$pos_!bottom!,                    # Position of the city text: top/bottom
+$belo_!demo:airbnb:BeloIcon!,     # Belo Icon's Public ID, if empty don't show
+$belopos_!right!,                 # Bélo Icon position is opposite of $pos and left/right
+$foil_!true!,                     # If true, it will do the cut-out of the city text
+$co_!rgb:fefefe!,                 # Color of the text
+$lrpad_205,                       # Left & right padding of the text bounding box
+$tbpad_171,                       # Top or bottom padding of the text bounding box
+$radius_205,                      # Radius of the postcard
+$whbelo_171,                      # Width & Height of Bélo Icon
+$xybelo_120,                      # X & Y Coordinates/Padding of Bélo
+$cobelo_!ee3d0c!,                 # Color of the Bélo Icon
+$shdwco_!000000!,                 # Color of the shadow of the text
+$shdwstrength_1,                  # Strength/bluriness of the shadow of the text
+$shdwx_0,                         # X coordinate of the shadow in relevant to the text
+$shdwy_67,                        # Y coordinate of the shadow in relevant to the text
+$shdwo_20,                        # Shadow Opacity
+$finalw_600/                      # Final Width
+
+###
+# Captures important variables
+###
+$w_iw,                            # Initial Width
+$h_ih,                            # Initial Height
+$resizeratio_$finalw_div_$w,      # Resize Ratio
+$wtext_$w_sub_$lrpad_sub_$lrpad,  # Width of text bounding box after padding
+$htext_$h_div_3_sub_$tbpad/       # Height of text bounding box: a third of postcard height after padding
+
+###
+# Calculates final values based on given final width
+###
+$flrpad_$resizeratio_mul_$lrpad,  # Final Left & Right Padding
+$ftbpad_$resizeratio_mul_$tbpad,  # Final Top or Bottom Padding
+$fradius_$resizeratio_mul_$radius,# Final Radius
+$fwhbelo_$resizeratio_mul_$whbelo,# Final Width & Height of Bélo Icon
+$fxybelo_$resizeratio_mul_$xybelo,# Final X & Y Coordinates/Padding of Bélo
+$fwtext_$resizeratio_mul_$wtext,  # Final Width of text bounding box after padding
+$fhtext_$resizeratio_mul_$htext/  # Final Height of text bounding box
+
+###
+# Calculates final shadow values
+###
+$fshdwx_$resizeratio_mul_$shdwx,  # Final X coordinate of the shadow in relevant to the text
+$fshdwy_$resizeratio_mul_$shdwy,  # Final Y coordinate of the shadow in relevant to the text
+$fshdwstrength_$shdwstrength_mul_2000_mul_$resizeratio/
+$fshdwstrength_$fshdwstrength_to_i/
+                                  # Final Shadow Strength: 2000 is the max value Cloudinary can accept & convert it to Integer
+
+###
+# Immediately reduce the canvas to final dimensions
+# This approach is for performance reason, always try working on smaller canvas/buffer
+###
+w_$finalw,                        # Resize to Final Width
+r_$fradius/                       # Apply Radius
+
+###
+# Create text buffer for the city
+# Builds the supporting variables to be re-used for shadow
+###
+l_text:                     # Text overlay starts
+  Rubik_                    # Font family
+  999_                      # Font size in pixels
+  alignment_center_         # Text alignment for multi-lines
+  weight_900_               # Font weight
+  letter_spacing_-20_       # Letter spacing in pixels, relative to default spacing
+  line_spacing_-150:        # Line spacing/height in pixels, relative to default spacing
+  $(city),                  # City Text
+co_$co,                     # Font color
+w_$fwtext,h_$fhtext,c_limit/# Set text as big as possible with given bounding box
+$txtl_current,              # Save current image (city text) buffer as $txtl (Text Layer)
+$txtlh_h/                   # Save current buffer's height to $txtlh (Text Layer Height)
+o_0,                        # Make it disappear, because it needs to be repositioned along with the shadow
+fl_layer_apply/             # Close the layer
+
+###
+# Create shadow buffer from text buffer
+# Our overlay tends to cut off the shadows causing a weird hard line on the shadow
+###
+l_$txtl/                    # Overlay from buffer
+e_replace_color:$shdwco/    # Change color
+e_blur:$fshdwstrength,      # Using e_blur instead of e_shadow to support color and opacity
+c_lpad,w_$finalw,h_$fhtext/ # Resize to final dimension
+if_$city_ne_!%20!,e_trim:0/ # Trim it without removing/cut-off the shadow on weird location (and only trim if it's a non-empty string)
+$shdwl_current,             # Save current shadow buffer as $shdwl (Shadow Layer)
+$shdwlh_h/                  # Save current shadow's height to $shdwlh (Shadow Layer Height)
+o_0,                        # Make it disappear, because it needs to be repositioned along with the text
+fl_layer_apply/             # Close the layer
+
+###
+# Calculate half-height difference between text buffer and shadow buffer
+###
+$deltah_$shdwlh_sub_$txtlh/$deltah_$deltah_div_2/
+
+###
+# Calculates X & Y for Text & Bélo Layers
+# X,Y Coordinates need to be calculated since x/y behaves inwards for positive value and outwards for negative value
+# Break it to 2 IFs, since we don't support nested-IFs
+###
+# Y-Axis
+if_$pos_eq_!top!/           # If Top Position
+  $ftxty_$ftbpad/
+  $ffshdwy_$ftbpad_sub_$deltah_add_$fshdwy/
+  $fbeloy_h_sub_$fwhbelo_sub_$fxybelo/
+if_else/                    # Else Bottom Position
+  $ftxty_h_sub_$txtlh_sub_$ftbpad/
+  $ffshdwy_h_sub_$txtlh_sub_$ftbpad_sub_$deltah_add_$fshdwy/
+  $fbeloy_$fxybelo/
+if_end/
+
+# X-Axis
+if_$belopos_eq_!left!/      # If Bélo Left Position
+  $fbelox_$fxybelo/
+if_else/                    # Else Bélo Right Position
+  $fbelox_w_sub_$fwhbelo_sub_$fxybelo/
+if_end/
+
+###
+# Shadow Overlay
+# First so it can be underneath the city text
+# Separate layer for shadow and city text, so it can punch-out/cut-out city text layer but not shadow layer
+###
+l_$shdwl/o_$shdwo,g_north,y_$ffshdwy,x_$fshdwx,fl_layer_apply.no_overflow/
+
+###
+# City Text Overlay
+# If Foil, punch it out! (make it transparent)
+# We don't support IF inside overlay, such as:
+#   l_$txtl/if_$foil_eq_!true!/e_cut_out/if_end/g_north,y_$ftxty,fl_layer_apply/
+###
+if_$foil_eq_!true!/
+  l_$txtl/g_north,y_$ftxty,fl_layer_apply,e_cut_out/
+if_else/
+  l_$txtl/g_north,y_$ftxty,fl_layer_apply/
+if_end/
+
+###
+# Bélo Overlay
+# Only show if it's not empty
+###
+if_$belo_ne_!!_and_$foil_ne_!true!/
+  l_$belo,w_$fwhbelo,e_replace_color:$cobelo/x_$fbelox,y_$fbeloy,g_north_west,fl_layer_apply/
+if_end/
+if_$belo_ne_!!_and_$foil_eq_!true!/
+  l_$belo,w_$fwhbelo,e_replace_color:$cobelo/x_$fbelox,y_$fbeloy,g_north_west,e_cut_out,fl_layer_apply/
+if_end/
+
+###
+# Postcard Public ID
+###
+demo/airbnb/Mexico%20City.png
