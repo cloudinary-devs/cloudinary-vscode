@@ -1,0 +1,28 @@
+https://res.cloudinary.com/demo/image/upload/
+# Simple if-else test
+if_$foil_eq_!true!/
+  e_sepia/
+if_else/
+  co_rgb:ffffff/
+if_end/
+
+# Nested transformations in if-else
+if_$pos_eq_!top!/
+  $ftxty_$ftbpad/
+  $ffshdwy_$ftbpad_sub_$deltah_add_$fshdwy/
+  $fbeloy_h_sub_$fwhbelo_sub_$fxybelo/
+if_else/
+  $ftxty_h_sub_$txtlh_sub_$ftbpad/
+  $ffshdwy_h_sub_$txtlh_sub_$ftbpad_sub_$deltah_add_$fshdwy/
+  $fbeloy_$fxybelo/
+if_end/
+
+# Multiple if-else blocks
+if_$belopos_eq_!left!/
+  $fbelox_$fxybelo/
+if_else/
+  $fbelox_w_sub_$fwhbelo_sub_$fxybelo/
+if_end/
+
+sample.jpg
+

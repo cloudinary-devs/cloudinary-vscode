@@ -1,0 +1,61 @@
+# Test file for syntax highlighting verification
+# This file tests all major syntax patterns
+
+### URLs (should be underlined/linked)
+https://res.cloudinary.com/demo/image/upload/
+
+### Keywords (should be purple/pink - keyword.control)
+if_isndef_$myvar/
+if_else/
+if_end/
+
+### Variable Assignments (should show colors)
+$width_800,
+$height_600,
+$name_!John_Doe!,
+$color_!rgb:fefefe!,
+
+### Variable References (should be blue/cyan)
+w_$width/
+h_$height/
+co_$(color)/
+
+### Parameters (parameter name in yellow, value in teal/blue)
+w_400,
+h_300,
+c_fill,
+g_auto,
+q_auto:best,
+f_webp,
+
+### Text Layers (should be colored)
+l_text:Arial_24_bold:Hello,
+l_$myimage,
+l_empty,
+
+### Exclamation Strings (should be orange/red)
+!Hello World!
+!rgb:ffffff!
+
+### Numbers (should be light blue/green)
+800
+600
+2.5
+1.25
+
+### Comments (should be green)
+# This is a comment
+// This is also a comment
+
+### Operators (should be subtle/gray)
+w_400,h_300/c_fill/q_80
+
+### Complex Example
+if_isndef_$logo/
+$logo_!my-logo-image!,
+if_end/
+l_text:Roboto_48:$(title),
+w_1200,h_630,c_fill,g_auto/
+l_$logo,w_200,x_50,y_50,g_north_west/
+sample.jpg
+

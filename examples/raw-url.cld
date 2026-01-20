@@ -1,0 +1,144 @@
+https://res.cloudinary.com/elukas/image/upload/
+$city_!MEXICO%0ACITY!,
+$pos_!bottom!,
+$belo_!demo:airbnb:BeloIcon!,
+$belopos_!right!,
+$foil_!true!,
+$co_!rgb:fefefe!,
+$lrpad_205,
+$tbpad_171,
+$radius_205,
+$whbelo_171,
+$xybelo_120,
+$cobelo_!ee3d0c!,
+$shdwco_!000000!,
+$shdwstrength_1,
+$shdwx_0,
+$shdwy_67,
+$shdwo_20,
+$finalw_600/
+
+$w_iw,
+$h_ih,
+$resizeratio_$finalw_div_$w,
+$wtext_$w_sub_$lrpad_sub_$lrpad,
+$htext_$h_div_3_sub_$tbpad/
+
+$flrpad_$resizeratio_mul_$lrpad,
+$ftbpad_$resizeratio_mul_$tbpad,
+$fradius_$resizeratio_mul_$radius,
+$fwhbelo_$resizeratio_mul_$whbelo,
+$fxybelo_$resizeratio_mul_$xybelo,
+$fwtext_$resizeratio_mul_$wtext,
+$fhtext_$resizeratio_mul_$htext/
+
+$fshdwx_$resizeratio_mul_$shdwx,
+$fshdwy_$resizeratio_mul_$shdwy,
+$fshdwstrength_$shdwstrength_mul_2000_mul_$resizeratio/
+
+$fshdwstrength_$fshdwstrength_to_i/
+w_$finalw,
+r_$fradius/
+
+l_text:Rubik_999_alignment_center_weight_900_letter_spacing_-20_line_spacing_-150:$(city),
+  co_$co,
+  w_$fwtext,
+  h_$fhtext,
+  c_limit/
+
+  $txtl_current,
+  $txtlh_h/
+
+  o_0,
+fl_layer_apply/
+
+
+l_$txtl/
+  e_replace_color:$shdwco/
+  e_blur:$fshdwstrength,
+  c_lpad,
+  w_$finalw,
+  h_$fhtext/
+
+  if_$city_ne_!%20!,
+    e_trim:0/
+
+    $shdwl_current,
+    $shdwlh_h/
+
+    o_0,
+  fl_layer_apply/
+
+
+  $deltah_$shdwlh_sub_$txtlh/
+  $deltah_$deltah_div_2/
+  if_$pos_eq_!top!/
+    $ftxty_$ftbpad/
+    $ffshdwy_$ftbpad_sub_$deltah_add_$fshdwy/
+    $fbeloy_h_sub_$fwhbelo_sub_$fxybelo/
+  if_else/
+    $ftxty_h_sub_$txtlh_sub_$ftbpad/
+    $ffshdwy_h_sub_$txtlh_sub_$ftbpad_sub_$deltah_add_$fshdwy/
+    $fbeloy_$fxybelo/
+  if_end/
+
+  if_$belopos_eq_!left!/
+    $fbelox_$fxybelo/
+  if_else/
+    $fbelox_w_sub_$fwhbelo_sub_$fxybelo/
+  if_end/
+
+  l_$shdwl/
+    o_$shdwo,
+    g_north,
+    y_$ffshdwy,
+    x_$fshdwx,
+  fl_layer_apply.no_overflow/
+
+
+  if_$foil_eq_!true!/
+    l_$txtl/
+      g_north,
+      y_$ftxty,
+    fl_layer_apply,
+
+    e_cut_out/
+
+
+  if_else/
+    l_$txtl/
+      g_north,
+      y_$ftxty,
+    fl_layer_apply/
+
+
+  if_end/
+
+  if_$belo_ne_!!_and_$foil_ne_!true!/
+    l_$belo,
+      w_$fwhbelo,
+      e_replace_color:$cobelo/
+
+      x_$fbelox,
+      y_$fbeloy,
+      g_north_west,
+    fl_layer_apply/
+
+
+  if_end/
+
+  if_$belo_ne_!!_and_$foil_eq_!true!/
+    l_$belo,
+      w_$fwhbelo,
+      e_replace_color:$cobelo/
+
+      x_$fbelox,
+      y_$fbeloy,
+      g_north_west,
+      e_cut_out,
+    fl_layer_apply/
+
+
+  if_end/
+
+  demo/airbnb/Mexico%20City.png

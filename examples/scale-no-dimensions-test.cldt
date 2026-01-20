@@ -1,0 +1,3 @@
+# Test file for c_scale without dimensions (should show info hint)
+https://res.cloudinary.com/demo/image/upload/c_scale,q_auto/sample.jpg
+

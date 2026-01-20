@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; style-src 'unsafe-inline';"
+    />
+    <title>CLDT Preview</title>
+    <style>
+      body {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        margin: 0;
+        font-family: var(--vscode-font-family);
+        color: var(--vscode-foreground);
+        background-color: var(--vscode-editor-background);
+      }
+      .error-message {
+        text-align: center;
+        padding: 20px;
+      }
+      .error-icon {
+        font-size: 48px;
+        margin-bottom: 16px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="error-message">
+      <div class="error-icon">⚠️</div>
+      <h2>No Cloudinary URL Found</h2>
+      <p>
+        Please add a valid Cloudinary transformation URL to preview the image.
+      </p>
+      <p style="font-size: 0.9em; color: var(--vscode-descriptionForeground)">
+        Expected format: https://res.cloudinary.com/...
+      </p>
+    </div>
+  </body>
+</html>

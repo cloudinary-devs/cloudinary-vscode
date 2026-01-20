@@ -1,0 +1,45 @@
+https://res.cloudinary.com/demo/image/upload/
+###
+# Variable Assignment Examples
+###
+$width_800,                   # Numeric value assignment
+$height_600,                  # Another numeric assignment
+$city_!MEXICO%20CITY!,        # String value with exclamation marks
+$name_!John_Doe!,             # String with underscore
+$color_!rgb:fefefe!,          # String with special chars
+$finalw_600/                  # Assignment ending with slash
+
+###
+# Variable Usage (References)
+###
+w_$width/                     # Using width variable
+h_$height/                    # Using height variable
+co_$color/                    # Using color variable
+
+###
+# Complex Example
+###
+$pos_!bottom!,                # Position variable
+$foil_!true!,
+$txtlh_205,
+$ftbpad_3,
+$lrpad_205/
+
+# Numeric padding
+
+if_$pos_eq_!top!/             # Using variable in condition
+  $ftxty_$ftbpad/             # Assignment using another variable
+if_else/
+  $ftxty_h_sub_$txtlh_sub_$ftbpad/ # Complex calculation
+if_end/
+
+###
+# More Variable References
+###
+l_text:Arial_30px:$(city),    # Variable reference with $()
+  w_$finalw/                  # Simple reference
+  fl_layer_apply/
+
+/v0/
+sample.jpg
+

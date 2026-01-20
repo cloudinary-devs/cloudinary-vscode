@@ -1,15 +1,16 @@
-import * as vscode from "vscode";
+import { v2 as cloudinary } from "cloudinary";
 import * as path from "path";
+import * as vscode from "vscode";
+import { CldtActivate, CldtDeactivate } from "./cldt/extension";
+import { registerAllCommands } from "./commands/registerCommands";
 import {
-  getGlobalConfigPath,
-  loadEnvironments,
   CloudinaryEnvironment,
+  getGlobalConfigPath,
   isPlaceholderConfig,
+  loadEnvironments,
 } from "./config/configUtils";
 import detectFolderMode from "./config/detectFolderMode";
-import { registerAllCommands } from "./commands/registerCommands";
 import { CloudinaryTreeDataProvider } from "./tree/treeDataProvider";
-import { v2 as cloudinary } from "cloudinary";
 import { generateUserAgent } from "./utils/userAgent";
 
 let statusBar: vscode.StatusBarItem;
@@ -19,15 +20,15 @@ let statusBar: vscode.StatusBarItem;
  * @param context - Extension context provided by VS Code.
  */
 export async function activate(context: vscode.ExtensionContext) {
+  CldtActivate(context);
   const cloudinaryProvider = new CloudinaryTreeDataProvider();
 
   // Check if this is the first run of the extension
-  const isFirstRun = context.globalState.get('cloudinary.firstRun', true);
-
+  const isFirstRun = context.globalState.get("cloudinary.firstRun", true);
 
   if (isFirstRun) {
     // Mark as no longer first run
-    context.globalState.update('cloudinary.firstRun', false);
+    context.globalState.update("cloudinary.firstRun", false);
 
     // Show welcome screen automatically on first install
     vscode.commands.executeCommand("cloudinary.openWelcomeScreen");
@@ -45,7 +46,13 @@ export async function activate(context: vscode.ExtensionContext) {
   }
 
   // Check if credentials are placeholder values
-  if (isPlaceholderConfig(firstCloudName, selectedEnv.apiKey, selectedEnv.apiSecret)) {
+  if (
+    isPlaceholderConfig(
+      firstCloudName,
+      selectedEnv.apiKey,
+      selectedEnv.apiSecret
+    )
+  ) {
     // Initialize status bar with placeholder indicator (no popup message to avoid scaring new users)
     statusBar = vscode.window.createStatusBarItem(
       vscode.StatusBarAlignment.Right,
@@ -56,7 +63,7 @@ export async function activate(context: vscode.ExtensionContext) {
     statusBar.command = "cloudinary.openGlobalConfig";
     statusBar.show();
     context.subscriptions.push(statusBar);
-    
+
     // Still register the tree view but don't make API calls
     vscode.window.registerTreeDataProvider(
       "cloudinaryMediaLibrary",
@@ -104,13 +111,15 @@ export async function activate(context: vscode.ExtensionContext) {
     const cloudNames = Object.keys(updatedEnvs);
 
     if (cloudNames.length === 0) {
-      vscode.window.showErrorMessage("❌ No Cloudinary environments found in updated config.");
+      vscode.window.showErrorMessage(
+        "❌ No Cloudinary environments found in updated config."
+      );
       return;
     }
 
     // Try to keep the previously active cloud name
     const preferredCloud = cloudinaryProvider.cloudName;
-    const newCloudName = cloudNames.includes(preferredCloud || '')
+    const newCloudName = cloudNames.includes(preferredCloud || "")
       ? preferredCloud
       : cloudNames[0];
 
@@ -144,7 +153,9 @@ export async function activate(context: vscode.ExtensionContext) {
     });
 
     const cacheKey = `cloudinary.dynamicFolders.${newCloudName}`;
-    const cachedFolderMode = context.globalState.get(cacheKey) as boolean | undefined;
+    const cachedFolderMode = context.globalState.get(cacheKey) as
+      | boolean
+      | undefined;
 
     if (typeof cachedFolderMode === "boolean") {
       cloudinaryProvider.dynamicFolders = cachedFolderMode;
@@ -158,10 +169,10 @@ export async function activate(context: vscode.ExtensionContext) {
     }
 
     cloudinaryProvider.refresh({
-      folderPath: '',
+      folderPath: "",
       nextCursor: null,
       searchQuery: null,
-      resourceTypeFilter: 'all'
+      resourceTypeFilter: "all",
     });
   });
 
@@ -169,7 +180,9 @@ export async function activate(context: vscode.ExtensionContext) {
 
   // Detect and cache folder mode
   const cacheKey = `cloudinary.dynamicFolders.${cloudinaryProvider.cloudName}`;
-  const cachedFolderMode = context.globalState.get(cacheKey) as boolean | undefined;
+  const cachedFolderMode = context.globalState.get(cacheKey) as
+    | boolean
+    | undefined;
 
   if (typeof cachedFolderMode === "boolean") {
     cloudinaryProvider.dynamicFolders = cachedFolderMode;
@@ -192,4 +205,6 @@ export async function activate(context: vscode.ExtensionContext) {
 /**
  * Optional cleanup on extension deactivation.
  */
-export function deactivate() { }
+export function deactivate() {
+  CldtDeactivate();
+}
