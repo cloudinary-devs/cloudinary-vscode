@@ -49,3 +49,9 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.temp
+
+# Local LLM documentation (not for public repo)
+temp/
+
+# Cursor AI configuration (local rules)
+.cursor/

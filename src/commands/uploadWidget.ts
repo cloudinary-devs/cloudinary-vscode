@@ -263,71 +263,90 @@ function getWebviewContent(
         background-color: var(--vscode-editor-background);
         color: var(--vscode-editor-foreground);
         margin: 0;
-        padding: 2rem;
+        padding: 1rem;
         display: flex;
         justify-content: center;
         align-items: flex-start;
-        min-height: 100vh;
       }
 
       /* Card container */
       .card {
         background-color: var(--vscode-editorWidget-background);
-        padding: 1.5rem;
-        border-radius: 12px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-        max-width: 900px;
+        padding: 1rem;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        max-width: 800px;
         width: 100%;
       }
 
-      /* Upload area */
-      #upload-area {
-        min-height: 500px;
+      .card h2 {
+        margin: 0 0 0.75rem 0;
+        font-size: 1.1rem;
+      }
+
+      /* Upload area wrapper */
+      .upload-wrapper {
         border: 1px dashed var(--vscode-editorWidget-border);
-        padding: 1rem;
         border-radius: 8px;
         background-color: var(--vscode-editor-background);
+        overflow: hidden;
+        /* Larger wrapper to fit more scaled content */
+        height: 370px;
+      }
+
+      /* Scale down the widget to 60% */
+      #upload-area {
+        transform: scale(0.6);
+        transform-origin: top left;
+        width: 166.67%;
+        height: 166.67%;
       }
 
       /* Preset selector */
       .preset-selector {
-        margin-bottom: 1.5rem;
-        background-color: var(--vscode-editorWidget-background);
-        border-radius: 8px;
-        padding: 1rem;
+        margin-bottom: 0.75rem;
+        background-color: var(--vscode-editor-background);
+        border-radius: 6px;
+        padding: 0.5rem 0.75rem;
         border: 1px solid var(--vscode-editorWidget-border);
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        flex-wrap: wrap;
       }
 
       .preset-label {
-        font-size: 0.9rem;
+        font-size: 0.8rem;
         font-weight: 600;
-        margin-bottom: 0.5rem;
+        margin: 0;
+        white-space: nowrap;
       }
 
       .preset-selector select {
         background-color: var(--vscode-dropdown-background);
         color: var(--vscode-dropdown-foreground);
         border: 1px solid var(--vscode-dropdown-border);
-        padding: 0.5rem;
+        padding: 0.35rem 0.5rem;
         border-radius: 4px;
-        font-size: 0.9rem;
-        width: 100%;
-        max-width: 400px;
-        margin-bottom: 0.75rem;
+        font-size: 0.8rem;
+        flex: 1;
+        min-width: 150px;
+        max-width: 300px;
       }
 
       /* Preset details */
       .preset-details {
-        margin-top: 0.75rem;
-        padding: 0.75rem;
-        background-color: var(--vscode-editor-background);
+        margin-top: 0.5rem;
+        padding: 0.5rem;
+        background-color: var(--vscode-editorWidget-background);
         border-radius: 4px;
-        font-size: 0.85rem;
+        font-size: 0.75rem;
         white-space: pre-wrap;
-        max-height: 200px;
+        max-height: 120px;
         overflow-y: auto;
         border: 1px solid var(--vscode-editorWidget-border);
         display: none;
+        width: 100%;
       }
 
       .preset-details.visible {
@@ -337,20 +356,22 @@ function getWebviewContent(
       /* Upload info */
       .upload-info {
         display: flex;
-        justify-content: space-between;
         align-items: center;
-        margin-bottom: 1rem;
-        padding: 0.5rem;
-        background-color: var(--vscode-editor-background);
-        border-radius: 4px;
+        gap: 0.5rem;
+        margin-bottom: 0.5rem;
+        font-size: 0.8rem;
+      }
+
+      .upload-info p {
+        margin: 0;
       }
 
       .upload-info code {
         background-color: var(--vscode-badge-background);
         color: var(--vscode-badge-foreground);
-        padding: 0.2rem 0.4rem;
+        padding: 0.15rem 0.35rem;
         border-radius: 3px;
-        font-size: 0.85rem;
+        font-size: 0.75rem;
       }
 
       /* Buttons and controls */
@@ -360,20 +381,109 @@ function getWebviewContent(
         color: var(--vscode-textLink-foreground);
         cursor: pointer;
         padding: 0;
-        font-size: 0.85rem;
+        font-size: 0.75rem;
         display: flex;
         align-items: center;
-        gap: 0.25rem;
+        gap: 0.2rem;
+        white-space: nowrap;
       }
 
       .preset-details-toggle::before {
         content: '▶';
-        font-size: 0.7rem;
+        font-size: 0.6rem;
         transition: transform 0.2s;
       }
 
       .preset-details-toggle.expanded::before {
         transform: rotate(90deg);
+      }
+
+
+      /* Uploaded assets section */
+      #uploaded-assets {
+        margin-top: 1.5rem;
+        padding-top: 1rem;
+        border-top: 1px solid var(--vscode-editorWidget-border);
+      }
+
+      #uploaded-assets h3 {
+        margin: 0 0 1rem 0;
+        font-size: 1rem;
+        font-weight: 600;
+      }
+
+      #asset-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: 1rem;
+      }
+
+      .asset-card {
+        background: var(--vscode-editor-background);
+        border: 1px solid var(--vscode-editorWidget-border);
+        border-radius: 8px;
+        padding: 0.5rem;
+        text-align: center;
+        transition: border-color 0.2s;
+      }
+
+      .asset-card:hover {
+        border-color: var(--vscode-focusBorder);
+      }
+
+      .asset-card .thumbnail {
+        width: 120px;
+        height: 120px;
+        object-fit: cover;
+        border-radius: 4px;
+        background: var(--vscode-editorWidget-background);
+      }
+
+      .asset-card .file-icon {
+        width: 120px;
+        height: 120px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--vscode-editorWidget-background);
+        border-radius: 4px;
+        font-size: 2rem;
+      }
+
+      .asset-card .public-id {
+        font-size: 0.7rem;
+        color: var(--vscode-descriptionForeground);
+        margin: 0.5rem 0;
+        word-break: break-all;
+        max-height: 2.4em;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .asset-card .actions {
+        display: flex;
+        gap: 0.25rem;
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+
+      .asset-card .actions button {
+        font-size: 0.7rem;
+        padding: 0.25rem 0.5rem;
+        background-color: var(--vscode-button-secondaryBackground);
+        color: var(--vscode-button-secondaryForeground);
+        border: none;
+        border-radius: 3px;
+        cursor: pointer;
+      }
+
+      .asset-card .actions button:hover {
+        background-color: var(--vscode-button-secondaryHoverBackground);
+      }
+
+      .asset-card .actions button.copied {
+        background-color: var(--vscode-testing-iconPassed, #4caf50);
+        color: white;
       }
     </style>
   </head>
@@ -399,7 +509,13 @@ function getWebviewContent(
       <div class="upload-info">
         <p>Uploading to: <code>${folderParam.replace(/"/g, "") || "root"}</code></p>
       </div>
-      <div id="upload-area"></div>
+      <div class="upload-wrapper">
+        <div id="upload-area"></div>
+      </div>
+      <div id="uploaded-assets" style="display: none;">
+        <h3>✅ Uploaded Assets</h3>
+        <div id="asset-grid"></div>
+      </div>
     </div>
 
     <script>
@@ -463,7 +579,21 @@ function getWebviewContent(
           multiple: true,
           showAdvancedOptions: true,
           resourceType: "auto",
-          inlineContainer: "#upload-area"
+          inlineContainer: "#upload-area",
+          language: "en",
+          text: {
+            "en": {
+              "local": {
+                "dd_title_single": "Click Browse to select a file",
+                "dd_title_multi": "Click Browse to select files",
+                "drop_title_single": "Or drop a file here",
+                "drop_title_multi": "Or drop files here"
+              },
+              "url": {
+                "inner_title": "Enter a URL below (use Paste button above if Ctrl+V doesn't work)"
+              }
+            }
+          }
         };
 
         // Add folder configuration if specified
@@ -496,6 +626,8 @@ function getWebviewContent(
           baseConfig,
           function(error, result) {
             if (!error && result && result.event === "success") {
+              // Render the uploaded asset thumbnail
+              renderUploadedAsset(result.info);
               vscode.postMessage({ command: "uploadComplete" });
             } else if (error) {
               vscode.postMessage({ 
@@ -507,6 +639,103 @@ function getWebviewContent(
         );
 
         widget.open();
+      }
+
+      /**
+       * Generates a thumbnail URL for the uploaded asset
+       */
+      function getThumbnailUrl(asset) {
+        const cloudName = "${cloudName}";
+        const publicId = asset.public_id;
+        const resourceType = asset.resource_type;
+        
+        if (resourceType === 'image') {
+          // Use transformation for image thumbnails
+          return \`https://res.cloudinary.com/\${cloudName}/image/upload/w_120,h_120,c_fill,g_auto,f_auto,q_auto/\${publicId}\`;
+        } else if (resourceType === 'video') {
+          // Use video thumbnail with start offset
+          return \`https://res.cloudinary.com/\${cloudName}/video/upload/w_120,h_120,c_fill,so_auto,f_jpg/\${publicId}.jpg\`;
+        }
+        return null; // Raw files don't have thumbnails
+      }
+
+      /**
+       * Gets file extension icon for raw files
+       */
+      function getFileIcon(format) {
+        const icons = {
+          'pdf': '📄',
+          'doc': '📝',
+          'docx': '📝',
+          'xls': '📊',
+          'xlsx': '📊',
+          'zip': '📦',
+          'rar': '📦',
+          'json': '📋',
+          'xml': '📋',
+          'txt': '📃'
+        };
+        return icons[format?.toLowerCase()] || '📁';
+      }
+
+      /**
+       * Renders an uploaded asset card in the gallery
+       */
+      function renderUploadedAsset(asset) {
+        const container = document.getElementById('uploaded-assets');
+        const grid = document.getElementById('asset-grid');
+        
+        // Show the uploaded assets section
+        container.style.display = 'block';
+        
+        const thumbnailUrl = getThumbnailUrl(asset);
+        const isRaw = asset.resource_type === 'raw';
+        
+        const card = document.createElement('div');
+        card.className = 'asset-card';
+        
+        // Create thumbnail or file icon
+        let mediaHtml;
+        if (thumbnailUrl) {
+          mediaHtml = \`<img class="thumbnail" src="\${thumbnailUrl}" alt="Thumbnail" onerror="this.parentElement.innerHTML='<div class=\\\\'file-icon\\\\'>\${getFileIcon(asset.format)}</div>'" />\`;
+        } else {
+          mediaHtml = \`<div class="file-icon">\${getFileIcon(asset.format)}</div>\`;
+        }
+        
+        // Truncate public_id for display
+        const displayId = asset.public_id.length > 30 
+          ? '...' + asset.public_id.slice(-27) 
+          : asset.public_id;
+        
+        card.innerHTML = \`
+          \${mediaHtml}
+          <div class="public-id" title="\${asset.public_id}">\${displayId}</div>
+          <div class="actions">
+            <button onclick="copyToClipboard(this, '\${asset.secure_url}')">Copy URL</button>
+            <button onclick="copyToClipboard(this, '\${asset.public_id}')">Copy ID</button>
+          </div>
+        \`;
+        
+        // Add to the beginning of the grid
+        grid.insertBefore(card, grid.firstChild);
+      }
+
+      /**
+       * Copies text to clipboard and shows feedback
+       */
+      function copyToClipboard(button, text) {
+        navigator.clipboard.writeText(text).then(() => {
+          const originalText = button.textContent;
+          button.textContent = 'Copied!';
+          button.classList.add('copied');
+          setTimeout(() => {
+            button.textContent = originalText;
+            button.classList.remove('copied');
+          }, 1500);
+        }).catch(() => {
+          // Fallback: request clipboard write from extension
+          vscode.postMessage({ command: 'copyToClipboard', text: text });
+        });
       }
 
       /**
