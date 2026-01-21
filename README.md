@@ -12,7 +12,7 @@ Easily explore, search, preview, and upload Cloudinary assets directly inside Vi
 - **Search & Filter** – Quickly locate assets by public ID or type
 - **Optimized Preview** – Preview images/videos with Cloudinary transformations applied (`f_auto`, `q_auto`)
 - **Right-click Actions** – Copy Public ID or URL instantly
-- **Upload Widget** – Upload directly to root or folder via Cloudinary's embedded widget
+- **Custom Upload Panel** – Upload files via drag-and-drop, file browser, or remote URL with progress tracking
 - **Environment Switching** – Switch between different product environments defined in config
 - **Status Bar Indicator** – Shows the active Cloudinary environment
 
@@ -78,10 +78,22 @@ Once a valid configuration has been added, the active environment will be shown 
 - Select from configured environments
 
 ### Upload
-- Click Upload from the title bar to upload to the root, or click **Upload here** on a folder entry to upload to that folder.
-- Alternatively, run `Cloudinary: Upload`.
-- **Upload Presets**: The extension automatically detects and lets you choose from your configured upload presets before uploading. Upload presets allow you to define upload parameters like transformations, folder destinations, tags, and processing options that are applied consistently to your uploads.
-- **Learn more**: See the [Cloudinary Upload Presets documentation](https://cloudinary.com/documentation/upload_presets) for details on creating and configuring upload presets for different use cases.
+
+- Click **Upload** from the title bar to open the upload panel, or click **Upload here** on a folder entry to open with that folder pre-selected.
+- Alternatively, run `Cloudinary: Upload` from the command palette.
+
+**Upload Panel Features:**
+- **Drag & Drop** – Drag files directly onto the drop zone
+- **File Browser** – Click "Browse Files" to select files from your system
+- **Remote URL** – Paste a URL to upload from a remote source
+- **Folder Selection** – Choose the destination folder from a dropdown
+- **Upload Presets** – Select from your configured upload presets (view preset settings with the "Settings" toggle)
+- **Custom Public ID** – Specify a custom public ID for single file uploads
+- **Tags** – Add comma-separated tags to your uploads
+- **Progress Tracking** – See real-time upload progress for each file
+- **Uploaded Assets** – View thumbnails of uploaded assets, click to preview, copy URL or public ID
+
+**Learn more**: See the [Cloudinary Upload Presets documentation](https://cloudinary.com/documentation/upload_presets) for details on creating and configuring upload presets.
 
 ![Uploading assets](https://res.cloudinary.com/demo/video/upload/w_1200/f_auto:animated/q_auto/e_accelerate:100/e_loop/docs/vscode-extension-vid3)
 
@@ -97,8 +109,14 @@ Once a valid configuration has been added, the active environment will be shown 
   - **Copy Secure URL**
 
 ### Preview Assets
-- Click any asset to open a preview webview
+- Click any asset to open a preview panel
 - Supports images, videos, and raw files
+- **Compact Preview** – Assets display at a smaller size with an enlarge button
+- **Full-Size View** – Click the enlarge button to open a lightbox with the full-size asset
+- **Asset Info** – View public ID, dimensions, file size, and original filename
+- **Metadata** – View tags, context metadata, and structured metadata
+- **URLs** – Copy original or optimized URLs with one click
+- **Type Icons** – Tab icons indicate asset type (image, video, or file)
 
 ### Refresh Tree
 - Click "Refresh" to reload the tree
@@ -108,7 +126,7 @@ Once a valid configuration has been added, the active environment will be shown 
 ## Known Limitations
 - Asset filtering is limited to basic types (image, video, raw)
 - No options to control number of items returned in tree or root folder
-- Drag and drop and pasting URLs into the Upload widget is not supported yet
+- Folder dropdown in upload panel only shows folders that have been browsed in the tree view
 
 ---
 
