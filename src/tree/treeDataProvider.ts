@@ -275,4 +275,30 @@ export class CloudinaryTreeDataProvider implements vscode.TreeDataProvider<Cloud
       this._onDidChangeTreeData.fire(); // optional, if you want immediate refresh
     }
   }
+
+  /**
+   * Gets all folder paths that have been loaded/cached.
+   * Returns folder items from the assetMap for use in folder selectors.
+   */
+  public getAvailableFolders(): Array<{ path: string; name: string }> {
+    const folders: Array<{ path: string; name: string }> = [];
+
+    for (const [, items] of this.assetMap.entries()) {
+      for (const item of items) {
+        if (item.type === 'folder') {
+          // FolderData has path and name properties
+          const folderData = item.data as { path?: string; name?: string };
+          if (folderData.path) {
+            folders.push({
+              path: folderData.path,
+              name: folderData.name || item.label?.toString() || folderData.path,
+            });
+          }
+        }
+      }
+    }
+
+    // Sort by path for consistent ordering
+    return folders.sort((a, b) => a.path.localeCompare(b.path));
+  }
 }
