@@ -738,15 +738,14 @@ function getWelcomeContent(provider: CloudinaryTreeDataProvider): string {
             <pre>{
   "your-cloud-name": {
     "apiKey": "your-api-key",
-    "apiSecret": "your-api-secret",
-    "uploadPreset": "your-upload-preset"
-  },
-  "staging-cloud": {
-    "apiKey": "staging-api-key",
-    "apiSecret": "staging-api-secret",
-    "uploadPreset": "staging-preset"
+    "apiSecret": "your-api-secret"
   }
 }</pre>
+          </div>
+
+          <div class="info">
+            <strong>💡 Note:</strong> The <strong>cloud name is the key</strong> (the property name in the JSON, e.g., <code>"your-cloud-name"</code>). 
+            You can optionally add <code>"uploadPreset": "your-preset-name"</code> if you want to use a default upload preset.
           </div>
 
           <h4>🔑 Finding Your Credentials</h4>
@@ -754,7 +753,7 @@ function getWelcomeContent(provider: CloudinaryTreeDataProvider): string {
             <li>Go to your <span class="link" onclick="openExternal('https://console.cloudinary.com')">Cloudinary Console</span></li>
             <li>Navigate to <strong>Settings</strong> → <strong>API Keys</strong></li>
             <li>Copy your Cloud Name, API Key, and API Secret</li>
-            <li>Create an upload preset in <strong>Settings</strong> → <strong>Upload</strong></li>
+            <li>(Optional) Create an upload preset in <strong>Settings</strong> → <strong>Upload</strong> if you want to use preset-based configurations</li>
           </ol>
 
           <button class="button" onclick="openGlobalConfig()">Open Configuration File</button>
@@ -939,13 +938,7 @@ function getWelcomeContent(provider: CloudinaryTreeDataProvider): string {
         return JSON.stringify({
           "your-cloud-name": {
             "apiKey": "your-api-key",
-            "apiSecret": "your-api-secret",
-            "uploadPreset": "your-upload-preset"
-          },
-          "staging-cloud": {
-            "apiKey": "staging-api-key",
-            "apiSecret": "staging-api-secret",
-            "uploadPreset": "staging-preset"
+            "apiSecret": "your-api-secret"
           }
         }, null, 2);
       }

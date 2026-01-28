@@ -69,7 +69,7 @@ export async function activate(context: vscode.ExtensionContext) {
   cloudinaryProvider.cloudName = firstCloudName;
   cloudinaryProvider.apiKey = selectedEnv.apiKey;
   cloudinaryProvider.apiSecret = selectedEnv.apiSecret;
-  cloudinaryProvider.uploadPreset = selectedEnv.uploadPreset;
+  cloudinaryProvider.uploadPreset = selectedEnv.uploadPreset || null;
 
   // Set user platform for analytics
   (cloudinary.utils as any).userPlatform = generateUserAgent();
@@ -128,7 +128,7 @@ export async function activate(context: vscode.ExtensionContext) {
     cloudinaryProvider.cloudName = newCloudName;
     cloudinaryProvider.apiKey = env.apiKey;
     cloudinaryProvider.apiSecret = env.apiSecret;
-    cloudinaryProvider.uploadPreset = env.uploadPreset;
+    cloudinaryProvider.uploadPreset = env.uploadPreset || null;
 
     statusBar.text = `$(cloud) ${newCloudName}`;
     statusBar.tooltip = "Click to switch Cloudinary environment";

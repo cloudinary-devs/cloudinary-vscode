@@ -238,14 +238,16 @@ export class CloudinaryTreeDataProvider implements vscode.TreeDataProvider<Cloud
   }
 
   /**
-   * Gets the currently selected upload preset or the first available one.
-   * @returns The selected upload preset name or null if none available.
+   * Gets the currently configured default upload preset.
+   * @returns The configured upload preset name, or null if none configured (uses signed upload).
    */
   getCurrentUploadPreset(): string | null {
+    // Only return a preset if one is explicitly configured and exists
     if (this.uploadPreset && this.uploadPresets.some(p => p.name === this.uploadPreset)) {
       return this.uploadPreset;
     }
-    return this.uploadPresets.length > 0 ? this.uploadPresets[0].name : null;
+    // Default to null (signed upload) when no preset is configured
+    return null;
   }
 
   public updateLoadMoreItem(folderPath: string, nextCursor: string) {

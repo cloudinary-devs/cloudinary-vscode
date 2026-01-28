@@ -8,7 +8,7 @@ import { generateUserAgent } from "../utils/userAgent";
 interface CloudinaryEnvironment {
   apiKey: string;
   apiSecret: string;
-  uploadPreset: string;
+  uploadPreset?: string;  // Optional: Default upload preset
 }
 
 /**
@@ -44,7 +44,7 @@ function registerSwitchEnv(
           provider.cloudName = selected;
           provider.apiKey = env.apiKey;
           provider.apiSecret = env.apiSecret;
-          provider.uploadPreset = env.uploadPreset;
+          provider.uploadPreset = env.uploadPreset || null;
 
           const cacheKey = `cloudinary.dynamicFolders.${selected}`;
           const cachedFolderMode = context.globalState.get(cacheKey) as boolean | undefined;
