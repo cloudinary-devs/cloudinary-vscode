@@ -68,7 +68,13 @@ function registerSwitchEnv(
             api_secret: env.apiSecret,
           });
 
-          statusBar.text = `$(cloud) ${selected}`;
+          // Update status bar with folder mode indicator
+          const folderMode = provider.dynamicFolders ? "Dynamic" : "Fixed";
+          statusBar.text = `$(cloud) ${selected} $(folder) ${folderMode}`;
+          statusBar.tooltip = provider.dynamicFolders
+            ? "Click to switch Cloudinary environment\n\nDynamic Folders: Assets can be organized independently of their public ID"
+            : "Click to switch Cloudinary environment\n\nFixed Folders: Asset folder is determined by public ID path";
+
           provider.refresh({
             folderPath: '',
             nextCursor: null,

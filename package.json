@@ -87,6 +87,11 @@
         "category": "Cloudinary"
       },
       {
+        "command": "cloudinary.setSortOrder",
+        "title": " Sort",
+        "category": "Cloudinary"
+      },
+      {
         "command": "cloudinary.searchAssets",
         "title": " Search",
         "category": "Cloudinary"
@@ -133,6 +138,11 @@
           "command": "cloudinary.setResourceFilter",
           "when": "view == cloudinaryMediaLibrary",
           "group": "1_search@2"
+        },
+        {
+          "command": "cloudinary.setSortOrder",
+          "when": "view == cloudinaryMediaLibrary",
+          "group": "1_search@3"
         },
         {
           "command": "cloudinary.openGlobalConfig",

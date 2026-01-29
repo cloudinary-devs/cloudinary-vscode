@@ -24,9 +24,16 @@ export class CloudinaryTreeDataProvider implements vscode.TreeDataProvider<Cloud
     searchQuery: null as string | null,
     isPaginating: false,
     resourceTypeFilter: 'all' as 'image' | 'video' | 'raw' | 'all',
+    sortDirection: 'desc' as 'asc' | 'desc',
   };
 
   private assetMap: Map<string, CloudinaryItem[]> = new Map();
+
+  // Track folders currently being prefetched to prevent duplicate requests
+  private prefetchingFolders: Set<string> = new Set();
+
+  // Maximum assets to load per folder (to prevent endless fetching for huge folders)
+  private readonly MAX_ASSETS_PER_FOLDER = 5000;
 
   private _onDidChangeTreeData = new vscode.EventEmitter<CloudinaryItem | undefined | void>();
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
@@ -85,13 +92,24 @@ export class CloudinaryTreeDataProvider implements vscode.TreeDataProvider<Cloud
     append = false
   ): Promise<CloudinaryItem[]> {
     try {
-      const maxResults = 100;
-      const expression = folderPath ? `folder="${folderPath}"` : '';
+      const maxResults = 500;
+
+      // Build expression based on folder mode
+      // Dynamic folders: use asset_folder field to prevent duplicates
+      // Fixed folders: use folder field (or empty for root to get all, then filter)
+      let expression: string;
+      if (this.dynamicFolders) {
+        // Dynamic folders: use asset_folder to only get assets in this specific folder
+        expression = folderPath ? `asset_folder="${folderPath}"` : 'asset_folder=""';
+      } else {
+        // Fixed folders: use folder field (empty returns all, filtered below)
+        expression = folderPath ? `folder="${folderPath}"` : '';
+      }
 
       const folderPromise = cloudinary.api.sub_folders(folderPath);
       const assetQuery = cloudinary.search
         .expression(expression)
-        .sort_by('created_at', 'desc')
+        .sort_by('created_at', this.viewState.sortDirection)
         .max_results(maxResults)
         .with_field(["tags", "context", "metadata"]);
 
@@ -115,9 +133,12 @@ export class CloudinaryTreeDataProvider implements vscode.TreeDataProvider<Cloud
       );
 
       const filteredAssets = assetsResult.resources.filter((asset: any) => {
-        const isRootLoad = folderPath === '' && !this.dynamicFolders;
-        const isNestedAsset = asset.public_id.includes('/');
-        if (isRootLoad && isNestedAsset) { return false; }
+        // For fixed folders at root level, filter out nested assets (they'll appear in their folders)
+        if (!this.dynamicFolders && folderPath === '') {
+          const isNestedAsset = asset.public_id.includes('/');
+          if (isNestedAsset) { return false; }
+        }
+        // Apply resource type filter
         if (this.viewState.resourceTypeFilter === 'all') { return true; }
         return asset.resource_type?.toLowerCase() === this.viewState.resourceTypeFilter;
       });
@@ -141,19 +162,25 @@ export class CloudinaryTreeDataProvider implements vscode.TreeDataProvider<Cloud
         this.assetMap.set(folderPath, [...existing, ...newAssets]);
       }
 
-      if (assetsResult.next_cursor) {
+      // If there are more assets, start background pre-fetching
+      if (assetsResult.next_cursor && !append) {
         this.viewState.nextCursor = assetsResult.next_cursor;
-        const loadMoreItem = new CloudinaryItem(
-          'Load More...',
+
+        // Add a loading indicator while prefetching
+        const loadingItem = new CloudinaryItem(
+          'Loading more assets...',
           vscode.TreeItemCollapsibleState.None,
-          'loadMore',
-          {
-            folderPath,
-            nextCursor: assetsResult.next_cursor,
-          }
+          'loading',
+          { folderPath }
         );
-        const updatedList = this.assetMap.get(folderPath) || [];
-        this.assetMap.set(folderPath, [...updatedList, loadMoreItem]);
+        const currentList = this.assetMap.get(folderPath) || [];
+        this.assetMap.set(folderPath, [...currentList, loadingItem]);
+
+        // Start background prefetch (don't await - let it run async)
+        this.prefetchRemainingAssets(folderPath, assetsResult.next_cursor);
+      } else if (assetsResult.next_cursor && append) {
+        // Continue prefetching if this was a prefetch call with more data
+        this.viewState.nextCursor = assetsResult.next_cursor;
       } else {
         this.viewState.nextCursor = null;
       }
@@ -165,15 +192,163 @@ export class CloudinaryTreeDataProvider implements vscode.TreeDataProvider<Cloud
     }
   }
 
-  async searchAssets(query: string, nextCursor: string | null = null): Promise<CloudinaryItem[]> {
+  /**
+   * Background pre-fetches remaining assets for a folder.
+   * Runs asynchronously and updates the tree as more assets are loaded.
+   */
+  private async prefetchRemainingAssets(folderPath: string, initialCursor: string): Promise<void> {
+    // Prevent duplicate prefetching for the same folder
+    if (this.prefetchingFolders.has(folderPath)) {
+      return;
+    }
+    this.prefetchingFolders.add(folderPath);
+
     try {
-      const maxResults = 100;
+      let nextCursor: string | null = initialCursor;
+      let totalAssets = this.countAssetsInFolder(folderPath);
+
+      while (nextCursor && totalAssets < this.MAX_ASSETS_PER_FOLDER) {
+        const result = await this.fetchAssetsPage(folderPath, nextCursor);
+
+        if (result.assets.length === 0) {
+          break;
+        }
+
+        // Remove the loading indicator and append new assets
+        this.appendPrefetchedAssets(folderPath, result.assets, result.nextCursor);
+        totalAssets += result.assets.length;
+        nextCursor = result.nextCursor;
+
+        // Fire tree update to show new assets
+        this._onDidChangeTreeData.fire();
+      }
+
+      // Remove any remaining loading indicator
+      this.removeLoadingIndicator(folderPath);
+      this._onDidChangeTreeData.fire();
+    } catch (err: any) {
+      // Remove loading indicator on error
+      this.removeLoadingIndicator(folderPath);
+      this._onDidChangeTreeData.fire();
+      // Don't show error for background operations - they're non-critical
+      console.error('Background prefetch error:', err);
+    } finally {
+      this.prefetchingFolders.delete(folderPath);
+    }
+  }
+
+  /**
+   * Fetches a single page of assets for prefetching.
+   */
+  private async fetchAssetsPage(
+    folderPath: string,
+    cursor: string
+  ): Promise<{ assets: CloudinaryItem[]; nextCursor: string | null }> {
+    const maxResults = 500;
+
+    let expression: string;
+    if (this.dynamicFolders) {
+      expression = folderPath ? `asset_folder="${folderPath}"` : 'asset_folder=""';
+    } else {
+      expression = folderPath ? `folder="${folderPath}"` : '';
+    }
+
+    const assetQuery = cloudinary.search
+      .expression(expression)
+      .sort_by('created_at', this.viewState.sortDirection)
+      .max_results(maxResults)
+      .with_field(["tags", "context", "metadata"])
+      .next_cursor(cursor);
+
+    const assetsResult = await assetQuery.execute();
+
+    const filteredAssets = assetsResult.resources.filter((asset: any) => {
+      if (!this.dynamicFolders && folderPath === '') {
+        const isNestedAsset = asset.public_id.includes('/');
+        if (isNestedAsset) { return false; }
+      }
+      if (this.viewState.resourceTypeFilter === 'all') { return true; }
+      return asset.resource_type?.toLowerCase() === this.viewState.resourceTypeFilter;
+    });
+
+    const assets = filteredAssets.map(
+      (asset: any) =>
+        new CloudinaryItem(
+          asset.public_id,
+          vscode.TreeItemCollapsibleState.None,
+          'asset',
+          asset,
+          this.cloudName!,
+          this.dynamicFolders
+        )
+    );
+
+    return {
+      assets,
+      nextCursor: assetsResult.next_cursor || null,
+    };
+  }
+
+  /**
+   * Appends prefetched assets to the folder's cache.
+   */
+  private appendPrefetchedAssets(
+    folderPath: string,
+    newAssets: CloudinaryItem[],
+    hasMore: string | null
+  ): void {
+    const items = this.assetMap.get(folderPath) || [];
+
+    // Remove the loading indicator if present
+    const filteredItems = items.filter(item => item.type !== 'loading');
+
+    // Append new assets
+    const updatedItems = [...filteredItems, ...newAssets];
+
+    // Add loading indicator back if there's more to fetch
+    if (hasMore) {
+      updatedItems.push(
+        new CloudinaryItem(
+          'Loading more assets...',
+          vscode.TreeItemCollapsibleState.None,
+          'loading',
+          { folderPath }
+        )
+      );
+    }
+
+    this.assetMap.set(folderPath, updatedItems);
+  }
+
+  /**
+   * Removes the loading indicator from a folder.
+   */
+  private removeLoadingIndicator(folderPath: string): void {
+    const items = this.assetMap.get(folderPath);
+    if (!items) { return; }
+
+    const filteredItems = items.filter(item => item.type !== 'loading');
+    this.assetMap.set(folderPath, filteredItems);
+  }
+
+  /**
+   * Counts the number of assets currently loaded for a folder.
+   */
+  private countAssetsInFolder(folderPath: string): number {
+    const items = this.assetMap.get(folderPath) || [];
+    return items.filter(item => item.type === 'asset').length;
+  }
+
+  // Cache key for search results
+  private readonly SEARCH_CACHE_KEY = '__search__';
+
+  async searchAssets(query: string): Promise<CloudinaryItem[]> {
+    try {
+      const maxResults = 500;
       const searchQuery = cloudinary.search
         .expression(`${query}*`)
-        .sort_by('public_id', 'asc')
+        .sort_by('created_at', this.viewState.sortDirection)
         .max_results(maxResults);
-
-      if (nextCursor) { searchQuery.next_cursor(nextCursor); }
 
       const assetsResult = await searchQuery.execute();
 
@@ -189,25 +364,154 @@ export class CloudinaryTreeDataProvider implements vscode.TreeDataProvider<Cloud
           )
       );
 
+      // Store in cache
+      this.assetMap.set(this.SEARCH_CACHE_KEY, assets);
+
+      // If there are more results, start background pre-fetching
       if (assetsResult.next_cursor) {
-        assets.push(
-          new CloudinaryItem(
-            'Load More...',
-            vscode.TreeItemCollapsibleState.None,
-            'loadMore',
-            {
-              searchQuery: query,
-              nextCursor: assetsResult.next_cursor,
-            }
-          )
+        // Add loading indicator
+        const loadingItem = new CloudinaryItem(
+          'Loading more results...',
+          vscode.TreeItemCollapsibleState.None,
+          'loading',
+          { query }
         );
+        this.assetMap.set(this.SEARCH_CACHE_KEY, [...assets, loadingItem]);
+
+        // Start background prefetch
+        this.prefetchSearchResults(query, assetsResult.next_cursor);
       }
 
-      return assets;
+      return this.assetMap.get(this.SEARCH_CACHE_KEY) || assets;
     } catch (err: any) {
       handleCloudinaryError('Search failed', err);
       return [];
     }
+  }
+
+  /**
+   * Background pre-fetches remaining search results.
+   */
+  private async prefetchSearchResults(query: string, initialCursor: string): Promise<void> {
+    const prefetchKey = `search:${query}`;
+
+    // Prevent duplicate prefetching
+    if (this.prefetchingFolders.has(prefetchKey)) {
+      return;
+    }
+    this.prefetchingFolders.add(prefetchKey);
+
+    try {
+      let nextCursor: string | null = initialCursor;
+      let totalAssets = this.countSearchResults();
+
+      while (nextCursor && totalAssets < this.MAX_ASSETS_PER_FOLDER) {
+        const result = await this.fetchSearchPage(query, nextCursor);
+
+        if (result.assets.length === 0) {
+          break;
+        }
+
+        // Append new assets to search cache
+        this.appendSearchResults(result.assets, result.nextCursor);
+        totalAssets += result.assets.length;
+        nextCursor = result.nextCursor;
+
+        // Fire tree update
+        this._onDidChangeTreeData.fire();
+      }
+
+      // Remove loading indicator
+      this.removeSearchLoadingIndicator();
+      this._onDidChangeTreeData.fire();
+    } catch (err: any) {
+      this.removeSearchLoadingIndicator();
+      this._onDidChangeTreeData.fire();
+      console.error('Search prefetch error:', err);
+    } finally {
+      this.prefetchingFolders.delete(prefetchKey);
+    }
+  }
+
+  /**
+   * Fetches a single page of search results.
+   */
+  private async fetchSearchPage(
+    query: string,
+    cursor: string
+  ): Promise<{ assets: CloudinaryItem[]; nextCursor: string | null }> {
+    const maxResults = 500;
+
+    const searchQuery = cloudinary.search
+      .expression(`${query}*`)
+      .sort_by('created_at', this.viewState.sortDirection)
+      .max_results(maxResults)
+      .next_cursor(cursor);
+
+    const assetsResult = await searchQuery.execute();
+
+    const assets = assetsResult.resources.map(
+      (asset: any) =>
+        new CloudinaryItem(
+          asset.public_id,
+          vscode.TreeItemCollapsibleState.None,
+          'asset',
+          asset,
+          this.cloudName!,
+          this.dynamicFolders
+        )
+    );
+
+    return {
+      assets,
+      nextCursor: assetsResult.next_cursor || null,
+    };
+  }
+
+  /**
+   * Appends prefetched search results to the cache.
+   */
+  private appendSearchResults(newAssets: CloudinaryItem[], hasMore: string | null): void {
+    const items = this.assetMap.get(this.SEARCH_CACHE_KEY) || [];
+
+    // Remove loading indicator
+    const filteredItems = items.filter(item => item.type !== 'loading');
+
+    // Append new assets
+    const updatedItems = [...filteredItems, ...newAssets];
+
+    // Add loading indicator back if more to fetch
+    if (hasMore) {
+      updatedItems.push(
+        new CloudinaryItem(
+          'Loading more results...',
+          vscode.TreeItemCollapsibleState.None,
+          'loading',
+          {}
+        )
+      );
+    }
+
+    this.assetMap.set(this.SEARCH_CACHE_KEY, updatedItems);
+  }
+
+  /**
+   * Removes the loading indicator from search results.
+   */
+  private removeSearchLoadingIndicator(): void {
+    const items = this.assetMap.get(this.SEARCH_CACHE_KEY);
+    if (!items) { return; }
+
+    const filteredItems = items.filter(item => item.type !== 'loading');
+    this.assetMap.set(this.SEARCH_CACHE_KEY, filteredItems);
+  }
+
+  /**
+   * Counts the number of search results currently loaded.
+   */
+  private countSearchResults(): number {
+    const items = this.assetMap.get(this.SEARCH_CACHE_KEY) || [];
+    return items.filter(item => item.type === 'asset').length;
   }
 
   /**
@@ -248,34 +552,6 @@ export class CloudinaryTreeDataProvider implements vscode.TreeDataProvider<Cloud
     }
     // Default to null (signed upload) when no preset is configured
     return null;
-  }
-
-  public updateLoadMoreItem(folderPath: string, nextCursor: string) {
-    const items = this.assetMap.get(folderPath);
-    if (!items) { return; }
-
-    const index = items.findIndex(
-      (item) =>
-        item.type === "loadMore" &&
-        item.data.folderPath === folderPath &&
-        item.data.nextCursor === nextCursor
-    );
-
-    if (index !== -1) {
-      const updated = [...items];
-      updated.splice(
-        index,
-        1,
-        new CloudinaryItem(
-          "──── More assets loaded ────",
-          vscode.TreeItemCollapsibleState.None,
-          "divider",
-          {}
-        )
-      );
-      this.assetMap.set(folderPath, updated);
-      this._onDidChangeTreeData.fire(); // optional, if you want immediate refresh
-    }
   }
 
   /**
