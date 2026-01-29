@@ -1,7 +1,6 @@
 import * as vscode from "vscode";
 import registerSearch from "./searchAssets";
-import registerFilter from "./setResourceFilter";
-import registerSortOrder from "./setSortOrder";
+import registerViewOptions from "./viewOptions";
 import registerPreview from "./previewAsset";
 import registerUpload from "./uploadWidget";
 import registerClipboard from "./copyCommands";
@@ -34,8 +33,7 @@ function registerAllCommands(
 
   registerSearch(context, provider);
   registerClearSearch(context, provider);
-  registerFilter(context, provider);
-  registerSortOrder(context, provider);
+  registerViewOptions(context, provider);
   registerPreview(context);
   registerUpload(context, provider);
   registerClipboard(context);
