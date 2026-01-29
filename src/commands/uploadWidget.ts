@@ -44,14 +44,8 @@ function registerUpload(
   context.subscriptions.push(
     vscode.commands.registerCommand("cloudinary.openUploadWidget", async () => {
       try {
+        // Fetch presets but don't require them - signed uploads work without presets
         await provider.fetchUploadPresets();
-        const uploadPreset = provider.getCurrentUploadPreset();
-
-        if (!uploadPreset) {
-          vscode.window.showErrorMessage("No upload presets available. Please create one in your Cloudinary account.");
-          return;
-        }
-
         openOrRevealUploadPanel("", provider, context);
       } catch (err: any) {
         vscode.window.showErrorMessage(`Failed to open upload widget: ${err.message}`);
@@ -65,14 +59,8 @@ function registerUpload(
       "cloudinary.uploadToFolder",
       async (folderItem: { label: string; data: { path?: string } }) => {
         try {
+          // Fetch presets but don't require them - signed uploads work without presets
           await provider.fetchUploadPresets();
-          const uploadPreset = provider.getCurrentUploadPreset();
-
-          if (!uploadPreset) {
-            vscode.window.showErrorMessage("No upload presets available. Please create one in your Cloudinary account.");
-            return;
-          }
-
           const folderPath = folderItem.data.path || "";
           openOrRevealUploadPanel(folderPath, provider, context);
         } catch (err: any) {
@@ -234,11 +222,16 @@ function createUploadPanel(
     }
 
     // Get upload options based on current preset, folder, and optional overrides
-    const getUploadOptions = (presetName: string, folder: string, publicId?: string, tags?: string, fileName?: string) => {
+    // Upload preset is optional - signed uploads work without one
+    const getUploadOptions = (presetName: string | null | undefined, folder: string, publicId?: string, tags?: string, fileName?: string) => {
       const options: Record<string, any> = {
-        upload_preset: presetName,
         resource_type: "auto",
       };
+
+      // Only add upload_preset if one is selected (not null, undefined, or empty string)
+      if (presetName && presetName.trim()) {
+        options.upload_preset = presetName;
+      }
 
       // Add folder configuration
       if (folder) {
@@ -276,7 +269,8 @@ function createUploadPanel(
     };
 
     if (message.command === "uploadFile" && message.dataUri && message.fileId) {
-      const presetName = message.preset || currentPreset;
+      // Use nullish coalescing - empty string "" means "no preset" (signed upload)
+      const presetName = message.preset !== undefined ? message.preset : currentPreset;
       const folder = message.folderPath !== undefined ? message.folderPath : currentFolderPath;
       const options = getUploadOptions(presetName, folder, message.publicId, message.tags, message.fileName);
 
@@ -315,7 +309,8 @@ function createUploadPanel(
     }
 
     if (message.command === "uploadUrl" && message.url) {
-      const presetName = message.preset || currentPreset;
+      // Use nullish coalescing - empty string "" means "no preset" (signed upload)
+      const presetName = message.preset !== undefined ? message.preset : currentPreset;
       const folder = message.folderPath !== undefined ? message.folderPath : currentFolderPath;
       // Try to extract filename from URL for display_name
       let urlFileName: string | undefined;
@@ -1009,10 +1004,11 @@ function getWebviewContent(
         <!-- Preset Selector -->
         <div class="setting-group">
           <div class="preset-header">
-            <div class="setting-label">Upload Preset</div>
-            <button class="preset-details-toggle" id="presetDetailsToggle">Settings</button>
+            <div class="setting-label">Upload Preset <span style="opacity: 0.7; font-weight: normal;">(optional)</span></div>
+            ${provider.uploadPresets.length > 0 ? '<button class="preset-details-toggle" id="presetDetailsToggle">Settings</button>' : ''}
           </div>
           <select id="presetSelect">
+            <option value="">No preset (signed upload)</option>
             ${provider.uploadPresets
       .map(
         (preset) => `
@@ -1146,7 +1142,13 @@ function getWebviewContent(
        * Update preset details display
        */
       function updatePresetDetails() {
-        const preset = presets.find(p => p.name === presetSelect.value);
+        const selectedValue = presetSelect.value;
+        if (!selectedValue) {
+          // No preset selected - using signed upload
+          presetDetails.textContent = 'Using signed upload (no preset required)';
+          return;
+        }
+        const preset = presets.find(p => p.name === selectedValue);
         if (preset) {
           presetDetails.textContent = formatPresetSettings(preset.settings);
         }
@@ -1158,11 +1160,13 @@ function getWebviewContent(
       /**
        * Toggle preset details visibility
        */
-      presetDetailsToggle.addEventListener('click', () => {
-        const isVisible = presetDetails.classList.toggle('visible');
-        presetDetailsToggle.classList.toggle('expanded', isVisible);
-        presetDetailsToggle.textContent = isVisible ? 'Hide' : 'Settings';
-      });
+      if (presetDetailsToggle) {
+        presetDetailsToggle.addEventListener('click', () => {
+          const isVisible = presetDetails.classList.toggle('visible');
+          presetDetailsToggle.classList.toggle('expanded', isVisible);
+          presetDetailsToggle.textContent = isVisible ? 'Hide' : 'Settings';
+        });
+      }
 
       /**
        * Update preset details when selection changes
@@ -1185,10 +1189,10 @@ function getWebviewContent(
       }
 
       /**
-       * Get current preset
+       * Get current preset (returns null if no preset selected)
        */
       function getCurrentPreset() {
-        return presetSelect.value;
+        return presetSelect.value || null;
       }
 
       /**

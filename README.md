@@ -40,18 +40,14 @@ Auto-created with placeholder content on first use:
 
 ```json
 {
-  "your-cloud-name-1": {
-    "apiKey": "<your-api-key>",
-    "apiSecret": "<your-api-secret>",
-    "uploadPreset": "<your-default-upload-preset>"
-  },
-  "your-cloud-name-2": {
-    "apiKey": "<your-api-key>",
-    "apiSecret": "<your-api-secret>",
-    "uploadPreset": "<your-default-upload-preset>"
+  "REPLACE_WITH_YOUR_CLOUD_NAME": {
+    "apiKey": "REPLACE_WITH_YOUR_API_KEY",
+    "apiSecret": "REPLACE_WITH_YOUR_API_SECRET"
   }
 }
 ```
+
+> **Note:** The **cloud name is the key** (the property name in the JSON object). You can optionally add `"uploadPreset": "your-preset-name"` if you want to use a default upload preset.
 
 ### 2. **Workspace Config** (Optional override)
 You can also include a project-specific config:
@@ -87,13 +83,13 @@ Once a valid configuration has been added, the active environment will be shown 
 - **File Browser** – Click "Browse Files" to select files from your system
 - **Remote URL** – Paste a URL to upload from a remote source
 - **Folder Selection** – Choose the destination folder from a dropdown
-- **Upload Presets** – Select from your configured upload presets (view preset settings with the "Settings" toggle)
+- **Upload Presets** – Optionally select from your configured upload presets (signed uploads work without a preset)
 - **Custom Public ID** – Specify a custom public ID for single file uploads
 - **Tags** – Add comma-separated tags to your uploads
 - **Progress Tracking** – See real-time upload progress for each file
 - **Uploaded Assets** – View thumbnails of uploaded assets, click to preview, copy URL or public ID
 
-**Learn more**: See the [Cloudinary Upload Presets documentation](https://cloudinary.com/documentation/upload_presets) for details on creating and configuring upload presets.
+**Learn more**: See the [Cloudinary Upload Presets documentation](https://cloudinary.com/documentation/upload_presets) for details on creating and configuring upload presets (optional).
 
 ![Uploading assets](https://res.cloudinary.com/demo/video/upload/w_1200/f_auto:animated/q_auto/e_accelerate:100/e_loop/docs/vscode-extension-vid3)
 

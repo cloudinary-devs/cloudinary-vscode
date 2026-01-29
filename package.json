@@ -82,8 +82,9 @@
         "title": "  Refresh"
       },
       {
-        "command": "cloudinary.setResourceFilter",
-        "title": " Filter",
+        "command": "cloudinary.viewOptions",
+        "title": "View Options",
+        "icon": "$(filter)",
         "category": "Cloudinary"
       },
       {
@@ -104,6 +105,7 @@
       {
         "command": "cloudinary.openGlobalConfig",
         "title": "Config",
+        "icon": "$(gear)",
         "category": "Cloudinary"
       },
       {
@@ -127,17 +129,17 @@
         {
           "command": "cloudinary.searchAssets",
           "when": "view == cloudinaryMediaLibrary",
-          "group": "1_search@1"
+          "group": "navigation@3"
         },
         {
-          "command": "cloudinary.setResourceFilter",
+          "command": "cloudinary.viewOptions",
           "when": "view == cloudinaryMediaLibrary",
-          "group": "1_search@2"
+          "group": "navigation@4"
         },
         {
           "command": "cloudinary.openGlobalConfig",
           "when": "view == cloudinaryMediaLibrary",
-          "group": "2_config@1"
+          "group": "navigation@5"
         }
       ],
       "view/item/context": [

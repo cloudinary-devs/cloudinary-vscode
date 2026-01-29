@@ -15,6 +15,24 @@ import { generateUserAgent } from "./utils/userAgent";
 let statusBar: vscode.StatusBarItem;
 
 /**
+ * Returns the status bar text with cloud name and folder mode indicator.
+ */
+function getStatusBarText(cloudName: string, dynamicFolders: boolean): string {
+  const folderMode = dynamicFolders ? "Dynamic" : "Fixed";
+  return `$(cloud) ${cloudName} $(folder) ${folderMode}`;
+}
+
+/**
+ * Returns the status bar tooltip with folder mode explanation.
+ */
+function getStatusBarTooltip(dynamicFolders: boolean): string {
+  const modeDescription = dynamicFolders
+    ? "Dynamic Folders: Assets can be organized independently of their public ID"
+    : "Fixed Folders: Asset folder is determined by public ID path";
+  return `Click to switch Cloudinary environment\n\n${modeDescription}`;
+}
+
+/**
  * Called by VS Code on extension activation. Sets up provider, status bar, and commands.
  * @param context - Extension context provided by VS Code.
  */
@@ -69,7 +87,7 @@ export async function activate(context: vscode.ExtensionContext) {
   cloudinaryProvider.cloudName = firstCloudName;
   cloudinaryProvider.apiKey = selectedEnv.apiKey;
   cloudinaryProvider.apiSecret = selectedEnv.apiSecret;
-  cloudinaryProvider.uploadPreset = selectedEnv.uploadPreset;
+  cloudinaryProvider.uploadPreset = selectedEnv.uploadPreset || null;
 
   // Set user platform for analytics
   (cloudinary.utils as any).userPlatform = generateUserAgent();
@@ -84,6 +102,7 @@ export async function activate(context: vscode.ExtensionContext) {
     vscode.StatusBarAlignment.Right,
     500
   );
+  // Status bar text will be updated after folder mode detection
   statusBar.text = `$(cloud) ${cloudinaryProvider.cloudName}`;
   statusBar.tooltip = "Click to switch Cloudinary environment";
   statusBar.command = "cloudinary.switchEnvironment";
@@ -128,11 +147,7 @@ export async function activate(context: vscode.ExtensionContext) {
     cloudinaryProvider.cloudName = newCloudName;
     cloudinaryProvider.apiKey = env.apiKey;
     cloudinaryProvider.apiSecret = env.apiSecret;
-    cloudinaryProvider.uploadPreset = env.uploadPreset;
-
-    statusBar.text = `$(cloud) ${newCloudName}`;
-    statusBar.tooltip = "Click to switch Cloudinary environment";
-    statusBar.command = "cloudinary.switchEnvironment";
+    cloudinaryProvider.uploadPreset = env.uploadPreset || null;
 
     // Update user platform for analytics
     (cloudinary.utils as any).userPlatform = generateUserAgent();
@@ -156,6 +171,11 @@ export async function activate(context: vscode.ExtensionContext) {
       );
       context.globalState.update(cacheKey, cloudinaryProvider.dynamicFolders);
     }
+
+    // Update status bar with folder mode indicator
+    statusBar.text = getStatusBarText(newCloudName!, cloudinaryProvider.dynamicFolders);
+    statusBar.tooltip = getStatusBarTooltip(cloudinaryProvider.dynamicFolders);
+    statusBar.command = "cloudinary.switchEnvironment";
 
     cloudinaryProvider.refresh({
       folderPath: '',
@@ -181,6 +201,10 @@ export async function activate(context: vscode.ExtensionContext) {
     );
     context.globalState.update(cacheKey, cloudinaryProvider.dynamicFolders);
   }
+
+  // Update status bar with folder mode indicator
+  statusBar.text = getStatusBarText(cloudinaryProvider.cloudName, cloudinaryProvider.dynamicFolders);
+  statusBar.tooltip = getStatusBarTooltip(cloudinaryProvider.dynamicFolders);
 
   vscode.window.registerTreeDataProvider(
     "cloudinaryMediaLibrary",
