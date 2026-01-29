@@ -102,7 +102,21 @@ function openOrRevealUploadPanel(
 }
 
 /**
+ * Size threshold (in bytes) above which to use chunked upload.
+ * Files over 100 MB require chunked upload to avoid 413 errors.
+ * We use a lower threshold (20 MB) for better reliability.
+ */
+const CHUNKED_UPLOAD_THRESHOLD = 20 * 1024 * 1024; // 20 MB
+
+/**
+ * Chunk size for chunked uploads. 6 MB is a good balance between
+ * network resilience and upload speed.
+ */
+const UPLOAD_CHUNK_SIZE = 6 * 1024 * 1024; // 6 MB
+
+/**
  * Uploads a file to Cloudinary with progress tracking.
+ * Uses chunked upload for large files to avoid 413 errors.
  */
 async function uploadWithProgress(
   panel: vscode.WebviewPanel,
@@ -110,30 +124,50 @@ async function uploadWithProgress(
   options: Record<string, any>,
   fileId: string
 ): Promise<any> {
-  return new Promise((resolve, reject) => {
-    const uploadStream = cloudinary.uploader.upload_stream(
-      options,
-      (error, result) => {
-        if (error) {
-          reject(error);
-        } else {
-          resolve(result);
-        }
-      }
-    );
+  // Convert data URI to buffer
+  const base64Data = dataUri.split(",")[1];
+  const buffer = Buffer.from(base64Data, "base64");
 
-    // Convert data URI to buffer
-    const base64Data = dataUri.split(",")[1];
-    const buffer = Buffer.from(base64Data, "base64");
+  // Use chunked upload for large files to avoid 413 errors
+  const useChunkedUpload = buffer.length > CHUNKED_UPLOAD_THRESHOLD;
+
+  return new Promise((resolve, reject) => {
+    let uploadStream;
+
+    if (useChunkedUpload) {
+      // Use chunked upload for large files
+      uploadStream = cloudinary.uploader.upload_chunked_stream(
+        { ...options, chunk_size: UPLOAD_CHUNK_SIZE },
+        (error, result) => {
+          if (error) {
+            reject(error);
+          } else {
+            resolve(result);
+          }
+        }
+      );
+    } else {
+      // Use standard upload stream for smaller files
+      uploadStream = cloudinary.uploader.upload_stream(
+        options,
+        (error, result) => {
+          if (error) {
+            reject(error);
+          } else {
+            resolve(result);
+          }
+        }
+      );
+    }
 
     // Create readable stream with progress tracking
     let uploaded = 0;
     const total = buffer.length;
-    const chunkSize = 64 * 1024; // 64KB chunks
+    const progressChunkSize = 64 * 1024; // 64KB chunks for progress reporting
 
     const readable = new Readable({
       read() {
-        const chunk = buffer.slice(uploaded, uploaded + chunkSize);
+        const chunk = buffer.slice(uploaded, uploaded + progressChunkSize);
         if (chunk.length > 0) {
           uploaded += chunk.length;
           const percent = Math.round((uploaded / total) * 100);
