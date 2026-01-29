@@ -4,6 +4,7 @@
 # Development files
 .vscode/**
 .vscode-test/**
+.cursor/**
 .github/**
 esbuild.js
 
@@ -47,3 +48,4 @@ Thumbs.db
 
 # Internal development
 internal/**
+temp/**
