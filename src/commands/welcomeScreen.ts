@@ -35,7 +35,7 @@ function createWelcomePanel(
       enableScripts: true,
       retainContextWhenHidden: true,
       localResourceRoots: [
-        vscode.Uri.joinPath(context.extensionUri, "src", "webview", "media"),
+        vscode.Uri.joinPath(context.extensionUri, "media"),
       ],
     }
   );
@@ -58,7 +58,6 @@ function createWelcomePanel(
     extensionUri: context.extensionUri,
     bodyContent: getWelcomeContent(provider),
     additionalScripts: [welcomeScriptUri],
-    inlineScript: "initCommon();",
   });
 
   panel.webview.onDidReceiveMessage((message: { command: string; data?: any }) => {

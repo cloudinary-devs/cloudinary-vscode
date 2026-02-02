@@ -34,7 +34,6 @@ export interface WebviewMediaUris {
   tokensUri: vscode.Uri;
   baseUri: vscode.Uri;
   componentsUri: vscode.Uri;
-  commonScriptUri: vscode.Uri;
 }
 
 /**
@@ -46,16 +45,13 @@ export function getMediaUris(
 ): WebviewMediaUris {
   return {
     tokensUri: getWebviewUri(webview, extensionUri, [
-      "src", "webview", "media", "styles", "tokens.css"
+      "media", "styles", "tokens.css"
     ]),
     baseUri: getWebviewUri(webview, extensionUri, [
-      "src", "webview", "media", "styles", "base.css"
+      "media", "styles", "base.css"
     ]),
     componentsUri: getWebviewUri(webview, extensionUri, [
-      "src", "webview", "media", "styles", "components.css"
-    ]),
-    commonScriptUri: getWebviewUri(webview, extensionUri, [
-      "src", "webview", "media", "scripts", "common.js"
+      "media", "styles", "components.css"
     ]),
   };
 }
@@ -69,7 +65,7 @@ export function getScriptUri(
   scriptName: string
 ): vscode.Uri {
   return getWebviewUri(webview, extensionUri, [
-    "src", "webview", "media", "scripts", scriptName
+    "media", "scripts", scriptName
   ]);
 }
 
@@ -114,10 +110,10 @@ export function createWebviewDocument(options: WebviewDocumentOptions): string {
   } = options;
 
   const nonce = getNonce();
-  const { tokensUri, baseUri, componentsUri, commonScriptUri } = getMediaUris(webview, extensionUri);
+  const { tokensUri, baseUri, componentsUri } = getMediaUris(webview, extensionUri);
   const csp = getCSP(webview, nonce);
 
-  const additionalScriptTags = additionalScripts
+  const scriptTags = additionalScripts
     .map((uri) => `<script nonce="${nonce}" src="${uri}"></script>`)
     .join("\n    ");
 
@@ -139,8 +135,7 @@ export function createWebviewDocument(options: WebviewDocumentOptions): string {
 <body${bodyClass ? ` class="${bodyClass}"` : ""}>
   ${bodyContent}
   
-  <script nonce="${nonce}" src="${commonScriptUri}"></script>
-  ${additionalScriptTags}
+  ${scriptTags}
   ${inlineScriptTag}
 </body>
 </html>`;

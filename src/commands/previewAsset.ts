@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { createWebviewDocument } from "../webview/webviewUtils";
+import { createWebviewDocument, getScriptUri } from "../webview/webviewUtils";
 import { escapeHtml, formatFileSize } from "../webview/utils/helpers";
 import { assetIcons, actionIcons } from "../webview/icons";
 
@@ -65,7 +65,7 @@ function registerPreview(context: vscode.ExtensionContext) {
           {
             enableScripts: true,
             localResourceRoots: [
-              vscode.Uri.joinPath(context.extensionUri, "src", "webview", "media"),
+              vscode.Uri.joinPath(context.extensionUri, "media"),
             ],
           }
         );
@@ -91,6 +91,13 @@ function registerPreview(context: vscode.ExtensionContext) {
           openPanels.delete(publicId);
         });
 
+        // Get the preview script
+        const previewScriptUri = getScriptUri(
+          panel.webview,
+          context.extensionUri,
+          "preview.js"
+        );
+
         // Set the HTML content
         panel.webview.html = createWebviewDocument({
           title: asset.public_id,
@@ -98,7 +105,7 @@ function registerPreview(context: vscode.ExtensionContext) {
           extensionUri: context.extensionUri,
           bodyContent: getPreviewContent(asset),
           bodyClass: "layout-centered",
-          inlineScript: "initCommon();",
+          additionalScripts: [previewScriptUri],
         });
 
         // Handle messages from webview

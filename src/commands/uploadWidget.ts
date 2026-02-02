@@ -221,7 +221,7 @@ function createUploadPanel(
       enableScripts: true,
       retainContextWhenHidden: true,
       localResourceRoots: [
-        vscode.Uri.joinPath(context.extensionUri, "src", "webview", "media"),
+        vscode.Uri.joinPath(context.extensionUri, "media"),
       ],
     }
   );
@@ -245,7 +245,6 @@ function createUploadPanel(
   // Configuration to pass to the webview
   const presetsJson = JSON.stringify(provider.uploadPresets);
   const initScript = `
-    initCommon();
     initUploadWidget({
       cloudName: "${escapeHtml(cloudName)}",
       presets: ${presetsJson}

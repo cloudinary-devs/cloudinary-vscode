@@ -1,8 +1,0 @@
-/**
- * Main stylesheet for Cloudinary VS Code extension webviews.
- * Imports all design system styles in the correct order.
- */
-
-@import url('./tokens.css');
-@import url('./base.css');
-@import url('./components.css');
