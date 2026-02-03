@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - **Chunked upload for large files** - Files over 100MB now upload reliably using chunked upload API
+- **Video preview playback** - Added `media-src` to Content Security Policy to allow video/audio playback
 - Prevented duplicate preview panels opening for the same asset
 
 ### Removed

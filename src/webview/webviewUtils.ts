@@ -78,6 +78,7 @@ export function getCSP(webview: vscode.Webview, nonce: string): string {
     `style-src ${webview.cspSource} 'unsafe-inline'`,
     `script-src ${webview.cspSource} 'nonce-${nonce}'`,
     `img-src ${webview.cspSource} https: data:`,
+    `media-src ${webview.cspSource} https:`,
     `font-src ${webview.cspSource}`,
   ].join("; ");
 }
