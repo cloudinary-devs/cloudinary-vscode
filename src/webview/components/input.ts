@@ -267,14 +267,14 @@ export function createInput(options: InputOptions): string {
     `class="${inputClasses}"`,
   ];
 
-  if (name) attributes.push(`name="${escapeHtml(name)}"`);
-  if (placeholder) attributes.push(`placeholder="${escapeHtml(placeholder)}"`);
-  if (value !== undefined) attributes.push(`value="${escapeHtml(value)}"`);
-  if (required) attributes.push("required");
-  if (disabled) attributes.push("disabled");
-  if (onChange) attributes.push(`onchange="${onChange}"`);
-  if (onInput) attributes.push(`oninput="${onInput}"`);
-  if (onKeypress) attributes.push(`onkeypress="${onKeypress}"`);
+  if (name) {attributes.push(`name="${escapeHtml(name)}"`);}
+  if (placeholder) {attributes.push(`placeholder="${escapeHtml(placeholder)}"`);}
+  if (value !== undefined) {attributes.push(`value="${escapeHtml(value)}"`);}
+  if (required) {attributes.push("required");}
+  if (disabled) {attributes.push("disabled");}
+  if (onChange) {attributes.push(`onchange="${onChange}"`);}
+  if (onInput) {attributes.push(`oninput="${onInput}"`);}
+  if (onKeypress) {attributes.push(`onkeypress="${onKeypress}"`);}
 
   const inputHtml = `<input ${attributes.join(" ")} />`;
 
@@ -330,10 +330,10 @@ export function createSelect(options: SelectOptions): string {
     `class="${selectClasses}"`,
   ];
 
-  if (name) attributes.push(`name="${escapeHtml(name)}"`);
-  if (required) attributes.push("required");
-  if (disabled) attributes.push("disabled");
-  if (onChange) attributes.push(`onchange="${onChange}"`);
+  if (name) {attributes.push(`name="${escapeHtml(name)}"`);}
+  if (required) {attributes.push("required");}
+  if (disabled) {attributes.push("disabled");}
+  if (onChange) {attributes.push(`onchange="${onChange}"`);}
 
   const optionsHtml = selectOptions
     .map((opt) => {

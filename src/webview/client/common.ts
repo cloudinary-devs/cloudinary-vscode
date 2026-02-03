@@ -50,7 +50,7 @@ export function truncateString(
   maxLength: number,
   position: "start" | "middle" | "end" = "end"
 ): string {
-  if (str.length <= maxLength) return str;
+  if (str.length <= maxLength) {return str;}
 
   switch (position) {
     case "start":
@@ -69,7 +69,7 @@ export function truncateString(
  * Format bytes to human readable size.
  */
 export function formatFileSize(bytes: number): string {
-  if (bytes === 0) return "0 B";
+  if (bytes === 0) {return "0 B";}
   const k = 1024;
   const sizes = ["B", "KB", "MB", "GB", "TB"];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
@@ -132,7 +132,7 @@ export function initTabs(): void {
 
   tabContainers.forEach((container) => {
     const nav = container.querySelector<HTMLElement>(":scope > .tabs__nav");
-    if (!nav) return;
+    if (!nav) {return;}
 
     const buttons = nav.querySelectorAll<HTMLButtonElement>(":scope > .tabs__btn");
     const contents = container.querySelectorAll<HTMLElement>(":scope > .tabs__content");

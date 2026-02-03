@@ -63,7 +63,7 @@ function initPresetDetails(): void {
   const presetDetailsToggle = document.getElementById("presetDetailsToggle");
   const presetDetails = document.getElementById("presetDetails");
 
-  if (!presetSelect || !presetDetails) return;
+  if (!presetSelect || !presetDetails) {return;}
 
   function formatPresetSettings(settings?: Record<string, unknown>): string {
     if (!settings || Object.keys(settings).length === 0) {
@@ -73,13 +73,13 @@ function initPresetDetails(): void {
       .map(([key, value]) => {
         const formattedKey = key.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
         let formattedValue: string;
-        if (value === "0" || value === 0) formattedValue = "No";
-        else if (value === "1" || value === 1) formattedValue = "Yes";
-        else if (value === "true") formattedValue = "Yes";
-        else if (value === "false") formattedValue = "No";
-        else if (Array.isArray(value)) formattedValue = value.join(", ");
-        else if (typeof value === "object") formattedValue = JSON.stringify(value);
-        else formattedValue = String(value);
+        if (value === "0" || value === 0) {formattedValue = "No";}
+        else if (value === "1" || value === 1) {formattedValue = "Yes";}
+        else if (value === "true") {formattedValue = "Yes";}
+        else if (value === "false") {formattedValue = "No";}
+        else if (Array.isArray(value)) {formattedValue = value.join(", ");}
+        else if (typeof value === "object") {formattedValue = JSON.stringify(value);}
+        else {formattedValue = String(value);}
         return `${formattedKey}: ${formattedValue}`;
       })
       .join("\n");
@@ -129,7 +129,7 @@ function initFileUpload(): void {
   const browseBtn = document.getElementById("browseBtn");
   const fileInput = document.getElementById("fileInput") as HTMLInputElement | null;
 
-  if (!dropZone || !fileInput) return;
+  if (!dropZone || !fileInput) {return;}
 
   if (browseBtn) {
     browseBtn.addEventListener("click", (e) => {
@@ -172,7 +172,7 @@ function initFileUpload(): void {
  */
 function processFiles(files: File[]): void {
   const vscode = getVSCode();
-  if (!vscode) return;
+  if (!vscode) {return;}
 
   const { preset, folder, publicId, tags } = getFormValues();
 
@@ -203,7 +203,7 @@ function processFiles(files: File[]): void {
 
   if (files.length === 1 && publicId) {
     const publicIdInput = document.getElementById("publicIdInput") as HTMLInputElement | null;
-    if (publicIdInput) publicIdInput.value = "";
+    if (publicIdInput) {publicIdInput.value = "";}
   }
 }
 
@@ -214,13 +214,13 @@ function initUrlUpload(): void {
   const urlInput = document.getElementById("urlInput") as HTMLInputElement | null;
   const uploadUrlBtn = document.getElementById("uploadUrlBtn");
 
-  if (!urlInput || !uploadUrlBtn) return;
+  if (!urlInput || !uploadUrlBtn) {return;}
 
   const vscode = getVSCode();
 
   uploadUrlBtn.addEventListener("click", () => {
     const url = urlInput.value.trim();
-    if (!url || !vscode) return;
+    if (!url || !vscode) {return;}
 
     const { preset, folder, publicId, tags } = getFormValues();
     const fileId = generateId("url");
@@ -239,7 +239,7 @@ function initUrlUpload(): void {
 
     urlInput.value = "";
     const publicIdInput = document.getElementById("publicIdInput") as HTMLInputElement | null;
-    if (publicIdInput) publicIdInput.value = "";
+    if (publicIdInput) {publicIdInput.value = "";}
   });
 
   urlInput.addEventListener("keypress", (e) => {
@@ -260,9 +260,9 @@ function initClearButton(): void {
 
   if (clearBtn) {
     clearBtn.addEventListener("click", () => {
-      if (assetGrid) assetGrid.innerHTML = "";
-      if (uploadQueue) uploadQueue.innerHTML = "";
-      if (uploadedAssets) uploadedAssets.classList.add("hidden");
+      if (assetGrid) {assetGrid.innerHTML = "";}
+      if (uploadQueue) {uploadQueue.innerHTML = "";}
+      if (uploadedAssets) {uploadedAssets.classList.add("hidden");}
     });
   }
 }
@@ -289,7 +289,7 @@ function initFolderChange(): void {
  */
 function addToQueue(fileId: string, fileName: string): void {
   const uploadQueue = document.getElementById("upload-queue");
-  if (!uploadQueue) return;
+  if (!uploadQueue) {return;}
 
   const item = document.createElement("div");
   item.className = "queue-item";
@@ -320,19 +320,19 @@ function updateQueueItem(
   errorMsg?: string
 ): void {
   const uploadQueue = document.getElementById("upload-queue");
-  if (!uploadQueue) return;
+  if (!uploadQueue) {return;}
 
   const item = uploadQueue.querySelector(`[data-file-id="${fileId}"]`);
-  if (!item) return;
+  if (!item) {return;}
 
   const progressBar = item.querySelector<HTMLElement>(".progress__bar");
   const statusEl = item.querySelector(".queue-item__status");
 
   item.className = "queue-item";
-  if (status === "complete") item.classList.add("queue-item--complete");
-  if (status === "error") item.classList.add("queue-item--error");
+  if (status === "complete") {item.classList.add("queue-item--complete");}
+  if (status === "error") {item.classList.add("queue-item--error");}
 
-  if (progressBar) progressBar.style.width = progress + "%";
+  if (progressBar) {progressBar.style.width = progress + "%";}
 
   if (statusEl) {
     if (status === "uploading") {
@@ -368,7 +368,7 @@ function renderUploadedAsset(asset: AssetData): void {
   const uploadedAssets = document.getElementById("uploaded-assets");
   const assetGrid = document.getElementById("asset-grid");
 
-  if (!uploadedAssets || !assetGrid) return;
+  if (!uploadedAssets || !assetGrid) {return;}
 
   uploadedAssets.classList.remove("hidden");
 
@@ -423,7 +423,7 @@ function renderUploadedAsset(asset: AssetData): void {
     img.addEventListener("error", function () {
       this.style.display = "none";
       const fallback = this.parentElement?.querySelector<HTMLElement>(".fallback");
-      if (fallback) fallback.style.display = "flex";
+      if (fallback) {fallback.style.display = "flex";}
     });
   }
 
@@ -448,20 +448,20 @@ function renderUploadedAsset(asset: AssetData): void {
 function handleUploadMessage(message: UploadMessage): void {
   switch (message.command) {
     case "uploadStarted":
-      if (message.fileId) updateQueueItem(message.fileId, "uploading", 0);
+      if (message.fileId) {updateQueueItem(message.fileId, "uploading", 0);}
       break;
 
     case "uploadProgress":
-      if (message.fileId) updateQueueItem(message.fileId, "uploading", message.percent || 0);
+      if (message.fileId) {updateQueueItem(message.fileId, "uploading", message.percent || 0);}
       break;
 
     case "uploadComplete":
-      if (message.fileId) updateQueueItem(message.fileId, "complete", 100);
-      if (message.asset) renderUploadedAsset(message.asset);
+      if (message.fileId) {updateQueueItem(message.fileId, "complete", 100);}
+      if (message.asset) {renderUploadedAsset(message.asset);}
       break;
 
     case "uploadError":
-      if (message.fileId) updateQueueItem(message.fileId, "error", 0, message.error);
+      if (message.fileId) {updateQueueItem(message.fileId, "error", 0, message.error);}
       break;
 
     case "setFolder": {
