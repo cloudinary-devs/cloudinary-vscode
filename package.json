@@ -3,7 +3,7 @@
   "publisher": "Cloudinary",
   "displayName": "Cloudinary",
   "description": "Easily find and manage your Cloudinary assets directly from Visual Studio Code.",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "icon": "resources/cloudinary_icon_blue.png",
   "repository": {
     "type": "git",

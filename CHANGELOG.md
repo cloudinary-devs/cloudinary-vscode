@@ -5,6 +5,30 @@ All notable changes to the Cloudinary VS Code extension will be documented in th
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.3] - 2026-02-03
+
+### Added
+- **New upload UI** - Simpler UI with easy drag and dropping of files directly onto the upload widget with visual feedback
+- **Upload progress tracking** - Real-time progress indicators for file uploads
+- **Uploaded asset gallery** - View thumbnails of recently uploaded assets with quick actions
+- **Dynamic folder selection** - Select target folder directly in upload widget
+- **View Options command** - New unified command for filtering and sorting assets
+- **Status bar folder mode** - Shows whether environment uses Dynamic or Fixed folder mode
+- **Developer documentation** - Architecture guides in `docs/` folder
+
+### Changed
+- **Upload presets are now optional** - Omit preset to use signed uploads (previously required)
+- Improved asset preview metadata display
+- Refactored webview system with external CSS/JS for better maintainability
+
+### Fixed
+- **Chunked upload for large files** - Files over 100MB now upload reliably using chunked upload API
+- Prevented duplicate preview panels opening for the same asset
+
+### Removed
+- "Load More Assets" command (replaced by automatic loading indicator)
+- Separate "Set Resource Filter" and "Set Sort Order" commands (replaced by "View Options")
+
 ## [0.1.2] - 2025-11-13
 
 ### Fixed
