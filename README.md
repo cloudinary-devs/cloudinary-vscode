@@ -128,13 +128,15 @@ Once a valid configuration has been added, the active environment will be shown 
 
 ## Contribute
 
-Got feedback or feature ideas? Open an issue.
+Got feedback or feature ideas? See [CONTRIBUTING.md](./CONTRIBUTING.md) or open an issue.
 
 ---
 
 ## Resources
 
 - [Cloudinary Documentation](https://cloudinary.com/documentation)
+- [Cloudinary Upload Presets](https://cloudinary.com/documentation/upload_presets)
+- [Cloudinary Admin API](https://cloudinary.com/documentation/admin_api)
 
 ---
 
