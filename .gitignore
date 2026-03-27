@@ -46,6 +46,8 @@ Thumbs.db
 *.swo
 *~
 .cursor/
+.claude/
+CLAUDE.md
 
 # Temporary files
 *.tmp

@@ -246,7 +246,7 @@ function createUploadPanel(
   const presetsJson = JSON.stringify(provider.uploadPresets);
   const initScript = `
     initUploadWidget({
-      cloudName: "${escapeHtml(cloudName)}",
+      cloudName: ${JSON.stringify(cloudName)},
       presets: ${presetsJson}
     });
   `;

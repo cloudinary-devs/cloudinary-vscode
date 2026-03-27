@@ -52,7 +52,6 @@ export * from "./components";
 
 // Utility scripts
 export * from "./utils";
-import { escapeHtml } from "./utils/helpers";
 
 // Icons
 export {
@@ -115,65 +114,4 @@ export function getCompleteScripts(): string {
   ].join("\n");
 }
 
-/**
- * Creates a complete HTML document for a webview panel.
- * 
- * @param options - Document configuration
- * @returns Complete HTML string
- * 
- * @example
- * ```typescript
- * panel.webview.html = createWebviewDocument({
- *   title: 'Upload to Cloudinary',
- *   body: createPanel({ content: '...' }),
- *   additionalStyles: '.custom { color: red; }',
- *   additionalScripts: 'console.log("Hello");'
- * });
- * ```
- */
-export function createWebviewDocument(options: {
-  /** Document title */
-  title: string;
-  /** Body content (HTML string) */
-  body: string;
-  /** Additional CSS to include */
-  additionalStyles?: string;
-  /** Additional JavaScript to include */
-  additionalScripts?: string;
-  /** Whether to include all component scripts (default: true) */
-  includeScripts?: boolean;
-}): string {
-  const {
-    title,
-    body,
-    additionalStyles = "",
-    additionalScripts = "",
-    includeScripts = true,
-  } = options;
-
-  const styles = getCompleteStyles();
-  const scripts = includeScripts ? getCompleteScripts() : "";
-
-  return `
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-      <meta charset="UTF-8" />
-      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-      <title>${escapeHtml(title)}</title>
-      <style>
-        ${styles}
-        ${additionalStyles}
-      </style>
-    </head>
-    <body>
-      ${body}
-      <script>
-        ${scripts}
-        ${additionalScripts}
-      </script>
-    </body>
-    </html>
-  `;
-}
 
