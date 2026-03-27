@@ -297,15 +297,28 @@ function addToQueue(fileId: string, fileName: string): void {
 
   const displayName = truncateString(fileName, 30, "middle");
 
-  item.innerHTML = `
-    <span class="queue-item__name" title="${fileName}">${displayName}</span>
-    <div class="queue-item__progress">
-      <div class="progress">
-        <div class="progress__bar" style="width: 0%"></div>
-      </div>
-    </div>
-    <span class="queue-item__status">Pending...</span>
-  `;
+  const nameEl = document.createElement("span");
+  nameEl.className = "queue-item__name";
+  nameEl.title = fileName;
+  nameEl.textContent = displayName;
+
+  const progressBar = document.createElement("div");
+  progressBar.className = "progress__bar";
+  progressBar.style.width = "0%";
+  const progress = document.createElement("div");
+  progress.className = "progress";
+  progress.appendChild(progressBar);
+  const progressWrapper = document.createElement("div");
+  progressWrapper.className = "queue-item__progress";
+  progressWrapper.appendChild(progress);
+
+  const statusEl = document.createElement("span");
+  statusEl.className = "queue-item__status";
+  statusEl.textContent = "Pending...";
+
+  item.appendChild(nameEl);
+  item.appendChild(progressWrapper);
+  item.appendChild(statusEl);
 
   uploadQueue.appendChild(item);
 }
@@ -378,52 +391,77 @@ function renderUploadedAsset(asset: AssetData): void {
   const card = document.createElement("div");
   card.className = "asset-card";
 
-  const fileIcon =
-    "<svg width='48' height='48' viewBox='0 0 24 24' fill='currentColor'><path d='M14 2H6C4.9 2 4 2.9 4 4V20C4 21.1 4.9 22 6 22H18C19.1 22 20 21.1 20 20V8L14 2ZM18 20H6V4H13V9H18V20ZM9 13H15V15H9V13ZM9 17H15V19H9V17Z'/></svg>";
+  // Static SVG icon — no user data
+  const fileIconSvg = "<svg width='48' height='48' viewBox='0 0 24 24' fill='currentColor'><path d='M14 2H6C4.9 2 4 2.9 4 4V20C4 21.1 4.9 22 6 22H18C19.1 22 20 21.1 20 20V8L14 2ZM18 20H6V4H13V9H18V20ZM9 13H15V15H9V13ZM9 17H15V19H9V17Z'/></svg>";
 
-  let mediaHtml: string;
+  // Thumbnail wrapper
+  const thumbnailWrapper = document.createElement("div");
+  thumbnailWrapper.className = "asset-card__thumbnail";
+  thumbnailWrapper.setAttribute("data-asset-id", asset.public_id);
+
   if (thumbnailUrl) {
-    mediaHtml = `
-      <div class="asset-card__thumbnail" data-asset-id="${asset.public_id}">
-        <img class="asset-card__image" src="${thumbnailUrl}" alt="Thumbnail" />
-        <div class="asset-card__icon fallback" style="display:none;">${fileIcon}</div>
-      </div>
-    `;
-  } else {
-    mediaHtml = `
-      <div class="asset-card__thumbnail" data-asset-id="${asset.public_id}">
-        <div class="asset-card__icon">${fileIcon}</div>
-      </div>
-    `;
-  }
-
-  const displayId = truncateString(asset.public_id, 25, "start");
-
-  card.innerHTML = `
-    ${mediaHtml}
-    <div class="asset-card__folder">📂 <code>${folderDisplay}</code></div>
-    <div class="asset-card__id" title="${asset.public_id}">${displayId}</div>
-    <div class="asset-card__actions">
-      <button class="btn btn--secondary btn--sm btn--copy" data-copy="${asset.secure_url}">Copy URL</button>
-      <button class="btn btn--secondary btn--sm btn--copy" data-copy="${asset.public_id}">Copy ID</button>
-    </div>
-  `;
-
-  // Click thumbnail to preview
-  const thumbnailWrapper = card.querySelector(".asset-card__thumbnail");
-  if (thumbnailWrapper && vscode) {
-    thumbnailWrapper.addEventListener("click", () => {
-      vscode.postMessage({ command: "openAsset", asset: asset });
-    });
-  }
-
-  // Handle image load errors
-  const img = card.querySelector<HTMLImageElement>(".asset-card__image");
-  if (img) {
+    const img = document.createElement("img");
+    img.className = "asset-card__image";
+    img.src = thumbnailUrl;
+    img.alt = "Thumbnail";
+    const fallbackEl = document.createElement("div");
+    fallbackEl.className = "asset-card__icon fallback";
+    fallbackEl.style.display = "none";
+    fallbackEl.innerHTML = fileIconSvg;
     img.addEventListener("error", function () {
       this.style.display = "none";
-      const fallback = this.parentElement?.querySelector<HTMLElement>(".fallback");
-      if (fallback) {fallback.style.display = "flex";}
+      fallbackEl.style.display = "flex";
+    });
+    thumbnailWrapper.appendChild(img);
+    thumbnailWrapper.appendChild(fallbackEl);
+  } else {
+    const iconEl = document.createElement("div");
+    iconEl.className = "asset-card__icon";
+    iconEl.innerHTML = fileIconSvg;
+    thumbnailWrapper.appendChild(iconEl);
+  }
+
+  // Folder
+  const folderEl = document.createElement("div");
+  folderEl.className = "asset-card__folder";
+  const folderCode = document.createElement("code");
+  folderCode.textContent = folderDisplay;
+  folderEl.appendChild(document.createTextNode("📂 "));
+  folderEl.appendChild(folderCode);
+
+  // Asset ID
+  const displayId = truncateString(asset.public_id, 25, "start");
+  const idEl = document.createElement("div");
+  idEl.className = "asset-card__id";
+  idEl.title = asset.public_id;
+  idEl.textContent = displayId;
+
+  // Action buttons
+  const actionsEl = document.createElement("div");
+  actionsEl.className = "asset-card__actions";
+
+  const copyUrlBtn = document.createElement("button");
+  copyUrlBtn.className = "btn btn--secondary btn--sm btn--copy";
+  copyUrlBtn.setAttribute("data-copy", asset.secure_url);
+  copyUrlBtn.textContent = "Copy URL";
+
+  const copyIdBtn = document.createElement("button");
+  copyIdBtn.className = "btn btn--secondary btn--sm btn--copy";
+  copyIdBtn.setAttribute("data-copy", asset.public_id);
+  copyIdBtn.textContent = "Copy ID";
+
+  actionsEl.appendChild(copyUrlBtn);
+  actionsEl.appendChild(copyIdBtn);
+
+  card.appendChild(thumbnailWrapper);
+  card.appendChild(folderEl);
+  card.appendChild(idEl);
+  card.appendChild(actionsEl);
+
+  // Click thumbnail to preview
+  if (vscode) {
+    thumbnailWrapper.addEventListener("click", () => {
+      vscode.postMessage({ command: "openAsset", asset: asset });
     });
   }
 
