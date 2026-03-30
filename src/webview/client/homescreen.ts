@@ -3,7 +3,7 @@
  * Handles button actions by posting messages to the extension host.
  */
 
-import { initVSCode, getVSCode } from "./common";
+import { initCommon, getVSCode } from "./common";
 
 function openGlobalConfig(): void {
   getVSCode()?.postMessage({ command: "openGlobalConfig" });
@@ -41,4 +41,4 @@ window.openUploadWidget = openUploadWidget;
 window.searchAssets = searchAssets;
 window.openWelcomeScreen = openWelcomeScreen;
 
-initVSCode();
+initCommon();
