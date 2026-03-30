@@ -12,6 +12,8 @@ import { CloudinaryTreeDataProvider } from "./tree/treeDataProvider";
 import { v2 as cloudinary } from "cloudinary";
 import { generateUserAgent } from "./utils/userAgent";
 import { HomescreenViewProvider } from "./webview/homescreenView";
+import { resetUploadPanel } from "./commands/uploadWidget";
+import { resetAllPreviewPanels } from "./commands/previewAsset";
 
 let statusBar: vscode.StatusBarItem;
 
@@ -51,6 +53,15 @@ export async function activate(context: vscode.ExtensionContext) {
       homescreenProvider,
       { webviewOptions: { retainContextWhenHidden: true } }
     )
+  );
+
+  // Refresh all open webviews when the active environment changes.
+  context.subscriptions.push(
+    cloudinaryProvider.onDidChangeEnvironment(() => {
+      homescreenProvider.refresh();
+      resetUploadPanel(cloudinaryProvider, context);
+      resetAllPreviewPanels(context.extensionUri);
+    })
   );
 
   // Check if this is the first run of the extension
@@ -197,6 +208,8 @@ export async function activate(context: vscode.ExtensionContext) {
       searchQuery: null,
       resourceTypeFilter: 'all'
     });
+
+    cloudinaryProvider.notifyEnvironmentChange();
   });
 
   context.subscriptions.push(watcher);
