@@ -75,6 +75,24 @@ function registerUpload(
 }
 
 /**
+ * Resets the upload panel for a new environment.
+ * If the panel is currently open, disposes it and reopens it with the new
+ * credentials already loaded in `provider`. No-ops if the panel is closed.
+ */
+export function resetUploadPanel(
+  provider: CloudinaryTreeDataProvider,
+  context: vscode.ExtensionContext
+): void {
+  if (!uploadPanel) {
+    return;
+  }
+  // Dispose first. The onDidDispose handler sets uploadPanel = undefined.
+  uploadPanel.dispose();
+  // Reopen immediately with new env credentials.
+  openOrRevealUploadPanel(currentFolderPath, provider, context);
+}
+
+/**
  * Opens the upload panel or reveals it if already open.
  */
 function openOrRevealUploadPanel(
