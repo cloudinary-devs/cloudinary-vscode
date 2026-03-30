@@ -86,9 +86,8 @@ export function resetUploadPanel(
   if (!uploadPanel) {
     return;
   }
-  // Dispose first. The onDidDispose handler sets uploadPanel = undefined.
   uploadPanel.dispose();
-  // Reopen immediately with new env credentials.
+  uploadPanel = undefined;
   openOrRevealUploadPanel(currentFolderPath, provider, context);
 }
 
