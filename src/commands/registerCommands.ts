@@ -21,6 +21,19 @@ function registerAllCommands(
   statusBar: vscode.StatusBarItem
 ) {
   context.subscriptions.push(
+    vscode.commands.registerCommand("cloudinary.showHomescreen", () => {
+      vscode.commands.executeCommand("setContext", "cloudinary.activeView", "homescreen");
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand("cloudinary.showLibrary", () => {
+      vscode.commands.executeCommand("setContext", "cloudinary.activeView", "library");
+      vscode.commands.executeCommand("workbench.view.extension.cloudinary");
+    })
+  );
+
+  context.subscriptions.push(
     vscode.commands.registerCommand("cloudinary.refresh", () =>
       provider.refresh({
         folderPath: '',
