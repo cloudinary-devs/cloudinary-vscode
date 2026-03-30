@@ -9,6 +9,8 @@ function postMessage(command: string): void {
   getVSCode()?.postMessage({ command });
 }
 
+initCommon();
+
 document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("hs-btn-configure")?.addEventListener("click", () => postMessage("openGlobalConfig"));
   document.getElementById("hs-btn-library")?.addEventListener("click", () => postMessage("showLibrary"));
@@ -16,5 +18,3 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("hs-btn-search")?.addEventListener("click", () => postMessage("searchAssets"));
   document.getElementById("hs-link-welcome")?.addEventListener("click", () => postMessage("openWelcomeScreen"));
 });
-
-initCommon();
