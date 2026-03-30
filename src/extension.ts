@@ -11,6 +11,7 @@ import { registerAllCommands } from "./commands/registerCommands";
 import { CloudinaryTreeDataProvider } from "./tree/treeDataProvider";
 import { v2 as cloudinary } from "cloudinary";
 import { generateUserAgent } from "./utils/userAgent";
+import { HomescreenViewProvider } from "./webview/homescreenView";
 
 let statusBar: vscode.StatusBarItem;
 
@@ -38,6 +39,19 @@ function getStatusBarTooltip(dynamicFolders: boolean): string {
  */
 export async function activate(context: vscode.ExtensionContext) {
   const cloudinaryProvider = new CloudinaryTreeDataProvider();
+
+  // Set initial view to homescreen
+  vscode.commands.executeCommand("setContext", "cloudinary.activeView", "homescreen");
+
+  // Register homescreen sidebar view
+  const homescreenProvider = new HomescreenViewProvider(context.extensionUri, cloudinaryProvider);
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider(
+      HomescreenViewProvider.viewType,
+      homescreenProvider,
+      { webviewOptions: { retainContextWhenHidden: true } }
+    )
+  );
 
   // Check if this is the first run of the extension
   const isFirstRun = context.globalState.get('cloudinary.firstRun', true);
