@@ -120,6 +120,50 @@ function registerPreview(context: vscode.ExtensionContext) {
 }
 
 /**
+ * Returns placeholder body HTML for an environment-changed preview panel.
+ */
+function getEnvChangedBodyContent(): string {
+  return `
+    <div style="
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      gap: 12px;
+      padding: 24px;
+      text-align: center;
+      font-family: var(--vscode-font-family);
+    ">
+      <svg width="32" height="32" viewBox="0 0 16 16" fill="var(--vscode-descriptionForeground)" aria-hidden="true">
+        <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
+        <path d="M7.002 11a1 1 0 1 1 2 0 1 1 0 0 1-2 0zM7.1 4.995a.905.905 0 1 1 1.8 0l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 4.995z"/>
+      </svg>
+      <p style="font-size: 13px; color: var(--vscode-foreground); margin: 0;">Environment changed</p>
+      <p style="font-size: 11px; color: var(--vscode-descriptionForeground); margin: 0; line-height: 1.5;">
+        This preview is from a different environment.<br>
+        Close this tab and browse the new environment.
+      </p>
+    </div>
+  `;
+}
+
+/**
+ * Replaces all open preview panels' HTML with an environment-changed placeholder.
+ * Called when the active Cloudinary environment switches.
+ */
+export function resetAllPreviewPanels(extensionUri: vscode.Uri): void {
+  for (const panel of openPanels.values()) {
+    panel.webview.html = createWebviewDocument({
+      title: "Environment Changed",
+      webview: panel.webview,
+      extensionUri,
+      bodyContent: getEnvChangedBodyContent(),
+    });
+  }
+}
+
+/**
  * Get asset type icon.
  */
 function getAssetTypeIcon(type: string): string {
