@@ -53,7 +53,7 @@
           "id": "cloudinaryHomescreen",
           "name": "Cloudinary",
           "type": "webview",
-          "when": "cloudinary.activeView == 'homescreen'"
+          "when": "cloudinary.activeView != 'library'"
         },
         {
           "id": "cloudinaryMediaLibrary",
