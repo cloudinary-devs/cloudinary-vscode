@@ -78,24 +78,24 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
             <p class="status-card__text">${hasConfig ? "Connected" : "Setup required"}</p>
           </div>
           ${!hasConfig
-            ? `<button class="btn btn--primary btn--sm" onclick="openGlobalConfig()">Configure</button>`
+            ? `<button id="hs-btn-configure" class="btn btn--primary btn--sm">Configure</button>`
             : ""}
         </div>
 
         <div class="btn-group btn-group--vertical" style="margin-top: 1rem; width: 100%;">
-          <button class="btn btn--secondary btn--md" style="width: 100%;" onclick="showLibrary()">
+          <button id="hs-btn-library" class="btn btn--secondary btn--md" style="width: 100%;">
             Browse Library
           </button>
-          <button class="btn btn--secondary btn--md" style="width: 100%;" onclick="openUploadWidget()">
+          <button id="hs-btn-upload" class="btn btn--secondary btn--md" style="width: 100%;">
             Upload
           </button>
-          <button class="btn btn--secondary btn--md" style="width: 100%;" onclick="searchAssets()">
+          <button id="hs-btn-search" class="btn btn--secondary btn--md" style="width: 100%;">
             Search
           </button>
         </div>
 
         <div style="margin-top: 1.5rem; text-align: center;">
-          <span class="link" onclick="openWelcomeScreen()">Welcome Guide</span>
+          <span id="hs-link-welcome" class="link" style="cursor: pointer;">Welcome Guide</span>
         </div>
       </div>
     `;
