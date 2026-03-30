@@ -16,11 +16,15 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
     private readonly _provider: CloudinaryTreeDataProvider
   ) {}
 
+  private _webviewView: vscode.WebviewView | undefined;
+
   resolveWebviewView(
     webviewView: vscode.WebviewView,
     _context: vscode.WebviewViewResolveContext,
     _token: vscode.CancellationToken
   ): void {
+    this._webviewView = webviewView;
+
     webviewView.webview.options = {
       enableScripts: true,
       localResourceRoots: [vscode.Uri.joinPath(this._extensionUri, "media")],
@@ -58,6 +62,28 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
         }
       }
     );
+  }
+
+  /**
+   * Re-renders the homescreen HTML with current credentials.
+   * Safe to call at any time; no-ops if the view has not been resolved yet.
+   */
+  refresh(): void {
+    if (!this._webviewView) {
+      return;
+    }
+    const scriptUri = getScriptUri(
+      this._webviewView.webview,
+      this._extensionUri,
+      "homescreen.js"
+    );
+    this._webviewView.webview.html = createWebviewDocument({
+      title: "Cloudinary",
+      webview: this._webviewView.webview,
+      extensionUri: this._extensionUri,
+      bodyContent: this._getBodyContent(),
+      additionalScripts: [scriptUri],
+    });
   }
 
   private _getBodyContent(): string {
