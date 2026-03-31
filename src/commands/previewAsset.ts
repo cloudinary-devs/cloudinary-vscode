@@ -124,23 +124,13 @@ function registerPreview(context: vscode.ExtensionContext) {
  */
 function getEnvChangedBodyContent(): string {
   return `
-    <div style="
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
-      gap: 12px;
-      padding: 24px;
-      text-align: center;
-      font-family: var(--vscode-font-family);
-    ">
-      <svg width="32" height="32" viewBox="0 0 16 16" fill="var(--vscode-descriptionForeground)" aria-hidden="true">
+    <div style="padding: 40px 24px; text-align: center; font-family: var(--vscode-font-family);">
+      <svg width="28" height="28" viewBox="0 0 16 16" fill="var(--vscode-descriptionForeground)" style="display:block;margin:0 auto 12px;" aria-hidden="true">
         <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
         <path d="M7.002 11a1 1 0 1 1 2 0 1 1 0 0 1-2 0zM7.1 4.995a.905.905 0 1 1 1.8 0l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 4.995z"/>
       </svg>
-      <p style="font-size: 13px; color: var(--vscode-foreground); margin: 0;">Environment changed</p>
-      <p style="font-size: 11px; color: var(--vscode-descriptionForeground); margin: 0; line-height: 1.5;">
+      <p style="font-size: 13px; font-weight: 500; color: var(--vscode-foreground); margin: 0 0 6px;">Environment changed</p>
+      <p style="font-size: 11px; color: var(--vscode-descriptionForeground); margin: 0; line-height: 1.6;">
         This preview is from a different environment.<br>
         Close this tab and browse the new environment.
       </p>

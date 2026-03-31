@@ -59,7 +59,7 @@ export async function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     cloudinaryProvider.onDidChangeEnvironment(() => {
       homescreenProvider.refresh();
-      resetUploadPanel(cloudinaryProvider, context);
+      resetUploadPanel(cloudinaryProvider, context).catch(() => {});
       resetAllPreviewPanels(context.extensionUri);
     })
   );
