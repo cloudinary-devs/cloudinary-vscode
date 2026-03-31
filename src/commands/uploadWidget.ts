@@ -79,17 +79,12 @@ function registerUpload(
  * If the panel is currently open, disposes it and reopens it with the new
  * credentials already loaded in `provider`. No-ops if the panel is closed.
  */
-export async function resetUploadPanel(
-  provider: CloudinaryTreeDataProvider,
-  context: vscode.ExtensionContext
-): Promise<void> {
+export function resetUploadPanel(): void {
   if (!uploadPanel) {
     return;
   }
-  await provider.fetchUploadPresets();
   uploadPanel.dispose();
   uploadPanel = undefined;
-  openOrRevealUploadPanel(currentFolderPath, provider, context);
 }
 
 /**
