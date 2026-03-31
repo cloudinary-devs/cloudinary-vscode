@@ -121,11 +121,18 @@ function registerPreview(context: vscode.ExtensionContext) {
 
 /**
  * Closes all open preview panels when the active environment switches.
- * Panels show assets from the old environment and are no longer valid.
+ * Uses the tab groups API so it works regardless of the openPanels tracking state.
  */
 export function resetAllPreviewPanels(): void {
-  for (const panel of openPanels.values()) {
-    panel.dispose();
+  for (const tabGroup of vscode.window.tabGroups.all) {
+    for (const tab of tabGroup.tabs) {
+      if (
+        tab.input instanceof vscode.TabInputWebview &&
+        tab.input.viewType === "cloudinaryAssetPreview"
+      ) {
+        vscode.window.tabGroups.close(tab);
+      }
+    }
   }
 }
 
