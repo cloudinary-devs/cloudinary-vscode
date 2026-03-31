@@ -25,6 +25,10 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
   ): void {
     this._webviewView = webviewView;
 
+    webviewView.onDidDispose(() => {
+      this._webviewView = undefined;
+    });
+
     webviewView.webview.options = {
       enableScripts: true,
       localResourceRoots: [vscode.Uri.joinPath(this._extensionUri, "media")],
