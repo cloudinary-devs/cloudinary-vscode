@@ -376,9 +376,17 @@ function registerConfigureAiTools(context: vscode.ExtensionContext): void {
           if (ideTarget.label === "Claude Code") {
             await installForClaudeCode(rootUri, skill.dirName, content, createdFiles, errors);
           } else if (ideTarget.label === "Cursor") {
-            await installForCursor(rootUri, skill.dirName, content, createdFiles);
+            try {
+              await installForCursor(rootUri, skill.dirName, content, createdFiles);
+            } catch (err) {
+              errors.push(`${skill.dirName}: ${err instanceof Error ? err.message : String(err)}`);
+            }
           } else {
-            await installForCopilot(rootUri, skill.dirName, content, createdFiles);
+            try {
+              await installForCopilot(rootUri, skill.name, content, createdFiles);
+            } catch (err) {
+              errors.push(`${skill.name}: ${err instanceof Error ? err.message : String(err)}`);
+            }
           }
         }
       }
@@ -407,6 +415,8 @@ function registerConfigureAiTools(context: vscode.ExtensionContext): void {
           );
           vscode.window.showTextDocument(doc);
         }
+      } else if (errors.length === 0) {
+        vscode.window.showInformationMessage("No files were written — all targets already exist.");
       }
     })
   );
