@@ -130,6 +130,11 @@
         "command": "cloudinary.showLibrary",
         "title": "Browse Media Library",
         "category": "Cloudinary"
+      },
+      {
+        "command": "cloudinary.configureAiTools",
+        "title": "Configure AI Tools",
+        "category": "Cloudinary"
       }
     ],
     "menus": {

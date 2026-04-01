@@ -7,6 +7,7 @@ import registerClipboard from "./copyCommands";
 import registerSwitchEnv from "./switchEnvironment";
 import registerClearSearch from "./clearSearch";
 import registerWelcomeScreen from "./welcomeScreen";
+import registerConfigureAiTools from "./configureAiTools";
 import { CloudinaryTreeDataProvider } from "../tree/treeDataProvider";
 
 /**
@@ -52,6 +53,7 @@ function registerAllCommands(
   registerClipboard(context);
   registerSwitchEnv(context, provider, statusBar);
   registerWelcomeScreen(context, provider);
+  registerConfigureAiTools(context);
 }
 
 export { registerAllCommands };
