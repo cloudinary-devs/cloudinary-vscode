@@ -1,0 +1,402 @@
+import * as vscode from "vscode";
+
+// ── Types ────────────────────────────────────────────────────────────────────
+
+type EditorType = "cursor" | "vscode" | "windsurf" | "antigravity" | "unknown";
+
+type SkillInfo = {
+  name: string;
+  description: string;
+};
+
+type GitHubEntry = {
+  name: string;
+  type: "file" | "dir";
+};
+
+type GitHubFile = {
+  content: string; // base64-encoded
+  encoding: string;
+};
+
+// ── Editor detection (same logic as legacy setupWorkspace) ───────────────────
+
+function detectEditor(): EditorType {
+  const uriScheme = vscode.env.uriScheme.toLowerCase();
+  if (uriScheme === "cursor") { return "cursor"; }
+  if (uriScheme === "windsurf") { return "windsurf"; }
+  if (uriScheme === "antigravity" || uriScheme === "gemini") { return "antigravity"; }
+  if (uriScheme === "vscode" || uriScheme === "vscode-insiders") { return "vscode"; }
+  const appName = vscode.env.appName.toLowerCase();
+  if (appName.includes("cursor")) { return "cursor"; }
+  if (appName.includes("windsurf")) { return "windsurf"; }
+  if (appName.includes("antigravity") || appName.includes("gemini")) { return "antigravity"; }
+  if (appName.includes("visual studio code") || appName.includes("vscode")) { return "vscode"; }
+  return "unknown";
+}
+
+function getMcpFilePath(editor: EditorType): string {
+  switch (editor) {
+    case "cursor":    return ".cursor/mcp.json";
+    case "windsurf":  return ".windsurf/mcp.json";
+    case "antigravity": return ".agent/mcp_config.json";
+    case "vscode":
+    default:          return ".vscode/mcp.json";
+  }
+}
+
+// ── GitHub API helpers ───────────────────────────────────────────────────────
+
+const SKILLS_BASE = "https://api.github.com/repos/cloudinary-devs/skills/contents";
+
+async function githubFetchJson<T>(url: string): Promise<T> {
+  const response = await fetch(url, {
+    headers: { Accept: "application/vnd.github+json" },
+  });
+  if (!response.ok) {
+    throw new Error(`GitHub API ${response.status}: ${url}`);
+  }
+  return response.json() as Promise<T>;
+}
+
+function decodeBase64(encoded: string): string {
+  // GitHub API returns base64 with newlines — strip them before decoding
+  return Buffer.from(encoded.replace(/\n/g, ""), "base64").toString("utf-8");
+}
+
+// ── Frontmatter helpers ──────────────────────────────────────────────────────
+
+function parseFrontmatter(content: string): Record<string, string> {
+  const match = content.match(/^---\n([\s\S]*?)\n---/);
+  if (!match) { return {}; }
+  const result: Record<string, string> = {};
+  for (const line of match[1].split("\n")) {
+    const colonIdx = line.indexOf(":");
+    if (colonIdx === -1) { continue; }
+    const key = line.slice(0, colonIdx).trim();
+    const value = line.slice(colonIdx + 1).trim();
+    if (key) { result[key] = value; }
+  }
+  return result;
+}
+
+/** Returns everything after the closing --- of the frontmatter block. */
+function getBodyAfterFrontmatter(content: string): string {
+  return content.replace(/^---\n[\s\S]*?\n---\n?/, "").trim();
+}
+
+/** Returns SKILL.md content with the `name:` line removed (Cursor .mdc format). */
+function toMdcContent(content: string): string {
+  return content.replace(/^(---\n)([\s\S]*?)(\n---)/m, (_, open, body, close) => {
+    const filtered = body
+      .split("\n")
+      .filter((line: string) => !line.startsWith("name:"))
+      .join("\n");
+    return `${open}${filtered}${close}`;
+  });
+}
+
+// ── Skill fetching ───────────────────────────────────────────────────────────
+
+async function fetchSkillList(): Promise<SkillInfo[]> {
+  const entries = await githubFetchJson<GitHubEntry[]>(`${SKILLS_BASE}/skills`);
+  const dirs = entries.filter((e) => e.type === "dir");
+
+  const results = await Promise.all(
+    dirs.map(async (dir): Promise<SkillInfo | null> => {
+      try {
+        const file = await githubFetchJson<GitHubFile>(
+          `${SKILLS_BASE}/skills/${dir.name}/SKILL.md`
+        );
+        const content = decodeBase64(file.content);
+        const fm = parseFrontmatter(content);
+        return { name: fm.name || dir.name, description: fm.description || "" };
+      } catch {
+        return null;
+      }
+    })
+  );
+
+  return results.filter((s): s is SkillInfo => s !== null);
+}
+
+async function fetchSkillContent(skillName: string): Promise<string> {
+  const file = await githubFetchJson<GitHubFile>(
+    `${SKILLS_BASE}/skills/${skillName}/SKILL.md`
+  );
+  return decodeBase64(file.content);
+}
+
+async function fetchReferenceFiles(
+  skillName: string
+): Promise<Array<{ name: string; content: string }>> {
+  let entries: GitHubEntry[];
+  try {
+    entries = await githubFetchJson<GitHubEntry[]>(
+      `${SKILLS_BASE}/skills/${skillName}/references`
+    );
+  } catch {
+    return []; // no references directory — that's fine
+  }
+
+  const files = await Promise.all(
+    entries
+      .filter((e) => e.type === "file")
+      .map(async (e) => {
+        const file = await githubFetchJson<GitHubFile>(
+          `${SKILLS_BASE}/skills/${skillName}/references/${e.name}`
+        );
+        return { name: e.name, content: decodeBase64(file.content) };
+      })
+  );
+  return files;
+}
+
+// ── Filesystem helpers ───────────────────────────────────────────────────────
+
+async function ensureDir(uri: vscode.Uri): Promise<void> {
+  try { await vscode.workspace.fs.createDirectory(uri); } catch { /* already exists */ }
+}
+
+/**
+ * Writes content to uri. If the file already exists, prompts the user before
+ * overwriting. Returns true if the file was written, false if the user skipped.
+ */
+async function writeWithOverwriteCheck(
+  uri: vscode.Uri,
+  content: string,
+  label: string
+): Promise<boolean> {
+  try {
+    await vscode.workspace.fs.stat(uri);
+    const answer = await vscode.window.showWarningMessage(
+      `${label} already exists. Overwrite?`,
+      "Yes",
+      "No"
+    );
+    if (answer !== "Yes") { return false; }
+  } catch {
+    // file doesn't exist — proceed
+  }
+  await ensureDir(vscode.Uri.joinPath(uri, ".."));
+  await vscode.workspace.fs.writeFile(uri, Buffer.from(content, "utf-8"));
+  return true;
+}
+
+// ── Skill installation — per IDE ─────────────────────────────────────────────
+
+async function installForClaudeCode(
+  rootUri: vscode.Uri,
+  skillName: string,
+  skillContent: string,
+  createdFiles: string[],
+  errors: string[]
+): Promise<void> {
+  const skillFile = vscode.Uri.joinPath(
+    rootUri, `.claude/skills/${skillName}/SKILL.md`
+  );
+  const written = await writeWithOverwriteCheck(
+    skillFile, skillContent, `${skillName}/SKILL.md`
+  );
+  if (!written) { return; }
+  createdFiles.push(`.claude/skills/${skillName}/SKILL.md`);
+
+  let refs: Array<{ name: string; content: string }>;
+  try {
+    refs = await fetchReferenceFiles(skillName);
+  } catch (err: any) {
+    errors.push(`${skillName} references: ${err.message}`);
+    return;
+  }
+
+  for (const ref of refs) {
+    try {
+      const refUri = vscode.Uri.joinPath(
+        rootUri, `.claude/skills/${skillName}/references/${ref.name}`
+      );
+      await ensureDir(vscode.Uri.joinPath(refUri, ".."));
+      await vscode.workspace.fs.writeFile(refUri, Buffer.from(ref.content, "utf-8"));
+      createdFiles.push(`.claude/skills/${skillName}/references/${ref.name}`);
+    } catch (err: any) {
+      errors.push(`${skillName}/references/${ref.name}: ${err.message}`);
+    }
+  }
+}
+
+async function installForCursor(
+  rootUri: vscode.Uri,
+  skillName: string,
+  skillContent: string,
+  createdFiles: string[]
+): Promise<void> {
+  const mdcUri = vscode.Uri.joinPath(rootUri, `.cursor/rules/${skillName}.mdc`);
+  const written = await writeWithOverwriteCheck(
+    mdcUri, toMdcContent(skillContent), `${skillName}.mdc`
+  );
+  if (written) { createdFiles.push(`.cursor/rules/${skillName}.mdc`); }
+}
+
+async function installForCopilot(
+  rootUri: vscode.Uri,
+  skillName: string,
+  skillContent: string,
+  createdFiles: string[]
+): Promise<void> {
+  const instructionsUri = vscode.Uri.joinPath(
+    rootUri, ".github/copilot-instructions.md"
+  );
+  await ensureDir(vscode.Uri.joinPath(rootUri, ".github"));
+
+  let existing = "";
+  try {
+    const bytes = await vscode.workspace.fs.readFile(instructionsUri);
+    existing = Buffer.from(bytes).toString("utf-8");
+  } catch {
+    // new file
+  }
+
+  const body = getBodyAfterFrontmatter(skillContent);
+  const section = `## ${skillName}\n\n${body}\n`;
+  const separator = existing.length > 0 ? "\n" : "";
+
+  await vscode.workspace.fs.writeFile(
+    instructionsUri,
+    Buffer.from(existing + separator + section, "utf-8")
+  );
+
+  if (!createdFiles.includes(".github/copilot-instructions.md")) {
+    createdFiles.push(".github/copilot-instructions.md");
+  }
+}
+
+// ── MCP Config ───────────────────────────────────────────────────────────────
+
+async function createMcpConfig(
+  rootUri: vscode.Uri,
+  mcpFilePath: string,
+  createdFiles: string[]
+): Promise<void> {
+  const mcpUri = vscode.Uri.joinPath(rootUri, mcpFilePath);
+  const written = await writeWithOverwriteCheck(
+    mcpUri,
+    JSON.stringify({ mcpServers: {} }, null, 2),
+    mcpFilePath
+  );
+  if (written) { createdFiles.push(mcpFilePath); }
+}
+
+// ── Command registration ─────────────────────────────────────────────────────
+
+function registerConfigureAiTools(context: vscode.ExtensionContext): void {
+  context.subscriptions.push(
+    vscode.commands.registerCommand("cloudinary.configureAiTools", async () => {
+      const workspaceFolders = vscode.workspace.workspaceFolders;
+      if (!workspaceFolders || workspaceFolders.length === 0) {
+        vscode.window.showErrorMessage("Please open a workspace folder first.");
+        return;
+      }
+      const rootUri = workspaceFolders[0].uri;
+
+      // ── Step 1: what to configure ──────────────────────────────────────────
+      const options = await vscode.window.showQuickPick(
+        [
+          { label: "Skills", description: "Install Cloudinary agent skills", picked: true },
+          { label: "MCP Config", description: "Add MCP server configuration file", picked: true },
+        ],
+        { canPickMany: true, placeHolder: "Select what to configure" }
+      );
+      if (!options || options.length === 0) { return; }
+
+      const createdFiles: string[] = [];
+      const errors: string[] = [];
+
+      // ── Step 2: skills flow ────────────────────────────────────────────────
+      if (options.some((o) => o.label === "Skills")) {
+        let skills: SkillInfo[];
+        try {
+          skills = await fetchSkillList();
+        } catch (err: any) {
+          vscode.window.showErrorMessage(`Failed to fetch skills: ${err.message}`);
+          return;
+        }
+
+        const pickedSkills = await vscode.window.showQuickPick(
+          skills.map((s) => ({ label: s.name, description: s.description, picked: true })),
+          { canPickMany: true, placeHolder: "Select skills to install" }
+        );
+        if (!pickedSkills || pickedSkills.length === 0) { return; }
+
+        // IDE target — pre-select based on detected editor
+        const editor = detectEditor();
+        const ideOptions: vscode.QuickPickItem[] = [
+          { label: "Claude Code", description: "Install to .claude/skills/" },
+          { label: "Cursor",      description: "Install to .cursor/rules/" },
+          { label: "VS Code (Copilot)", description: "Append to .github/copilot-instructions.md" },
+        ];
+        const defaultLabel =
+          editor === "cursor" ? "Cursor" :
+          editor === "vscode" ? "VS Code (Copilot)" :
+          "Claude Code";
+
+        const qp = vscode.window.createQuickPick();
+        qp.items = ideOptions;
+        qp.activeItems = ideOptions.filter((o) => o.label === defaultLabel);
+        qp.placeholder = "Select AI tool to install skills for";
+
+        const ideTarget = await new Promise<vscode.QuickPickItem | undefined>((resolve) => {
+          qp.onDidAccept(() => { resolve(qp.activeItems[0]); qp.dispose(); });
+          qp.onDidHide(() => { resolve(undefined); qp.dispose(); });
+          qp.show();
+        });
+        if (!ideTarget) { return; }
+
+        for (const item of pickedSkills) {
+          const skill = skills.find((s) => s.name === item.label)!;
+          let content: string;
+          try {
+            content = await fetchSkillContent(skill.name);
+          } catch (err: any) {
+            errors.push(`${skill.name}: ${err.message}`);
+            continue;
+          }
+
+          if (ideTarget.label === "Claude Code") {
+            await installForClaudeCode(rootUri, skill.name, content, createdFiles, errors);
+          } else if (ideTarget.label === "Cursor") {
+            await installForCursor(rootUri, skill.name, content, createdFiles);
+          } else {
+            await installForCopilot(rootUri, skill.name, content, createdFiles);
+          }
+        }
+      }
+
+      // ── Step 3: MCP config flow ────────────────────────────────────────────
+      if (options.some((o) => o.label === "MCP Config")) {
+        const editor = detectEditor();
+        await createMcpConfig(rootUri, getMcpFilePath(editor), createdFiles);
+      }
+
+      // ── Step 4: feedback ───────────────────────────────────────────────────
+      if (errors.length > 0) {
+        vscode.window.showWarningMessage(
+          `Some files could not be downloaded: ${errors.join(", ")}`
+        );
+      }
+
+      if (createdFiles.length > 0) {
+        const action = await vscode.window.showInformationMessage(
+          `✅ Configured AI tools: ${createdFiles.join(", ")}`,
+          "Open File"
+        );
+        if (action === "Open File") {
+          const doc = await vscode.workspace.openTextDocument(
+            vscode.Uri.joinPath(rootUri, createdFiles[0])
+          );
+          vscode.window.showTextDocument(doc);
+        }
+      }
+    })
+  );
+}
+
+export default registerConfigureAiTools;
