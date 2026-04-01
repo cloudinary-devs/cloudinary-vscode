@@ -304,6 +304,75 @@ async function installForCopilot(
   }
 }
 
+// ── Status detection ─────────────────────────────────────────────────────────
+
+/**
+ * Returns the set of skill dirNames already installed for the given IDE target.
+ * Errors reading individual paths are silently treated as "not installed".
+ */
+async function readInstalledSkillDirNames(
+  rootUri: vscode.Uri,
+  ideTargetLabel: string,
+  skills: SkillInfo[]
+): Promise<Set<string>> {
+  const installed = new Set<string>();
+
+  if (ideTargetLabel === "VS Code (Copilot)") {
+    try {
+      const uri = vscode.Uri.joinPath(rootUri, ".github/copilot-instructions.md");
+      const bytes = await vscode.workspace.fs.readFile(uri);
+      const content = Buffer.from(bytes).toString("utf-8");
+      for (const skill of skills) {
+        if (content.includes(`## ${skill.name}`)) {
+          installed.add(skill.dirName);
+        }
+      }
+    } catch {
+      // file not found — nothing installed
+    }
+    return installed;
+  }
+
+  await Promise.all(
+    skills.map(async (skill) => {
+      try {
+        const checkPath =
+          ideTargetLabel === "Claude Code"
+            ? `.claude/skills/${skill.dirName}/SKILL.md`
+            : `.cursor/rules/${skill.dirName}.mdc`;
+        await vscode.workspace.fs.stat(vscode.Uri.joinPath(rootUri, checkPath));
+        installed.add(skill.dirName);
+      } catch {
+        // not installed
+      }
+    })
+  );
+  return installed;
+}
+
+/**
+ * Returns the set of server keys already present in the MCP config file.
+ * Returns an empty Set if the file doesn't exist or can't be parsed.
+ */
+async function readConfiguredMcpServerKeys(
+  rootUri: vscode.Uri,
+  mcpFilePath: string,
+  rootKey: string
+): Promise<Set<string>> {
+  try {
+    const uri = vscode.Uri.joinPath(rootUri, mcpFilePath);
+    const bytes = await vscode.workspace.fs.readFile(uri);
+    const config = JSON.parse(Buffer.from(bytes).toString("utf-8"));
+    const servers = config[rootKey];
+    if (servers && typeof servers === "object") {
+      return new Set(Object.keys(servers));
+    }
+  } catch {
+    // file not found or invalid JSON
+  }
+  return new Set();
+}
+
 // ── MCP Server definitions ────────────────────────────────────────────────────
 
 const MCP_SERVERS: McpServerDef[] = [
