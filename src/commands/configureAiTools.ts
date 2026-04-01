@@ -8,10 +8,7 @@ type McpServerDef = {
   label: string;
   description: string;
   key: string;
-  /** Config entry for Cursor / windsurf / antigravity / Claude (mcpServers format) */
-  cursorConfig: Record<string, unknown>;
-  /** Config entry for VS Code (servers format, "servers" root key) */
-  vscodeConfig: Record<string, unknown>;
+  config: Record<string, unknown>; // same for all editors; root key differs by editor
 };
 
 type SkillInfo = {
@@ -314,111 +311,31 @@ const MCP_SERVERS: McpServerDef[] = [
     label: "Cloudinary Asset Management",
     description: "Browse, upload, and manage media assets",
     key: "cloudinary-asset-mgmt",
-    cursorConfig: {
-      command: "npx",
-      args: ["-y", "@cloudinary/asset-management", "mcp", "start"],
-      env: {
-        CLOUDINARY_CLOUD_NAME: "your_cloud_name",
-        CLOUDINARY_API_KEY: "your_api_key",
-        CLOUDINARY_API_SECRET: "your_api_secret",
-      },
-    },
-    vscodeConfig: {
-      type: "stdio",
-      command: "npx",
-      args: ["-y", "@cloudinary/asset-management", "mcp", "start"],
-      env: {
-        CLOUDINARY_CLOUD_NAME: "${env:CLOUDINARY_CLOUD_NAME}",
-        CLOUDINARY_API_KEY: "${env:CLOUDINARY_API_KEY}",
-        CLOUDINARY_API_SECRET: "${env:CLOUDINARY_API_SECRET}",
-      },
-    },
+    config: { url: "https://asset-management.mcp.cloudinary.com/mcp" },
   },
   {
     label: "Cloudinary Environment Config",
     description: "Configure upload presets, transformations, and settings",
     key: "cloudinary-env-config",
-    cursorConfig: {
-      command: "npx",
-      args: ["-y", "@cloudinary/environment-config", "mcp", "start"],
-      env: {
-        CLOUDINARY_CLOUD_NAME: "your_cloud_name",
-        CLOUDINARY_API_KEY: "your_api_key",
-        CLOUDINARY_API_SECRET: "your_api_secret",
-      },
-    },
-    vscodeConfig: {
-      type: "stdio",
-      command: "npx",
-      args: ["-y", "@cloudinary/environment-config", "mcp", "start"],
-      env: {
-        CLOUDINARY_CLOUD_NAME: "${env:CLOUDINARY_CLOUD_NAME}",
-        CLOUDINARY_API_KEY: "${env:CLOUDINARY_API_KEY}",
-        CLOUDINARY_API_SECRET: "${env:CLOUDINARY_API_SECRET}",
-      },
-    },
+    config: { url: "https://environment-config.mcp.cloudinary.com/mcp" },
   },
   {
     label: "Cloudinary Structured Metadata",
     description: "Manage structured metadata fields and values",
     key: "cloudinary-smd",
-    cursorConfig: {
-      command: "npx",
-      args: ["-y", "@cloudinary/structured-metadata", "mcp", "start"],
-      env: {
-        CLOUDINARY_CLOUD_NAME: "your_cloud_name",
-        CLOUDINARY_API_KEY: "your_api_key",
-        CLOUDINARY_API_SECRET: "your_api_secret",
-      },
-    },
-    vscodeConfig: {
-      type: "stdio",
-      command: "npx",
-      args: ["-y", "@cloudinary/structured-metadata", "mcp", "start"],
-      env: {
-        CLOUDINARY_CLOUD_NAME: "${env:CLOUDINARY_CLOUD_NAME}",
-        CLOUDINARY_API_KEY: "${env:CLOUDINARY_API_KEY}",
-        CLOUDINARY_API_SECRET: "${env:CLOUDINARY_API_SECRET}",
-      },
-    },
+    config: { url: "https://structured-metadata.mcp.cloudinary.com/mcp" },
   },
   {
     label: "Cloudinary Analysis",
     description: "AI-powered image and video analysis",
     key: "cloudinary-analysis",
-    cursorConfig: {
-      command: "npx",
-      args: ["-y", "@cloudinary/analysis", "mcp", "start"],
-      env: {
-        CLOUDINARY_CLOUD_NAME: "your_cloud_name",
-        CLOUDINARY_API_KEY: "your_api_key",
-        CLOUDINARY_API_SECRET: "your_api_secret",
-      },
-    },
-    vscodeConfig: {
-      type: "stdio",
-      command: "npx",
-      args: ["-y", "@cloudinary/analysis", "mcp", "start"],
-      env: {
-        CLOUDINARY_CLOUD_NAME: "${env:CLOUDINARY_CLOUD_NAME}",
-        CLOUDINARY_API_KEY: "${env:CLOUDINARY_API_KEY}",
-        CLOUDINARY_API_SECRET: "${env:CLOUDINARY_API_SECRET}",
-      },
-    },
+    config: { url: "https://analysis.mcp.cloudinary.com/sse" },
   },
   {
     label: "MediaFlows",
     description: "AI-powered media workflows and automation",
     key: "mediaflows",
-    cursorConfig: {
-      url: "https://mediaflows.mcp.cloudinary.com/v2/mcp",
-      headers: {
-        "cld-cloud-name": "your_cloud_name",
-        "cld-api-key": "your_api_key",
-        "cld-secret": "your_api_secret",
-      },
-    },
-    vscodeConfig: {
+    config: {
       url: "https://mediaflows.mcp.cloudinary.com/v2/mcp",
       headers: {
         "cld-cloud-name": "your_cloud_name",
@@ -466,7 +383,7 @@ async function createMcpConfig(
   const servers = config[rootKey] as Record<string, unknown>;
 
   for (const def of selectedDefs) {
-    servers[def.key] = isVscode ? def.vscodeConfig : def.cursorConfig;
+    servers[def.key] = def.config;
   }
 
   await ensureDir(vscode.Uri.joinPath(mcpUri, ".."));
