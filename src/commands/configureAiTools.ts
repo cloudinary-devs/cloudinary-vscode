@@ -423,8 +423,16 @@ async function createMcpConfig(
   mcpFilePath: string,
   createdFiles: string[]
 ): Promise<void> {
+  const rootKey = editor === "vscode" ? "servers" : "mcpServers";
+  const configuredKeys = await readConfiguredMcpServerKeys(rootUri, mcpFilePath, rootKey);
+
   const selected = await vscode.window.showQuickPick(
-    MCP_SERVERS.map((s) => ({ label: s.label, description: s.description, picked: true })),
+    MCP_SERVERS.map((s) => ({
+      label: s.label,
+      description: s.description,
+      detail: configuredKeys.has(s.key) ? "✓ already configured" : "Not configured",
+      picked: !configuredKeys.has(s.key),
+    })),
     { canPickMany: true, placeHolder: "Select MCP servers to configure" }
   );
   if (!selected || selected.length === 0) { return; }
@@ -434,8 +442,6 @@ async function createMcpConfig(
     .filter((s): s is McpServerDef => s !== undefined);
 
   const mcpUri = vscode.Uri.joinPath(rootUri, mcpFilePath);
-  const isVscode = editor === "vscode";
-  const rootKey = isVscode ? "servers" : "mcpServers";
 
   // Read and merge into existing config if present
   let config: Record<string, unknown> = {};
@@ -500,13 +506,7 @@ function registerConfigureAiTools(context: vscode.ExtensionContext): void {
           return;
         }
 
-        const pickedSkills = await vscode.window.showQuickPick(
-          skills.map((s) => ({ label: s.name, description: s.description, picked: true })),
-          { canPickMany: true, placeHolder: "Select skills to install" }
-        );
-        if (!pickedSkills || pickedSkills.length === 0) { return; }
-
-        // IDE target — pre-select based on detected editor
+        // IDE target first — needed to check install status before showing skills
         const editor = detectEditor();
         const ideOptions: vscode.QuickPickItem[] = [
           { label: "Claude Code", description: "Install to .claude/skills/" },
@@ -529,6 +529,19 @@ function registerConfigureAiTools(context: vscode.ExtensionContext): void {
           qp.show();
         });
         if (!ideTarget) { return; }
+
+        const installedDirNames = await readInstalledSkillDirNames(rootUri, ideTarget.label, skills);
+
+        const pickedSkills = await vscode.window.showQuickPick(
+          skills.map((s) => ({
+            label: s.name,
+            description: s.description,
+            detail: installedDirNames.has(s.dirName) ? "✓ installed" : "Not installed",
+            picked: true,
+          })),
+          { canPickMany: true, placeHolder: "Select skills to install" }
+        );
+        if (!pickedSkills || pickedSkills.length === 0) { return; }
 
         for (const item of pickedSkills) {
           const skill = skills.find((s) => s.name === item.label);
