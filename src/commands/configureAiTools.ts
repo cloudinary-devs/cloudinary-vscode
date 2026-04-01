@@ -61,18 +61,25 @@ function getMcpFilePath(editor: EditorType): string {
 const SKILLS_BASE = "https://api.github.com/repos/cloudinary-devs/skills/contents";
 
 async function githubFetchJson<T>(url: string): Promise<T> {
-  const headers: Record<string, string> = { Accept: "application/vnd.github+json" };
+  const baseHeaders: Record<string, string> = { Accept: "application/vnd.github+json" };
 
-  try {
-    const session = await vscode.authentication.getSession("github", ["repo"], { silent: true });
-    if (session) {
-      headers["Authorization"] = `Bearer ${session.accessToken}`;
+  // Try unauthenticated first (works for public repos, no UI)
+  let response = await fetch(url, { headers: baseHeaders });
+
+  // On 401/403/404 attempt GitHub auth and retry once
+  if (!response.ok && [401, 403, 404].includes(response.status)) {
+    try {
+      const session = await vscode.authentication.getSession("github", ["repo"], { createIfNone: true });
+      if (session) {
+        response = await fetch(url, {
+          headers: { ...baseHeaders, Authorization: `Bearer ${session.accessToken}` },
+        });
+      }
+    } catch {
+      // auth declined or unavailable — fall through with original error
     }
-  } catch {
-    // auth not available — proceed unauthenticated
   }
 
-  const response = await fetch(url, { headers });
   if (!response.ok) {
     throw new Error(`GitHub API ${response.status}: ${url}`);
   }
