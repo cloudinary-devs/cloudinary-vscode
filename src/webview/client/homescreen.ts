@@ -16,4 +16,5 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("hs-btn-library")?.addEventListener("click", () => postMessage("showLibrary"));
   document.getElementById("hs-btn-upload")?.addEventListener("click", () => postMessage("openUploadWidget"));
   document.getElementById("hs-link-welcome")?.addEventListener("click", () => postMessage("openWelcomeScreen"));
+  document.getElementById("hs-btn-ai-tools")?.addEventListener("click", () => postMessage("configureAiTools"));
 });
