@@ -537,7 +537,7 @@ function registerConfigureAiTools(context: vscode.ExtensionContext): void {
             label: s.name,
             description: s.description,
             detail: installedDirNames.has(s.dirName) ? "✓ installed" : "Not installed",
-            picked: true,
+            picked: true, // always pre-selected; writeWithOverwriteCheck guards re-installs
           })),
           { canPickMany: true, placeHolder: "Select skills to install" }
         );
