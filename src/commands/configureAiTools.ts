@@ -4,6 +4,16 @@ import * as vscode from "vscode";
 
 type EditorType = "cursor" | "vscode" | "windsurf" | "antigravity" | "unknown";
 
+type McpServerDef = {
+  label: string;
+  description: string;
+  key: string;
+  /** Config entry for Cursor / windsurf / antigravity / Claude (mcpServers format) */
+  cursorConfig: Record<string, unknown>;
+  /** Config entry for VS Code (servers format, "servers" root key) */
+  vscodeConfig: Record<string, unknown>;
+};
+
 type SkillInfo = {
   name: string;
   description: string;
@@ -51,9 +61,18 @@ function getMcpFilePath(editor: EditorType): string {
 const SKILLS_BASE = "https://api.github.com/repos/cloudinary-devs/skills/contents";
 
 async function githubFetchJson<T>(url: string): Promise<T> {
-  const response = await fetch(url, {
-    headers: { Accept: "application/vnd.github+json" },
-  });
+  const headers: Record<string, string> = { Accept: "application/vnd.github+json" };
+
+  try {
+    const session = await vscode.authentication.getSession("github", ["repo"], { silent: true });
+    if (session) {
+      headers["Authorization"] = `Bearer ${session.accessToken}`;
+    }
+  } catch {
+    // auth not available — proceed unauthenticated
+  }
+
+  const response = await fetch(url, { headers });
   if (!response.ok) {
     throw new Error(`GitHub API ${response.status}: ${url}`);
   }
@@ -281,20 +300,176 @@ async function installForCopilot(
   }
 }
 
+// ── MCP Server definitions ────────────────────────────────────────────────────
+
+const MCP_SERVERS: McpServerDef[] = [
+  {
+    label: "Cloudinary Asset Management",
+    description: "Browse, upload, and manage media assets",
+    key: "cloudinary-asset-mgmt",
+    cursorConfig: {
+      command: "npx",
+      args: ["-y", "@cloudinary/asset-management", "mcp", "start"],
+      env: {
+        CLOUDINARY_CLOUD_NAME: "your_cloud_name",
+        CLOUDINARY_API_KEY: "your_api_key",
+        CLOUDINARY_API_SECRET: "your_api_secret",
+      },
+    },
+    vscodeConfig: {
+      type: "stdio",
+      command: "npx",
+      args: ["-y", "@cloudinary/asset-management", "mcp", "start"],
+      env: {
+        CLOUDINARY_CLOUD_NAME: "${env:CLOUDINARY_CLOUD_NAME}",
+        CLOUDINARY_API_KEY: "${env:CLOUDINARY_API_KEY}",
+        CLOUDINARY_API_SECRET: "${env:CLOUDINARY_API_SECRET}",
+      },
+    },
+  },
+  {
+    label: "Cloudinary Environment Config",
+    description: "Configure upload presets, transformations, and settings",
+    key: "cloudinary-env-config",
+    cursorConfig: {
+      command: "npx",
+      args: ["-y", "@cloudinary/environment-config", "mcp", "start"],
+      env: {
+        CLOUDINARY_CLOUD_NAME: "your_cloud_name",
+        CLOUDINARY_API_KEY: "your_api_key",
+        CLOUDINARY_API_SECRET: "your_api_secret",
+      },
+    },
+    vscodeConfig: {
+      type: "stdio",
+      command: "npx",
+      args: ["-y", "@cloudinary/environment-config", "mcp", "start"],
+      env: {
+        CLOUDINARY_CLOUD_NAME: "${env:CLOUDINARY_CLOUD_NAME}",
+        CLOUDINARY_API_KEY: "${env:CLOUDINARY_API_KEY}",
+        CLOUDINARY_API_SECRET: "${env:CLOUDINARY_API_SECRET}",
+      },
+    },
+  },
+  {
+    label: "Cloudinary Structured Metadata",
+    description: "Manage structured metadata fields and values",
+    key: "cloudinary-smd",
+    cursorConfig: {
+      command: "npx",
+      args: ["-y", "@cloudinary/structured-metadata", "mcp", "start"],
+      env: {
+        CLOUDINARY_CLOUD_NAME: "your_cloud_name",
+        CLOUDINARY_API_KEY: "your_api_key",
+        CLOUDINARY_API_SECRET: "your_api_secret",
+      },
+    },
+    vscodeConfig: {
+      type: "stdio",
+      command: "npx",
+      args: ["-y", "@cloudinary/structured-metadata", "mcp", "start"],
+      env: {
+        CLOUDINARY_CLOUD_NAME: "${env:CLOUDINARY_CLOUD_NAME}",
+        CLOUDINARY_API_KEY: "${env:CLOUDINARY_API_KEY}",
+        CLOUDINARY_API_SECRET: "${env:CLOUDINARY_API_SECRET}",
+      },
+    },
+  },
+  {
+    label: "Cloudinary Analysis",
+    description: "AI-powered image and video analysis",
+    key: "cloudinary-analysis",
+    cursorConfig: {
+      command: "npx",
+      args: ["-y", "@cloudinary/analysis", "mcp", "start"],
+      env: {
+        CLOUDINARY_CLOUD_NAME: "your_cloud_name",
+        CLOUDINARY_API_KEY: "your_api_key",
+        CLOUDINARY_API_SECRET: "your_api_secret",
+      },
+    },
+    vscodeConfig: {
+      type: "stdio",
+      command: "npx",
+      args: ["-y", "@cloudinary/analysis", "mcp", "start"],
+      env: {
+        CLOUDINARY_CLOUD_NAME: "${env:CLOUDINARY_CLOUD_NAME}",
+        CLOUDINARY_API_KEY: "${env:CLOUDINARY_API_KEY}",
+        CLOUDINARY_API_SECRET: "${env:CLOUDINARY_API_SECRET}",
+      },
+    },
+  },
+  {
+    label: "MediaFlows",
+    description: "AI-powered media workflows and automation",
+    key: "mediaflows",
+    cursorConfig: {
+      url: "https://mediaflows.mcp.cloudinary.com/v2/mcp",
+      headers: {
+        "cld-cloud-name": "your_cloud_name",
+        "cld-api-key": "your_api_key",
+        "cld-secret": "your_api_secret",
+      },
+    },
+    vscodeConfig: {
+      url: "https://mediaflows.mcp.cloudinary.com/v2/mcp",
+      headers: {
+        "cld-cloud-name": "your_cloud_name",
+        "cld-api-key": "your_api_key",
+        "cld-secret": "your_api_secret",
+      },
+    },
+  },
+];
+
 // ── MCP Config ───────────────────────────────────────────────────────────────
 
 async function createMcpConfig(
   rootUri: vscode.Uri,
+  editor: EditorType,
   mcpFilePath: string,
   createdFiles: string[]
 ): Promise<void> {
-  const mcpUri = vscode.Uri.joinPath(rootUri, mcpFilePath);
-  const written = await writeWithOverwriteCheck(
-    mcpUri,
-    JSON.stringify({ mcpServers: {} }, null, 2),
-    mcpFilePath
+  const selected = await vscode.window.showQuickPick(
+    MCP_SERVERS.map((s) => ({ label: s.label, description: s.description, picked: true })),
+    { canPickMany: true, placeHolder: "Select MCP servers to configure" }
   );
-  if (written) { createdFiles.push(mcpFilePath); }
+  if (!selected || selected.length === 0) { return; }
+
+  const selectedDefs = selected
+    .map((item) => MCP_SERVERS.find((s) => s.label === item.label))
+    .filter((s): s is McpServerDef => s !== undefined);
+
+  const mcpUri = vscode.Uri.joinPath(rootUri, mcpFilePath);
+  const isVscode = editor === "vscode";
+  const rootKey = isVscode ? "servers" : "mcpServers";
+
+  // Read and merge into existing config if present
+  let config: Record<string, unknown> = {};
+  try {
+    const bytes = await vscode.workspace.fs.readFile(mcpUri);
+    config = JSON.parse(Buffer.from(bytes).toString("utf-8"));
+  } catch {
+    // new file
+  }
+
+  if (!config[rootKey] || typeof config[rootKey] !== "object") {
+    config[rootKey] = {};
+  }
+  const servers = config[rootKey] as Record<string, unknown>;
+
+  for (const def of selectedDefs) {
+    servers[def.key] = isVscode ? def.vscodeConfig : def.cursorConfig;
+  }
+
+  await ensureDir(vscode.Uri.joinPath(mcpUri, ".."));
+  await vscode.workspace.fs.writeFile(
+    mcpUri,
+    Buffer.from(JSON.stringify(config, null, 2), "utf-8")
+  );
+  if (!createdFiles.includes(mcpFilePath)) {
+    createdFiles.push(mcpFilePath);
+  }
 }
 
 // ── Command registration ─────────────────────────────────────────────────────
@@ -394,7 +569,7 @@ function registerConfigureAiTools(context: vscode.ExtensionContext): void {
       // ── Step 3: MCP config flow ────────────────────────────────────────────
       if (options.some((o) => o.label === "MCP Config")) {
         const editor = detectEditor();
-        await createMcpConfig(rootUri, getMcpFilePath(editor), createdFiles);
+        await createMcpConfig(rootUri, editor, getMcpFilePath(editor), createdFiles);
       }
 
       // ── Step 4: feedback ───────────────────────────────────────────────────
