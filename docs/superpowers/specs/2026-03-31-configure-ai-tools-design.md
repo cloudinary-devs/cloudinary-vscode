@@ -48,13 +48,15 @@ Show a `canPickMany: true` QuickPick. Each item:
 
 ### IDE target selection
 
-After skill selection, ask which AI tool to install for (single-select QuickPick):
+After skill selection, ask which AI tool to install for (single-select QuickPick). Use `detectEditor()` to pre-select the matching option as the active item — the user can change it but doesn't have to:
 
-| Option | Install location |
-|--------|-----------------|
-| Claude Code | `.claude/skills/<name>/SKILL.md` + `.claude/skills/<name>/references/<file>` |
-| Cursor | `.cursor/rules/<name>.mdc` |
-| VS Code (Copilot) | `.github/copilot-instructions.md` |
+| Option | Pre-selected when | Install location |
+|--------|------------------|-----------------|
+| Claude Code | `unknown` or VS Code without Copilot signal | `.claude/skills/<name>/SKILL.md` + `.claude/skills/<name>/references/<file>` |
+| Cursor | `cursor` | `.cursor/rules/<name>.mdc` |
+| VS Code (Copilot) | `vscode` | `.github/copilot-instructions.md` |
+
+`detectEditor()` returning `windsurf` or `antigravity` falls back to pre-selecting Claude Code (closest equivalent).
 
 ### Downloading and writing files
 
