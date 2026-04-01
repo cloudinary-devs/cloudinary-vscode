@@ -7,6 +7,7 @@ type EditorType = "cursor" | "vscode" | "windsurf" | "antigravity" | "unknown";
 type SkillInfo = {
   name: string;
   description: string;
+  dirName: string; // GitHub directory name, used for API paths and local install paths
 };
 
 type GitHubEntry = {
@@ -87,7 +88,7 @@ function getBodyAfterFrontmatter(content: string): string {
 
 /** Returns SKILL.md content with the `name:` line removed (Cursor .mdc format). */
 function toMdcContent(content: string): string {
-  return content.replace(/^(---\n)([\s\S]*?)(\n---)/m, (_, open, body, close) => {
+  return content.replace(/^(---\n)([\s\S]*?)(\n---)/, (_, open, body, close) => {
     const filtered = body
       .split("\n")
       .filter((line: string) => !line.startsWith("name:"))
@@ -110,7 +111,7 @@ async function fetchSkillList(): Promise<SkillInfo[]> {
         );
         const content = decodeBase64(file.content);
         const fm = parseFrontmatter(content);
-        return { name: fm.name || dir.name, description: fm.description || "" };
+        return { name: fm.name || dir.name, description: fm.description || "", dirName: dir.name };
       } catch {
         return null;
       }
@@ -139,17 +140,21 @@ async function fetchReferenceFiles(
     return []; // no references directory — that's fine
   }
 
-  const files = await Promise.all(
+  const results = await Promise.all(
     entries
       .filter((e) => e.type === "file")
       .map(async (e) => {
-        const file = await githubFetchJson<GitHubFile>(
-          `${SKILLS_BASE}/skills/${skillName}/references/${e.name}`
-        );
-        return { name: e.name, content: decodeBase64(file.content) };
+        try {
+          const file = await githubFetchJson<GitHubFile>(
+            `${SKILLS_BASE}/skills/${skillName}/references/${e.name}`
+          );
+          return { name: e.name, content: decodeBase64(file.content) };
+        } catch {
+          return null;
+        }
       })
   );
-  return files;
+  return results.filter((f): f is { name: string; content: string } => f !== null);
 }
 
 // ── Filesystem helpers ───────────────────────────────────────────────────────
@@ -255,6 +260,13 @@ async function installForCopilot(
     // new file
   }
 
+  if (existing.includes(`## ${skillName}`)) {
+    if (!createdFiles.includes(".github/copilot-instructions.md")) {
+      createdFiles.push(".github/copilot-instructions.md");
+    }
+    return;
+  }
+
   const body = getBodyAfterFrontmatter(skillContent);
   const section = `## ${skillName}\n\n${body}\n`;
   const separator = existing.length > 0 ? "\n" : "";
@@ -351,21 +363,22 @@ function registerConfigureAiTools(context: vscode.ExtensionContext): void {
         if (!ideTarget) { return; }
 
         for (const item of pickedSkills) {
-          const skill = skills.find((s) => s.name === item.label)!;
+          const skill = skills.find((s) => s.name === item.label);
+          if (!skill) { continue; }
           let content: string;
           try {
-            content = await fetchSkillContent(skill.name);
+            content = await fetchSkillContent(skill.dirName);
           } catch (err: any) {
-            errors.push(`${skill.name}: ${err.message}`);
+            errors.push(`${skill.dirName}: ${err.message}`);
             continue;
           }
 
           if (ideTarget.label === "Claude Code") {
-            await installForClaudeCode(rootUri, skill.name, content, createdFiles, errors);
+            await installForClaudeCode(rootUri, skill.dirName, content, createdFiles, errors);
           } else if (ideTarget.label === "Cursor") {
-            await installForCursor(rootUri, skill.name, content, createdFiles);
+            await installForCursor(rootUri, skill.dirName, content, createdFiles);
           } else {
-            await installForCopilot(rootUri, skill.name, content, createdFiles);
+            await installForCopilot(rootUri, skill.dirName, content, createdFiles);
           }
         }
       }
