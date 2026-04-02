@@ -7,6 +7,20 @@ import * as vscode from "vscode";
 import { CloudinaryTreeDataProvider } from "../tree/treeDataProvider";
 import { createWebviewDocument, getScriptUri } from "./webviewUtils";
 import { escapeHtml } from "./utils/helpers";
+import {
+  SkillInfo,
+  MCP_SERVERS,
+  detectEditor,
+  getMcpFilePath,
+  fetchSkillList,
+  fetchSkillContent,
+  readInstalledSkillDirNames,
+  readConfiguredMcpServerKeys,
+  installForClaudeCode,
+  installForCursor,
+  installForCopilot,
+  installMcpServers,
+} from "../aiToolsService";
 
 export class HomescreenViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = "cloudinaryHomescreen";
@@ -17,6 +31,7 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
   ) {}
 
   private _webviewView: vscode.WebviewView | undefined;
+  private _cachedSkills: SkillInfo[] | undefined;
 
   resolveWebviewView(
     webviewView: vscode.WebviewView,
@@ -49,7 +64,7 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
     });
 
     webviewView.webview.onDidReceiveMessage(
-      (message: { command: string }) => {
+      (message: { command: string; skills?: string[]; ideTarget?: string; mcpServers?: string[] }) => {
         switch (message.command) {
           case "openGlobalConfig":
             vscode.commands.executeCommand("cloudinary.openGlobalConfig");
@@ -63,8 +78,15 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
           case "openWelcomeScreen":
             vscode.commands.executeCommand("cloudinary.openWelcomeScreen");
             break;
-          case "configureAiTools":
-            vscode.commands.executeCommand("cloudinary.configureAiTools");
+          case "aiToolsExpanded":
+            this._handleAiToolsExpanded();
+            break;
+          case "installAiTools":
+            this._handleInstallAiTools(
+              message.skills ?? [],
+              message.ideTarget ?? "Claude Code",
+              message.mcpServers ?? []
+            );
             break;
         }
       }
@@ -751,5 +773,134 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
         </div>
       </div>
     `;
+  }
+
+  private async _handleAiToolsExpanded(): Promise<void> {
+    const view = this._webviewView;
+    if (!view) { return; }
+
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (!workspaceFolders || workspaceFolders.length === 0) {
+      view.webview.postMessage({
+        command: "aiToolsData",
+        error: "Please open a workspace folder first.",
+      });
+      return;
+    }
+    const rootUri = workspaceFolders[0].uri;
+
+    try {
+      // Fetch skills once; cache for subsequent opens
+      if (!this._cachedSkills) {
+        this._cachedSkills = await fetchSkillList();
+      }
+      const skills = this._cachedSkills;
+
+      const ideLabels: string[] = ["Claude Code", "Cursor", "VS Code (Copilot)"];
+
+      // Pre-compute installed status for all 3 IDEs
+      const installedByIde: Record<string, string[]> = {};
+      await Promise.all(
+        ideLabels.map(async (label) => {
+          const installedSet = await readInstalledSkillDirNames(rootUri, label, skills);
+          installedByIde[label] = [...installedSet];
+        })
+      );
+
+      // MCP servers — use detected editor for the config file path
+      const editor = detectEditor();
+      const mcpFilePath = getMcpFilePath(editor);
+      const rootKey = editor === "vscode" ? "servers" : "mcpServers";
+      const configuredMcpSet = await readConfiguredMcpServerKeys(rootUri, mcpFilePath, rootKey);
+
+      const detectedIde =
+        editor === "cursor" ? "Cursor" :
+        editor === "vscode" ? "VS Code (Copilot)" :
+        "Claude Code";
+
+      view.webview.postMessage({
+        command: "aiToolsData",
+        skills: skills.map((s) => ({ name: s.name, description: s.description, dirName: s.dirName })),
+        installedByIde,
+        mcpServers: MCP_SERVERS.map((s) => ({ key: s.key, label: s.label, description: s.description })),
+        configuredMcpKeys: [...configuredMcpSet],
+        detectedIde,
+      });
+    } catch (err: any) {
+      view.webview.postMessage({
+        command: "aiToolsData",
+        error: err.message ?? String(err),
+      });
+    }
+  }
+
+  private async _handleInstallAiTools(
+    skills: string[],
+    ideTarget: string,
+    mcpServers: string[]
+  ): Promise<void> {
+    const view = this._webviewView;
+    if (!view) { return; }
+
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (!workspaceFolders || workspaceFolders.length === 0) {
+      view.webview.postMessage({ command: "aiToolsResult", errors: ["No workspace folder open."] });
+      return;
+    }
+    const rootUri = workspaceFolders[0].uri;
+    const errors: string[] = [];
+
+    // Install skills
+    const cachedSkills = this._cachedSkills ?? [];
+    for (const dirName of skills) {
+      const skillInfo = cachedSkills.find((s) => s.dirName === dirName);
+      if (!skillInfo) { continue; }
+
+      let content: string;
+      try {
+        content = await fetchSkillContent(dirName);
+      } catch (err: any) {
+        errors.push(`${dirName}: ${err.message}`);
+        view.webview.postMessage({ command: "aiToolsProgress", item: dirName, status: "error" });
+        continue;
+      }
+
+      const createdFiles: string[] = [];
+      try {
+        if (ideTarget === "Claude Code") {
+          await installForClaudeCode(rootUri, dirName, content, createdFiles, errors);
+        } else if (ideTarget === "Cursor") {
+          await installForCursor(rootUri, dirName, content, createdFiles);
+        } else {
+          await installForCopilot(rootUri, skillInfo.name, content, createdFiles);
+        }
+        view.webview.postMessage({ command: "aiToolsProgress", item: dirName, status: "done" });
+      } catch (err: any) {
+        errors.push(`${dirName}: ${err.message}`);
+        view.webview.postMessage({ command: "aiToolsProgress", item: dirName, status: "error" });
+      }
+    }
+
+    // Install MCP servers
+    if (mcpServers.length > 0) {
+      const editor = detectEditor();
+      const createdFiles: string[] = [];
+      try {
+        await installMcpServers(rootUri, editor, mcpServers, createdFiles);
+        for (const key of mcpServers) {
+          view.webview.postMessage({ command: "aiToolsProgress", item: key, status: "done" });
+        }
+      } catch (err: any) {
+        errors.push(`MCP: ${err.message}`);
+        for (const key of mcpServers) {
+          view.webview.postMessage({ command: "aiToolsProgress", item: key, status: "error" });
+        }
+      }
+    }
+
+    // Invalidate cached skills so next open re-reads disk
+    this._cachedSkills = undefined;
+
+    view.webview.postMessage({ command: "aiToolsResult", errors });
   }
 }
