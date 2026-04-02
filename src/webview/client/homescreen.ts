@@ -241,6 +241,8 @@ function handleAiToolsData(msg: AiToolsDataMessage): void {
   renderAdditionalPlatformRows(msg.additionalPlatforms);
   renderSkillRows(msg.skills, msg.installedOnPrimary);
   renderMcpRows(msg.mcpServers, msg.configuredMcpKeys);
+  const applyBtn = el<HTMLButtonElement>("hs-ai-apply");
+  if (applyBtn) { applyBtn.textContent = "Apply"; }
   showPanelState("ready");
   updateApplyButton();
 }
