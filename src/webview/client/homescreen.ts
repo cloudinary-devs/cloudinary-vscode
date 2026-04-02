@@ -150,9 +150,10 @@ function renderSkillRows(
     const statusText = status === "installed" ? "installed"
                      : status === "partial"   ? "partial"
                      : "—";
-    const checked = status !== "installed" ? "checked" : "";
+    const checked = "checked";
+    const disabled = status === "installed" ? "disabled" : "";
     return `<label class="hs-ai-item">
-      <input type="checkbox" class="hs-ai-cb" data-skill="${escapeHtml(s.dirName)}" ${checked}>
+      <input type="checkbox" class="hs-ai-cb" data-skill="${escapeHtml(s.dirName)}" ${checked} ${disabled}>
       <span class="hs-ai-item-name" title="${escapeHtml(s.description)}">${escapeHtml(s.name)}</span>
       <span class="hs-ai-item-status ${statusClass}">${statusText}</span>
     </label>`;

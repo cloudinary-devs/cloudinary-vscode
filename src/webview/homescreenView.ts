@@ -558,6 +558,14 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
           margin-top: 1px;
         }
 
+        .hs-ai-item input[type="checkbox"]:disabled { opacity: 0.5; cursor: default; }
+        .hs-ai-hint {
+          font-size: 9px;
+          color: var(--vscode-descriptionForeground);
+          margin: 3px 0 0 0;
+          padding: 0;
+        }
+
         /* Progress tick */
         .hs-ai-item-tick {
           flex-shrink: 0;
@@ -705,6 +713,7 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
               <div>
                 <div class="hs-ai-section-head">Skills</div>
                 <div id="hs-ai-skills-list"></div>
+                <div class="hs-ai-hint">Installed skills are locked. Delete files to uninstall.</div>
                 <div class="hs-ai-section-head" style="margin-top:8px">Install for</div>
                 <div id="hs-ai-platform-list"></div>
               </div>
