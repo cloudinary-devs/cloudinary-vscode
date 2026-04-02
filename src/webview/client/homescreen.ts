@@ -328,6 +328,11 @@ function init(): void {
     });
   });
 
+  // Configure credentials button (uses hs-setup-banner-btn, not hs-action)
+  document.getElementById("hs-btn-configure")?.addEventListener("click", () => {
+    getVSCode()?.postMessage({ command: "openGlobalConfig" });
+  });
+
   // Accordion toggle
   el("hs-btn-ai-tools").addEventListener("click", toggleAccordion);
 
