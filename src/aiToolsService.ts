@@ -17,7 +17,7 @@ export type SkillInfo = {
   dirName: string;
 };
 
-export type PlatformId = 'universal' | 'claude-code' | 'vscode-copilot' | 'windsurf';
+export type PlatformId = "universal" | "claude-code" | "vscode-copilot" | "windsurf";
 
 export type PlatformDef = {
   id: PlatformId;
@@ -26,10 +26,10 @@ export type PlatformDef = {
 };
 
 export const PLATFORMS: PlatformDef[] = [
-  { id: 'universal',      label: 'Universal',        sublabel: 'Cursor, Codex, Amp, Warp + more' },
-  { id: 'claude-code',    label: 'Claude Code' },
-  { id: 'vscode-copilot', label: 'VS Code (Copilot)' },
-  { id: 'windsurf',       label: 'Windsurf' },
+  { id: "universal",      label: "Universal",        sublabel: "Cursor, Codex, Amp, Warp + more" },
+  { id: "claude-code",    label: "Claude Code" },
+  { id: "vscode-copilot", label: "VS Code (Copilot)" },
+  { id: "windsurf",       label: "Windsurf" },
 ];
 
 type GitHubEntry = {
@@ -70,10 +70,10 @@ export function getMcpFilePath(editor: EditorType): string {
 
 export function detectEditorPlatform(): PlatformId {
   const editor = detectEditor();
-  if (editor === 'windsurf') { return 'windsurf'; }
-  if (editor === 'vscode')   { return 'vscode-copilot'; }
-  if (editor === 'cursor' || editor === 'antigravity') { return 'universal'; }
-  return 'claude-code'; // claude-code, unknown
+  if (editor === "windsurf") { return "windsurf"; }
+  if (editor === "vscode")   { return "vscode-copilot"; }
+  if (editor === "cursor" || editor === "antigravity") { return "universal"; }
+  return "claude-code"; // claude-code, unknown
 }
 
 // ── GitHub API helpers ────────────────────────────────────────────────────────
@@ -325,22 +325,34 @@ export async function installForUniversal(
   createdFiles: string[],
   errors: string[]
 ): Promise<void> {
-  const skillFile = vscode.Uri.joinPath(rootUri, `.agents/skills/${skillName}/SKILL.md`);
-  const written = await writeWithOverwriteCheck(skillFile, skillContent, `${skillName}/SKILL.md`);
+  const skillFile = vscode.Uri.joinPath(
+    rootUri, `.agents/skills/${skillName}/SKILL.md`
+  );
+  const written = await writeWithOverwriteCheck(
+    skillFile, skillContent, `${skillName}/SKILL.md`
+  );
   if (!written) { return; }
   createdFiles.push(`.agents/skills/${skillName}/SKILL.md`);
 
   let refs: Array<{ name: string; content: string }>;
-  try { refs = await fetchReferenceFiles(skillName); } catch (err: any) {
-    errors.push(`${skillName} references: ${err.message}`); return;
+  try {
+    refs = await fetchReferenceFiles(skillName);
+  } catch (err: any) {
+    errors.push(`${skillName} references: ${err.message}`);
+    return;
   }
+
   for (const ref of refs) {
     try {
-      const refUri = vscode.Uri.joinPath(rootUri, `.agents/skills/${skillName}/references/${ref.name}`);
-      await ensureDir(vscode.Uri.joinPath(refUri, '..'));
-      await vscode.workspace.fs.writeFile(refUri, Buffer.from(ref.content, 'utf-8'));
+      const refUri = vscode.Uri.joinPath(
+        rootUri, `.agents/skills/${skillName}/references/${ref.name}`
+      );
+      await ensureDir(vscode.Uri.joinPath(refUri, ".."));
+      await vscode.workspace.fs.writeFile(refUri, Buffer.from(ref.content, "utf-8"));
       createdFiles.push(`.agents/skills/${skillName}/references/${ref.name}`);
-    } catch (err: any) { errors.push(`${skillName}/references/${ref.name}: ${err.message}`); }
+    } catch (err: any) {
+      errors.push(`${skillName}/references/${ref.name}: ${err.message}`);
+    }
   }
 }
 
@@ -351,22 +363,34 @@ export async function installForWindsurf(
   createdFiles: string[],
   errors: string[]
 ): Promise<void> {
-  const skillFile = vscode.Uri.joinPath(rootUri, `.windsurf/skills/${skillName}/SKILL.md`);
-  const written = await writeWithOverwriteCheck(skillFile, skillContent, `${skillName}/SKILL.md`);
+  const skillFile = vscode.Uri.joinPath(
+    rootUri, `.windsurf/skills/${skillName}/SKILL.md`
+  );
+  const written = await writeWithOverwriteCheck(
+    skillFile, skillContent, `${skillName}/SKILL.md`
+  );
   if (!written) { return; }
   createdFiles.push(`.windsurf/skills/${skillName}/SKILL.md`);
 
   let refs: Array<{ name: string; content: string }>;
-  try { refs = await fetchReferenceFiles(skillName); } catch (err: any) {
-    errors.push(`${skillName} references: ${err.message}`); return;
+  try {
+    refs = await fetchReferenceFiles(skillName);
+  } catch (err: any) {
+    errors.push(`${skillName} references: ${err.message}`);
+    return;
   }
+
   for (const ref of refs) {
     try {
-      const refUri = vscode.Uri.joinPath(rootUri, `.windsurf/skills/${skillName}/references/${ref.name}`);
-      await ensureDir(vscode.Uri.joinPath(refUri, '..'));
-      await vscode.workspace.fs.writeFile(refUri, Buffer.from(ref.content, 'utf-8'));
+      const refUri = vscode.Uri.joinPath(
+        rootUri, `.windsurf/skills/${skillName}/references/${ref.name}`
+      );
+      await ensureDir(vscode.Uri.joinPath(refUri, ".."));
+      await vscode.workspace.fs.writeFile(refUri, Buffer.from(ref.content, "utf-8"));
       createdFiles.push(`.windsurf/skills/${skillName}/references/${ref.name}`);
-    } catch (err: any) { errors.push(`${skillName}/references/${ref.name}: ${err.message}`); }
+    } catch (err: any) {
+      errors.push(`${skillName}/references/${ref.name}: ${err.message}`);
+    }
   }
 }
 
@@ -379,11 +403,11 @@ export async function readInstalledSkillDirNames(
 ): Promise<Set<string>> {
   const installed = new Set<string>();
 
-  if (platform === 'vscode-copilot') {
+  if (platform === "vscode-copilot") {
     try {
-      const uri = vscode.Uri.joinPath(rootUri, '.github/copilot-instructions.md');
+      const uri = vscode.Uri.joinPath(rootUri, ".github/copilot-instructions.md");
       const bytes = await vscode.workspace.fs.readFile(uri);
-      const content = Buffer.from(bytes).toString('utf-8');
+      const content = Buffer.from(bytes).toString("utf-8");
       for (const skill of skills) {
         if (content.includes(`## ${skill.name}`)) {
           installed.add(skill.dirName);
@@ -396,9 +420,9 @@ export async function readInstalledSkillDirNames(
   }
 
   const pathPrefix =
-    platform === 'claude-code' ? '.claude/skills' :
-    platform === 'universal'   ? '.agents/skills' :
-    /* windsurf */               '.windsurf/skills';
+    platform === "claude-code" ? ".claude/skills" :
+    platform === "universal"   ? ".agents/skills" :
+    /* windsurf */               ".windsurf/skills";
 
   await Promise.all(
     skills.map(async (skill) => {
@@ -417,10 +441,10 @@ export async function readInstalledSkillDirNames(
 
 export async function detectActivePlatforms(rootUri: vscode.Uri): Promise<PlatformId[]> {
   const checks: Array<{ id: PlatformId; path: string }> = [
-    { id: 'universal',      path: '.agents/skills' },
-    { id: 'claude-code',    path: '.claude/skills' },
-    { id: 'vscode-copilot', path: '.github/copilot-instructions.md' },
-    { id: 'windsurf',       path: '.windsurf/skills' },
+    { id: "universal",      path: ".agents/skills" },
+    { id: "claude-code",    path: ".claude/skills" },
+    { id: "vscode-copilot", path: ".github/copilot-instructions.md" },
+    { id: "windsurf",       path: ".windsurf/skills" },
   ];
   const active = new Set<PlatformId>([detectEditorPlatform()]);
   await Promise.all(
