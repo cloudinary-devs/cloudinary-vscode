@@ -732,12 +732,7 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
               <button class="hs-ai-apply" id="hs-ai-apply" disabled>Apply</button>
             </div>
 
-            <!-- Done state -->
-            <div class="hs-ai-panel-inner hidden" id="hs-ai-state-done">
-              <div id="hs-ai-done-skills-list"></div>
-              <div id="hs-ai-done-mcp-list"></div>
-              <button class="hs-ai-apply" id="hs-ai-apply-again">Apply again</button>
-            </div>
+
 
             <!-- Error state -->
             <div class="hs-ai-panel-inner hidden" id="hs-ai-state-error">

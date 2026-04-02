@@ -264,58 +264,11 @@ function handleAiToolsProgress(msg: AiToolsProgressMessage): void {
   row.appendChild(tick);
 }
 
-function handleAiToolsResult(msg: AiToolsResultMessage): void {
-  // Force a re-fetch next time the panel opens so installed state is fresh
+function handleAiToolsResult(_msg: AiToolsResultMessage): void {
   _dataFetched = false;
   _cachedData = null;
-
-  // Build done state: collect rows with ticks and show them
-  const doneSkillsDiv = el("hs-ai-done-skills-list");
-  const doneMcpDiv = el("hs-ai-done-mcp-list");
-
-  if (doneSkillsDiv) {
-    const rows = document.querySelectorAll<HTMLElement>("#hs-ai-skills-list .hs-ai-item");
-    doneSkillsDiv.innerHTML = "";
-    rows.forEach((row) => {
-      const tick = row.querySelector(".hs-ai-item-tick");
-      if (!tick) { return; }
-      const name = row.querySelector(".hs-ai-item-name")?.textContent ?? "";
-      const isOk = tick.classList.contains("hs-ai-item-tick--ok");
-      const statusClass = isOk ? "hs-ai-item-status--ok" : "hs-ai-item-status--none";
-      const statusText = isOk ? "installed" : "error";
-      doneSkillsDiv.insertAdjacentHTML(
-        "beforeend",
-        `<div class="hs-ai-item">
-          <span class="hs-ai-item-tick hs-ai-item-tick--${isOk ? "ok" : "err"}">${isOk ? "✓" : "✕"}</span>
-          <span class="hs-ai-item-name">${name}</span>
-          <span class="hs-ai-item-status ${statusClass}">${statusText}</span>
-        </div>`
-      );
-    });
-  }
-
-  if (doneMcpDiv) {
-    const rows = document.querySelectorAll<HTMLElement>("#hs-ai-mcp-list .hs-ai-item");
-    doneMcpDiv.innerHTML = "";
-    rows.forEach((row) => {
-      const tick = row.querySelector(".hs-ai-item-tick");
-      if (!tick) { return; }
-      const name = row.querySelector(".hs-ai-item-name")?.textContent ?? "";
-      const isOk = tick.classList.contains("hs-ai-item-tick--ok");
-      const statusClass = isOk ? "hs-ai-item-status--ok" : "hs-ai-item-status--none";
-      const statusText = isOk ? "configured" : "error";
-      doneMcpDiv.insertAdjacentHTML(
-        "beforeend",
-        `<div class="hs-ai-item">
-          <span class="hs-ai-item-tick hs-ai-item-tick--${isOk ? "ok" : "err"}">${isOk ? "✓" : "✕"}</span>
-          <span class="hs-ai-item-name">${name}</span>
-          <span class="hs-ai-item-status ${statusClass}">${statusText}</span>
-        </div>`
-      );
-    });
-  }
-
-  showPanelState("done");
+  showPanelState("loading");
+  getVSCode()?.postMessage({ command: "aiToolsExpanded" });
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
@@ -340,13 +293,6 @@ function init(): void {
 
   // Apply button
   el<HTMLButtonElement>("hs-ai-apply")?.addEventListener("click", handleApply);
-
-  // Apply again button (done state)
-  el<HTMLButtonElement>("hs-ai-apply-again")?.addEventListener("click", () => {
-    // Re-open: reset state and re-fetch
-    _isOpen = false;
-    toggleAccordion();
-  });
 
   // VS Code → webview messages
   window.addEventListener("message", (event: MessageEvent<InboundMessage>) => {
