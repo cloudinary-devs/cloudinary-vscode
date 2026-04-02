@@ -9,6 +9,7 @@ import { createWebviewDocument, getScriptUri } from "./webviewUtils";
 import { escapeHtml } from "./utils/helpers";
 import {
   PlatformId,
+  PLATFORMS,
   SkillInfo,
   MCP_SERVERS,
   detectEditor,
@@ -23,6 +24,7 @@ import {
   installForWindsurf,
   installMcpServers,
   detectActivePlatforms,
+  detectEditorPlatform,
 } from "../aiToolsService";
 
 export class HomescreenViewProvider implements vscode.WebviewViewProvider {
@@ -549,7 +551,12 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
         }
         .hs-ai-item-status--ok::before   { background: #4ade80; }
         .hs-ai-item-status--none::before { background: rgba(255,255,255,0.15); }
-        .hs-ai-item-status--partial::before { background: rgba(250,204,21,0.7); }
+        .hs-ai-platform-badge {
+          font-size: 9px;
+          font-weight: 400;
+          color: var(--vscode-descriptionForeground);
+          margin-left: 4px;
+        }
         .hs-ai-platform-sub {
           display: block;
           font-size: 9px;
@@ -711,10 +718,10 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
             <!-- Ready / applying state -->
             <div class="hs-ai-panel-inner hidden" id="hs-ai-state-ready">
               <div>
-                <div class="hs-ai-section-head">Skills</div>
+                <div class="hs-ai-section-head">Skills <span class="hs-ai-platform-badge" id="hs-ai-skills-platform"></span></div>
                 <div id="hs-ai-skills-list"></div>
                 <div class="hs-ai-hint">Installed skills are locked. Delete files to uninstall.</div>
-                <div class="hs-ai-section-head" style="margin-top:8px">Install for</div>
+                <div class="hs-ai-section-head" style="margin-top:8px">Also install for</div>
                 <div id="hs-ai-platform-list"></div>
               </div>
               <div>
@@ -770,16 +777,20 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
       }
       const skills = this._cachedSkills;
 
-      const platformIds: PlatformId[] = ["universal", "claude-code", "vscode-copilot", "windsurf"];
-      const installedByPlatform: Record<string, string[]> = {};
-      await Promise.all(
-        platformIds.map(async (pid) => {
-          const set = await readInstalledSkillDirNames(rootUri, pid, skills);
-          installedByPlatform[pid] = [...set];
-        })
-      );
+      const primaryPlatform = detectEditorPlatform();
+      const [installedOnPrimarySet, activePlatforms] = await Promise.all([
+        readInstalledSkillDirNames(rootUri, primaryPlatform, skills),
+        detectActivePlatforms(rootUri),
+      ]);
 
-      const activePlatforms = await detectActivePlatforms(rootUri);
+      const additionalPlatforms = PLATFORMS
+        .filter((p) => p.id !== primaryPlatform)
+        .map((p) => ({
+          id: p.id,
+          label: p.label,
+          sublabel: p.sublabel,
+          locked: activePlatforms.includes(p.id as PlatformId),
+        }));
 
       const editor = detectEditor();
       const mcpFilePath = getMcpFilePath(editor);
@@ -789,8 +800,9 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
       view.webview.postMessage({
         command: "aiToolsData",
         skills: skills.map((s) => ({ name: s.name, description: s.description, dirName: s.dirName })),
-        installedByPlatform,
-        activePlatforms,
+        primaryPlatform,
+        installedOnPrimary: [...installedOnPrimarySet],
+        additionalPlatforms,
         mcpServers: MCP_SERVERS.map((s) => ({ key: s.key, label: s.label, description: s.description })),
         configuredMcpKeys: [...configuredMcpSet],
       });
