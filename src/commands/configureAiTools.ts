@@ -104,7 +104,15 @@ function registerConfigureAiTools(context: vscode.ExtensionContext): void {
         });
         if (!ideTarget) { return; }
 
-        const installedDirNames = await readInstalledSkillDirNames(rootUri, ideTarget.label as any, skills);
+        const platformForStatus: Record<string, import("../aiToolsService").PlatformId | undefined> = {
+          "Claude Code": "claude-code",
+          "Cursor": "universal",       // Cursor's new canonical path is .agents/skills/
+          "VS Code (Copilot)": "vscode-copilot",
+        };
+        const pid = platformForStatus[ideTarget.label];
+        const installedDirNames = pid
+          ? await readInstalledSkillDirNames(rootUri, pid, skills)
+          : new Set<string>();
 
         const pickedSkills = await vscode.window.showQuickPick(
           skills.map((s) => ({
