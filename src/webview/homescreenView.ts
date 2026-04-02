@@ -720,6 +720,7 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
               <div>
                 <div class="hs-ai-section-head">MCP Servers</div>
                 <div id="hs-ai-mcp-list"></div>
+                <div class="hs-ai-hint">Configured servers are locked. Delete config entries to remove.</div>
               </div>
               <button class="hs-ai-apply" id="hs-ai-apply" disabled>Apply</button>
             </div>

@@ -107,17 +107,22 @@ const PLATFORM_DEFS = [
   { id: "windsurf",       label: "Windsurf" },
 ];
 
-function renderPlatformRows(activePlatforms: string[]): void {
+function renderPlatformRows(
+  activePlatforms: string[],
+  installedByPlatform: Record<string, string[]>
+): void {
   const list = el("hs-ai-platform-list");
   if (!list) { return; }
   const activeSet = new Set(activePlatforms);
   list.innerHTML = PLATFORM_DEFS.map((p) => {
+    const hasInstalls = (installedByPlatform[p.id] ?? []).length > 0;
     const checked = activeSet.has(p.id) ? "checked" : "";
+    const disabled = hasInstalls ? "disabled" : "";
     const sublabel = p.sublabel
       ? `<span class="hs-ai-platform-sub">${escapeHtml(p.sublabel)}</span>`
       : "";
     return `<label class="hs-ai-item hs-ai-platform-row">
-      <input type="checkbox" class="hs-ai-cb hs-ai-platform-cb" data-platform="${escapeHtml(p.id)}" ${checked}>
+      <input type="checkbox" class="hs-ai-cb hs-ai-platform-cb" data-platform="${escapeHtml(p.id)}" ${checked} ${disabled}>
       <span class="hs-ai-item-name">${escapeHtml(p.label)}${sublabel}</span>
     </label>`;
   }).join("");
@@ -176,7 +181,7 @@ function renderMcpRows(
       const statusClass = isConfigured ? "hs-ai-item-status--ok" : "hs-ai-item-status--none";
       const statusText = isConfigured ? "configured" : "—";
       return `<label class="hs-ai-item">
-        <input type="checkbox" class="hs-ai-cb" data-mcp="${escapeHtml(s.key)}" ${isConfigured ? "" : "checked"}>
+        <input type="checkbox" class="hs-ai-cb" data-mcp="${escapeHtml(s.key)}" checked ${isConfigured ? "disabled" : ""}>
         <span class="hs-ai-item-name" title="${escapeHtml(s.description)}">${escapeHtml(s.label)}</span>
         <span class="hs-ai-item-status ${statusClass}">${statusText}</span>
       </label>`;
@@ -263,7 +268,7 @@ function handleAiToolsData(msg: AiToolsDataMessage): void {
   };
 
   const checkedPlatforms = msg.activePlatforms;
-  renderPlatformRows(checkedPlatforms);
+  renderPlatformRows(checkedPlatforms, msg.installedByPlatform);
   renderSkillRows(msg.skills, msg.installedByPlatform, checkedPlatforms);
   renderMcpRows(msg.mcpServers, msg.configuredMcpKeys);
   showPanelState("ready");
