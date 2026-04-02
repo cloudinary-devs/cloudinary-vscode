@@ -369,6 +369,266 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
           to   { opacity: 1; transform: translateY(0); }
         }
         .hs-header { animation: hs-in 0.18s ease both; }
+
+        /* ── AI Tools accordion ── */
+        #hs-btn-ai-tools { user-select: none; }
+        #hs-btn-ai-tools.expanded {
+          background: var(--vscode-list-hoverBackground);
+          border-radius: 7px 7px 0 0;
+        }
+
+        .hs-ai-panel {
+          overflow: hidden;
+          max-height: 0;
+          transition: max-height 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+          border-radius: 0 0 7px 7px;
+          background: rgba(255,255,255,0.02);
+          border-top: 1px solid transparent;
+        }
+        .hs-ai-panel.open {
+          max-height: 520px;
+          border-top-color: var(--vscode-panel-border, rgba(128,128,128,0.14));
+        }
+        .hs-ai-panel-inner {
+          padding: 10px 10px 12px;
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+        }
+
+        /* Loading skeletons */
+        .hs-ai-loading { display: flex; flex-direction: column; gap: 6px; }
+        .hs-skeleton {
+          height: 22px;
+          border-radius: 4px;
+          background: linear-gradient(
+            90deg,
+            rgba(255,255,255,0.04) 0%,
+            rgba(255,255,255,0.09) 50%,
+            rgba(255,255,255,0.04) 100%
+          );
+          background-size: 200% 100%;
+          animation: shimmer 1.4s ease infinite;
+        }
+        .hs-skeleton--short { width: 55%; }
+        .hs-skeleton--label { height: 10px; width: 38%; margin-bottom: 4px; }
+        @keyframes shimmer {
+          0%   { background-position: 200% 0; }
+          100% { background-position: -200% 0; }
+        }
+
+        /* Section headers */
+        .hs-ai-section-head {
+          display: flex;
+          align-items: center;
+          gap: 7px;
+          font-size: 9.5px;
+          font-weight: 700;
+          letter-spacing: 0.9px;
+          text-transform: uppercase;
+          color: var(--vscode-descriptionForeground);
+          opacity: 0.8;
+          margin-bottom: 5px;
+        }
+        .hs-ai-section-head::after {
+          content: '';
+          flex: 1;
+          height: 1px;
+          background: var(--vscode-panel-border, rgba(128,128,128,0.14));
+        }
+
+        /* IDE segmented control */
+        .hs-ai-ide {
+          position: relative;
+          display: flex;
+          background: rgba(255,255,255,0.04);
+          border: 1px solid var(--vscode-panel-border, rgba(128,128,128,0.14));
+          border-radius: 5px;
+          padding: 2px;
+          margin-bottom: 7px;
+        }
+        .hs-ai-ide-pill {
+          position: absolute;
+          top: 2px;
+          height: calc(100% - 4px);
+          background: rgba(52,72,197,0.35);
+          border: 1px solid rgba(52,72,197,0.5);
+          border-radius: 3px;
+          transition:
+            left 0.15s cubic-bezier(0.4,0,0.2,1),
+            width 0.15s cubic-bezier(0.4,0,0.2,1);
+          pointer-events: none;
+        }
+        .hs-ai-ide-btn {
+          flex: 1;
+          padding: 3px 4px;
+          font-size: 9px;
+          font-weight: 600;
+          letter-spacing: 0.2px;
+          text-align: center;
+          text-transform: uppercase;
+          background: none;
+          border: none;
+          border-radius: 3px;
+          color: var(--vscode-descriptionForeground);
+          cursor: pointer;
+          font-family: var(--vscode-font-family);
+          position: relative;
+          z-index: 1;
+          transition: color 0.15s;
+          white-space: nowrap;
+        }
+        .hs-ai-ide-btn.active { color: var(--vscode-foreground); }
+        .hs-ai-ide-btn:hover:not(.active) { color: var(--vscode-foreground); opacity: 0.7; }
+
+        /* Checklist items */
+        .hs-ai-item {
+          display: flex;
+          align-items: center;
+          gap: 7px;
+          padding: 3px 4px 3px 2px;
+          border-radius: 4px;
+          transition: background 0.1s;
+          cursor: pointer;
+          animation: hs-row-in 0.18s ease both;
+        }
+        .hs-ai-item:hover { background: var(--vscode-list-hoverBackground); }
+        .hs-ai-item:nth-child(1) { animation-delay: .05s; }
+        .hs-ai-item:nth-child(2) { animation-delay: .09s; }
+        .hs-ai-item:nth-child(3) { animation-delay: .13s; }
+        .hs-ai-item:nth-child(4) { animation-delay: .17s; }
+        .hs-ai-item:nth-child(5) { animation-delay: .21s; }
+        @keyframes hs-row-in {
+          from { opacity: 0; transform: translateX(-4px); }
+          to   { opacity: 1; transform: translateX(0); }
+        }
+
+        /* Custom checkbox */
+        .hs-ai-cb {
+          appearance: none;
+          -webkit-appearance: none;
+          width: 12px;
+          height: 12px;
+          flex-shrink: 0;
+          border: 1.5px solid var(--vscode-checkbox-border);
+          border-radius: 2px;
+          background: var(--vscode-checkbox-background);
+          cursor: pointer;
+          position: relative;
+          transition: border-color 0.1s, background 0.1s;
+        }
+        .hs-ai-cb:checked {
+          background: var(--vscode-button-background);
+          border-color: var(--vscode-button-background);
+        }
+        .hs-ai-cb:checked::after {
+          content: '';
+          position: absolute;
+          left: 2px; top: -1px;
+          width: 5px; height: 8px;
+          border: 1.5px solid var(--vscode-button-foreground);
+          border-top: none;
+          border-left: none;
+          transform: rotate(45deg);
+        }
+        .hs-ai-cb:focus-visible {
+          outline: 1px solid var(--vscode-focusBorder);
+          outline-offset: 1px;
+        }
+
+        .hs-ai-item-name {
+          flex: 1;
+          font-size: 11px;
+          color: var(--vscode-foreground);
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          cursor: pointer;
+        }
+
+        /* Status indicator */
+        .hs-ai-item-status {
+          flex-shrink: 0;
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          font-size: 9.5px;
+          color: var(--vscode-descriptionForeground);
+          white-space: nowrap;
+        }
+        .hs-ai-item-status::before {
+          content: '';
+          display: inline-block;
+          width: 5px;
+          height: 5px;
+          border-radius: 1px;
+          flex-shrink: 0;
+        }
+        .hs-ai-item-status--ok::before   { background: #4ade80; }
+        .hs-ai-item-status--none::before { background: rgba(255,255,255,0.15); }
+
+        /* Progress tick */
+        .hs-ai-item-tick {
+          flex-shrink: 0;
+          width: 13px;
+          height: 13px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 9px;
+          animation: tick-in 0.2s cubic-bezier(0.34,1.56,0.64,1) both;
+        }
+        @keyframes tick-in {
+          from { opacity: 0; transform: scale(0); }
+          to   { opacity: 1; transform: scale(1); }
+        }
+        .hs-ai-item-tick--ok  { color: #4ade80; }
+        .hs-ai-item-tick--err { color: var(--vscode-errorForeground); }
+
+        /* Apply button */
+        .hs-ai-apply {
+          width: 100%;
+          padding: 6px 0;
+          font-size: 11px;
+          font-weight: 600;
+          letter-spacing: 0.3px;
+          color: var(--vscode-button-foreground);
+          background: var(--vscode-button-background);
+          border: none;
+          border-radius: 5px;
+          cursor: pointer;
+          font-family: var(--vscode-font-family);
+          transition: opacity 0.12s;
+          position: relative;
+          overflow: hidden;
+          margin-top: 2px;
+        }
+        .hs-ai-apply::after {
+          content: '';
+          position: absolute;
+          inset: 0;
+          background: rgba(255,255,255,0);
+          transition: background 0.12s;
+        }
+        .hs-ai-apply:hover::after { background: rgba(255,255,255,0.08); }
+        .hs-ai-apply:disabled { opacity: 0.35; cursor: default; }
+        .hs-ai-apply:disabled::after { background: none; }
+        .hs-ai-apply:focus-visible {
+          outline: 1px solid var(--vscode-focusBorder);
+          outline-offset: 2px;
+        }
+
+        /* Error banner */
+        .hs-ai-error {
+          font-size: 10.5px;
+          color: var(--vscode-errorForeground);
+          padding: 5px 7px;
+          border-radius: 4px;
+          background: rgba(241,76,76,0.08);
+          border: 1px solid rgba(241,76,76,0.2);
+        }
+
+        .hidden { display: none !important; }
       </style>
 
       <div class="hs-root">
@@ -421,7 +681,7 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
 
           <div class="hs-section-divider" role="separator"></div>
 
-          <button id="hs-btn-ai-tools" class="hs-action">
+          <button id="hs-btn-ai-tools" class="hs-action" aria-expanded="false" aria-controls="hs-ai-panel">
             <span class="hs-action-icon hs-action-icon--violet" aria-hidden="true">
               <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M7.657 6.247c.11-.33.576-.33.686 0l.645 1.937a2.89 2.89 0 0 0 1.829 1.828l1.936.645c.33.11.33.576 0 .686l-1.937.645a2.89 2.89 0 0 0-1.828 1.829l-.645 1.936a.361.361 0 0 1-.686 0l-.645-1.937a2.89 2.89 0 0 0-1.828-1.828l-1.937-.645a.361.361 0 0 1 0-.686l1.937-.645a2.89 2.89 0 0 0 1.828-1.828l.645-1.937zM3.794 1.148a.217.217 0 0 1 .412 0l.387 1.162c.173.518.579.924 1.097 1.097l1.162.387a.217.217 0 0 1 0 .412l-1.162.387A1.734 1.734 0 0 0 4.593 5.69l-.387 1.162a.217.217 0 0 1-.412 0L3.407 5.69A1.734 1.734 0 0 0 2.31 4.593l-1.162-.387a.217.217 0 0 1 0-.412l1.162-.387A1.734 1.734 0 0 0 3.407 2.31l.387-1.162zM10.863.099a.145.145 0 0 1 .274 0l.258.774c.115.346.386.617.732.732l.774.258a.145.145 0 0 1 0 .274l-.774.258a1.156 1.156 0 0 0-.732.732l-.258.774a.145.145 0 0 1-.274 0l-.258-.774a1.156 1.156 0 0 0-.732-.732L9.1 2.137a.145.145 0 0 1 0-.274l.774-.258c.346-.115.617-.386.732-.732L10.863.1z"/></svg>
             </span>
@@ -429,7 +689,58 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
               <span class="hs-action-title">Configure AI Tools</span>
               <span class="hs-action-desc">MCP servers &amp; agent skills</span>
             </span>
+            <svg class="hs-chevron" id="hs-ai-chevron" width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M4.5 3L7.5 6L4.5 9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </button>
+
+          <!-- AI Tools accordion panel -->
+          <div class="hs-ai-panel" id="hs-ai-panel" role="region" aria-label="Configure AI Tools">
+
+            <!-- Loading state -->
+            <div class="hs-ai-panel-inner" id="hs-ai-state-loading">
+              <div class="hs-ai-loading">
+                <div class="hs-skeleton hs-skeleton--label"></div>
+                <div class="hs-skeleton"></div>
+                <div class="hs-skeleton"></div>
+                <div class="hs-skeleton hs-skeleton--short"></div>
+                <div style="height:6px"></div>
+                <div class="hs-skeleton hs-skeleton--label"></div>
+                <div class="hs-skeleton"></div>
+                <div class="hs-skeleton"></div>
+              </div>
+            </div>
+
+            <!-- Ready / applying state -->
+            <div class="hs-ai-panel-inner hidden" id="hs-ai-state-ready">
+              <div>
+                <div class="hs-ai-section-head">Skills</div>
+                <div class="hs-ai-ide" id="hs-ai-ide" role="group" aria-label="Target IDE">
+                  <div class="hs-ai-ide-pill" id="hs-ai-ide-pill"></div>
+                  <button class="hs-ai-ide-btn active" data-ide="Claude Code">Claude Code</button>
+                  <button class="hs-ai-ide-btn" data-ide="Cursor">Cursor</button>
+                  <button class="hs-ai-ide-btn" data-ide="VS Code (Copilot)">VS Code</button>
+                </div>
+                <div id="hs-ai-skills-list"></div>
+              </div>
+              <div>
+                <div class="hs-ai-section-head">MCP Servers</div>
+                <div id="hs-ai-mcp-list"></div>
+              </div>
+              <button class="hs-ai-apply" id="hs-ai-apply" disabled>Apply</button>
+            </div>
+
+            <!-- Done state -->
+            <div class="hs-ai-panel-inner hidden" id="hs-ai-state-done">
+              <div id="hs-ai-done-skills-list"></div>
+              <div id="hs-ai-done-mcp-list"></div>
+              <button class="hs-ai-apply" id="hs-ai-apply-again">Apply again</button>
+            </div>
+
+            <!-- Error state -->
+            <div class="hs-ai-panel-inner hidden" id="hs-ai-state-error">
+              <div class="hs-ai-error" id="hs-ai-error-msg"></div>
+            </div>
+
+          </div><!-- /hs-ai-panel -->
         </div>
 
         <div class="hs-footer">
