@@ -51,11 +51,19 @@ function el<T extends HTMLElement>(id: string): T {
 }
 
 function show(id: string): void {
-  el(id).classList.remove("hidden");
+  el(id)?.classList.remove("hidden");
 }
 
 function hide(id: string): void {
-  el(id).classList.add("hidden");
+  el(id)?.classList.add("hidden");
+}
+
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 // ── State rendering ───────────────────────────────────────────────────────────
@@ -98,8 +106,8 @@ function renderSkillRows(
       const statusClass = isInstalled ? "hs-ai-item-status--ok" : "hs-ai-item-status--none";
       const statusText = isInstalled ? "installed" : "—";
       return `<label class="hs-ai-item">
-        <input type="checkbox" class="hs-ai-cb" data-skill="${s.dirName}" ${isInstalled ? "" : "checked"}>
-        <span class="hs-ai-item-name" title="${s.description}">${s.name}</span>
+        <input type="checkbox" class="hs-ai-cb" data-skill="${escapeHtml(s.dirName)}" ${isInstalled ? "" : "checked"}>
+        <span class="hs-ai-item-name" title="${escapeHtml(s.description)}">${escapeHtml(s.name)}</span>
         <span class="hs-ai-item-status ${statusClass}">${statusText}</span>
       </label>`;
     })
@@ -122,8 +130,8 @@ function renderMcpRows(
       const statusClass = isConfigured ? "hs-ai-item-status--ok" : "hs-ai-item-status--none";
       const statusText = isConfigured ? "configured" : "—";
       return `<label class="hs-ai-item">
-        <input type="checkbox" class="hs-ai-cb" data-mcp="${s.key}" ${isConfigured ? "" : "checked"}>
-        <span class="hs-ai-item-name" title="${s.description}">${s.label}</span>
+        <input type="checkbox" class="hs-ai-cb" data-mcp="${escapeHtml(s.key)}" ${isConfigured ? "" : "checked"}>
+        <span class="hs-ai-item-name" title="${escapeHtml(s.description)}">${escapeHtml(s.label)}</span>
         <span class="hs-ai-item-status ${statusClass}">${statusText}</span>
       </label>`;
     })
@@ -205,7 +213,8 @@ function handleApply(): void {
 
 function handleAiToolsData(msg: AiToolsDataMessage): void {
   if (msg.error) {
-    el("hs-ai-error-msg").textContent = msg.error;
+    const errEl = el("hs-ai-error-msg");
+    if (errEl) { errEl.textContent = msg.error; }
     showPanelState("error");
     return;
   }
