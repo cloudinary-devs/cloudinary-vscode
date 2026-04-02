@@ -146,7 +146,7 @@ function renderMcpRows(
       const statusClass = isConfigured ? "hs-ai-item-status--ok" : "hs-ai-item-status--none";
       const statusText = isConfigured ? "configured" : "—";
       return `<label class="hs-ai-item">
-        <input type="checkbox" class="hs-ai-cb" data-mcp="${escapeHtml(s.key)}" checked ${isConfigured ? "disabled" : ""}>
+        <input type="checkbox" class="hs-ai-cb" data-mcp="${escapeHtml(s.key)}" ${isConfigured ? "checked disabled" : ""}>
         <span class="hs-ai-item-name" title="${escapeHtml(s.description)}">${escapeHtml(s.label)}</span>
         <span class="hs-ai-item-status ${statusClass}">${statusText}</span>
       </label>`;
