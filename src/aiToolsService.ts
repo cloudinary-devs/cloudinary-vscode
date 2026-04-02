@@ -17,6 +17,21 @@ export type SkillInfo = {
   dirName: string;
 };
 
+export type PlatformId = 'universal' | 'claude-code' | 'vscode-copilot' | 'windsurf';
+
+export type PlatformDef = {
+  id: PlatformId;
+  label: string;
+  sublabel?: string;
+};
+
+export const PLATFORMS: PlatformDef[] = [
+  { id: 'universal',      label: 'Universal',        sublabel: 'Cursor, Codex, Amp, Warp + more' },
+  { id: 'claude-code',    label: 'Claude Code' },
+  { id: 'vscode-copilot', label: 'VS Code (Copilot)' },
+  { id: 'windsurf',       label: 'Windsurf' },
+];
+
 type GitHubEntry = {
   name: string;
   type: "file" | "dir";
@@ -51,6 +66,14 @@ export function getMcpFilePath(editor: EditorType): string {
     case "vscode":
     default:            return ".vscode/mcp.json";
   }
+}
+
+export function detectEditorPlatform(): PlatformId {
+  const editor = detectEditor();
+  if (editor === 'windsurf') { return 'windsurf'; }
+  if (editor === 'vscode')   { return 'vscode-copilot'; }
+  if (editor === 'cursor' || editor === 'antigravity') { return 'universal'; }
+  return 'claude-code'; // claude-code, unknown
 }
 
 // ── GitHub API helpers ────────────────────────────────────────────────────────
@@ -295,20 +318,72 @@ export async function installForCopilot(
   }
 }
 
+export async function installForUniversal(
+  rootUri: vscode.Uri,
+  skillName: string,
+  skillContent: string,
+  createdFiles: string[],
+  errors: string[]
+): Promise<void> {
+  const skillFile = vscode.Uri.joinPath(rootUri, `.agents/skills/${skillName}/SKILL.md`);
+  const written = await writeWithOverwriteCheck(skillFile, skillContent, `${skillName}/SKILL.md`);
+  if (!written) { return; }
+  createdFiles.push(`.agents/skills/${skillName}/SKILL.md`);
+
+  let refs: Array<{ name: string; content: string }>;
+  try { refs = await fetchReferenceFiles(skillName); } catch (err: any) {
+    errors.push(`${skillName} references: ${err.message}`); return;
+  }
+  for (const ref of refs) {
+    try {
+      const refUri = vscode.Uri.joinPath(rootUri, `.agents/skills/${skillName}/references/${ref.name}`);
+      await ensureDir(vscode.Uri.joinPath(refUri, '..'));
+      await vscode.workspace.fs.writeFile(refUri, Buffer.from(ref.content, 'utf-8'));
+      createdFiles.push(`.agents/skills/${skillName}/references/${ref.name}`);
+    } catch (err: any) { errors.push(`${skillName}/references/${ref.name}: ${err.message}`); }
+  }
+}
+
+export async function installForWindsurf(
+  rootUri: vscode.Uri,
+  skillName: string,
+  skillContent: string,
+  createdFiles: string[],
+  errors: string[]
+): Promise<void> {
+  const skillFile = vscode.Uri.joinPath(rootUri, `.windsurf/skills/${skillName}/SKILL.md`);
+  const written = await writeWithOverwriteCheck(skillFile, skillContent, `${skillName}/SKILL.md`);
+  if (!written) { return; }
+  createdFiles.push(`.windsurf/skills/${skillName}/SKILL.md`);
+
+  let refs: Array<{ name: string; content: string }>;
+  try { refs = await fetchReferenceFiles(skillName); } catch (err: any) {
+    errors.push(`${skillName} references: ${err.message}`); return;
+  }
+  for (const ref of refs) {
+    try {
+      const refUri = vscode.Uri.joinPath(rootUri, `.windsurf/skills/${skillName}/references/${ref.name}`);
+      await ensureDir(vscode.Uri.joinPath(refUri, '..'));
+      await vscode.workspace.fs.writeFile(refUri, Buffer.from(ref.content, 'utf-8'));
+      createdFiles.push(`.windsurf/skills/${skillName}/references/${ref.name}`);
+    } catch (err: any) { errors.push(`${skillName}/references/${ref.name}: ${err.message}`); }
+  }
+}
+
 // ── Status detection ──────────────────────────────────────────────────────────
 
 export async function readInstalledSkillDirNames(
   rootUri: vscode.Uri,
-  ideTargetLabel: string,
+  platform: PlatformId,
   skills: SkillInfo[]
 ): Promise<Set<string>> {
   const installed = new Set<string>();
 
-  if (ideTargetLabel === "VS Code (Copilot)") {
+  if (platform === 'vscode-copilot') {
     try {
-      const uri = vscode.Uri.joinPath(rootUri, ".github/copilot-instructions.md");
+      const uri = vscode.Uri.joinPath(rootUri, '.github/copilot-instructions.md');
       const bytes = await vscode.workspace.fs.readFile(uri);
-      const content = Buffer.from(bytes).toString("utf-8");
+      const content = Buffer.from(bytes).toString('utf-8');
       for (const skill of skills) {
         if (content.includes(`## ${skill.name}`)) {
           installed.add(skill.dirName);
@@ -320,14 +395,17 @@ export async function readInstalledSkillDirNames(
     return installed;
   }
 
+  const pathPrefix =
+    platform === 'claude-code' ? '.claude/skills' :
+    platform === 'universal'   ? '.agents/skills' :
+    /* windsurf */               '.windsurf/skills';
+
   await Promise.all(
     skills.map(async (skill) => {
       try {
-        const checkPath =
-          ideTargetLabel === "Claude Code"
-            ? `.claude/skills/${skill.dirName}/SKILL.md`
-            : `.cursor/rules/${skill.dirName}.mdc`;
-        await vscode.workspace.fs.stat(vscode.Uri.joinPath(rootUri, checkPath));
+        await vscode.workspace.fs.stat(
+          vscode.Uri.joinPath(rootUri, `${pathPrefix}/${skill.dirName}/SKILL.md`)
+        );
         installed.add(skill.dirName);
       } catch {
         // not installed
@@ -335,6 +413,25 @@ export async function readInstalledSkillDirNames(
     })
   );
   return installed;
+}
+
+export async function detectActivePlatforms(rootUri: vscode.Uri): Promise<PlatformId[]> {
+  const checks: Array<{ id: PlatformId; path: string }> = [
+    { id: 'universal',      path: '.agents/skills' },
+    { id: 'claude-code',    path: '.claude/skills' },
+    { id: 'vscode-copilot', path: '.github/copilot-instructions.md' },
+    { id: 'windsurf',       path: '.windsurf/skills' },
+  ];
+  const active = new Set<PlatformId>([detectEditorPlatform()]);
+  await Promise.all(
+    checks.map(async ({ id, path }) => {
+      try {
+        await vscode.workspace.fs.stat(vscode.Uri.joinPath(rootUri, path));
+        active.add(id);
+      } catch { /* not present */ }
+    })
+  );
+  return [...active];
 }
 
 export async function readConfiguredMcpServerKeys(
