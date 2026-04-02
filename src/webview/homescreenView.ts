@@ -8,6 +8,7 @@ import { CloudinaryTreeDataProvider } from "../tree/treeDataProvider";
 import { createWebviewDocument, getScriptUri } from "./webviewUtils";
 import { escapeHtml } from "./utils/helpers";
 import {
+  PlatformId,
   SkillInfo,
   MCP_SERVERS,
   detectEditor,
@@ -17,9 +18,11 @@ import {
   readInstalledSkillDirNames,
   readConfiguredMcpServerKeys,
   installForClaudeCode,
-  installForCursor,
   installForCopilot,
+  installForUniversal,
+  installForWindsurf,
   installMcpServers,
+  detectActivePlatforms,
 } from "../aiToolsService";
 
 export class HomescreenViewProvider implements vscode.WebviewViewProvider {
@@ -64,7 +67,7 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
     });
 
     webviewView.webview.onDidReceiveMessage(
-      async (message: { command: string; skills?: string[]; ideTarget?: string; mcpServers?: string[] }) => {
+      async (message: { command: string; skills?: string[]; platforms?: string[]; mcpServers?: string[] }) => {
         switch (message.command) {
           case "openGlobalConfig":
             vscode.commands.executeCommand("cloudinary.openGlobalConfig");
@@ -84,7 +87,7 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
           case "installAiTools":
             await this._handleInstallAiTools(
               message.skills ?? [],
-              message.ideTarget ?? "Claude Code",
+              message.platforms ?? [],
               message.mcpServers ?? []
             );
             break;
@@ -461,50 +464,6 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
           background: var(--vscode-panel-border, rgba(128,128,128,0.14));
         }
 
-        /* IDE segmented control */
-        .hs-ai-ide {
-          position: relative;
-          display: flex;
-          background: rgba(255,255,255,0.04);
-          border: 1px solid var(--vscode-panel-border, rgba(128,128,128,0.14));
-          border-radius: 5px;
-          padding: 2px;
-          margin-bottom: 7px;
-        }
-        .hs-ai-ide-pill {
-          position: absolute;
-          top: 2px;
-          height: calc(100% - 4px);
-          background: rgba(52,72,197,0.35);
-          border: 1px solid rgba(52,72,197,0.5);
-          border-radius: 3px;
-          transition:
-            left 0.15s cubic-bezier(0.4,0,0.2,1),
-            width 0.15s cubic-bezier(0.4,0,0.2,1);
-          pointer-events: none;
-        }
-        .hs-ai-ide-btn {
-          flex: 1;
-          padding: 3px 4px;
-          font-size: 9px;
-          font-weight: 600;
-          letter-spacing: 0.2px;
-          text-align: center;
-          text-transform: uppercase;
-          background: none;
-          border: none;
-          border-radius: 3px;
-          color: var(--vscode-descriptionForeground);
-          cursor: pointer;
-          font-family: var(--vscode-font-family);
-          position: relative;
-          z-index: 1;
-          transition: color 0.15s;
-          white-space: nowrap;
-        }
-        .hs-ai-ide-btn.active { color: var(--vscode-foreground); }
-        .hs-ai-ide-btn:hover:not(.active) { color: var(--vscode-foreground); opacity: 0.7; }
-
         /* Checklist items */
         .hs-ai-item {
           display: flex;
@@ -590,6 +549,14 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
         }
         .hs-ai-item-status--ok::before   { background: #4ade80; }
         .hs-ai-item-status--none::before { background: rgba(255,255,255,0.15); }
+        .hs-ai-item-status--partial::before { background: rgba(250,204,21,0.7); }
+        .hs-ai-platform-sub {
+          display: block;
+          font-size: 9px;
+          font-weight: 400;
+          color: var(--vscode-descriptionForeground);
+          margin-top: 1px;
+        }
 
         /* Progress tick */
         .hs-ai-item-tick {
@@ -737,13 +704,9 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
             <div class="hs-ai-panel-inner hidden" id="hs-ai-state-ready">
               <div>
                 <div class="hs-ai-section-head">Skills</div>
-                <div class="hs-ai-ide" id="hs-ai-ide" role="group" aria-label="Target IDE">
-                  <div class="hs-ai-ide-pill" id="hs-ai-ide-pill"></div>
-                  <button class="hs-ai-ide-btn active" data-ide="Claude Code">Claude Code</button>
-                  <button class="hs-ai-ide-btn" data-ide="Cursor">Cursor</button>
-                  <button class="hs-ai-ide-btn" data-ide="VS Code (Copilot)">VS Code</button>
-                </div>
                 <div id="hs-ai-skills-list"></div>
+                <div class="hs-ai-section-head" style="margin-top:8px">Install for</div>
+                <div id="hs-ai-platform-list"></div>
               </div>
               <div>
                 <div class="hs-ai-section-head">MCP Servers</div>
@@ -792,41 +755,34 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
     const rootUri = workspaceFolders[0].uri;
 
     try {
-      // Fetch skills once; cache for subsequent opens
       if (!this._cachedSkills) {
         this._cachedSkills = await fetchSkillList();
       }
       const skills = this._cachedSkills;
 
-      const ideLabels: string[] = ["Claude Code", "Cursor", "VS Code (Copilot)"];
-
-      // Pre-compute installed status for all 3 IDEs
-      const installedByIde: Record<string, string[]> = {};
+      const platformIds: PlatformId[] = ["universal", "claude-code", "vscode-copilot", "windsurf"];
+      const installedByPlatform: Record<string, string[]> = {};
       await Promise.all(
-        ideLabels.map(async (label) => {
-          const installedSet = await readInstalledSkillDirNames(rootUri, label, skills);
-          installedByIde[label] = [...installedSet];
+        platformIds.map(async (pid) => {
+          const set = await readInstalledSkillDirNames(rootUri, pid, skills);
+          installedByPlatform[pid] = [...set];
         })
       );
 
-      // MCP servers — use detected editor for the config file path
+      const activePlatforms = await detectActivePlatforms(rootUri);
+
       const editor = detectEditor();
       const mcpFilePath = getMcpFilePath(editor);
       const rootKey = editor === "vscode" ? "servers" : "mcpServers";
       const configuredMcpSet = await readConfiguredMcpServerKeys(rootUri, mcpFilePath, rootKey);
 
-      const detectedIde =
-        editor === "cursor" ? "Cursor" :
-        editor === "vscode" ? "VS Code (Copilot)" :
-        "Claude Code";
-
       view.webview.postMessage({
         command: "aiToolsData",
         skills: skills.map((s) => ({ name: s.name, description: s.description, dirName: s.dirName })),
-        installedByIde,
+        installedByPlatform,
+        activePlatforms,
         mcpServers: MCP_SERVERS.map((s) => ({ key: s.key, label: s.label, description: s.description })),
         configuredMcpKeys: [...configuredMcpSet],
-        detectedIde,
       });
     } catch (err: any) {
       view.webview.postMessage({
@@ -838,7 +794,7 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
 
   private async _handleInstallAiTools(
     skills: string[],
-    ideTarget: string,
+    platforms: string[],
     mcpServers: string[]
   ): Promise<void> {
     const view = this._webviewView;
@@ -851,9 +807,8 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
     }
     const rootUri = workspaceFolders[0].uri;
     const errors: string[] = [];
-
-    // Install skills
     const cachedSkills = this._cachedSkills ?? [];
+
     for (const dirName of skills) {
       const skillInfo = cachedSkills.find((s) => s.dirName === dirName);
       if (!skillInfo) { continue; }
@@ -868,22 +823,30 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
       }
 
       const createdFiles: string[] = [];
-      try {
-        if (ideTarget === "Claude Code") {
-          await installForClaudeCode(rootUri, dirName, content, createdFiles, errors);
-        } else if (ideTarget === "Cursor") {
-          await installForCursor(rootUri, dirName, content, createdFiles);
-        } else {
-          await installForCopilot(rootUri, skillInfo.name, content, createdFiles);
+      let anyError = false;
+      for (const platform of platforms) {
+        try {
+          if (platform === "claude-code") {
+            await installForClaudeCode(rootUri, dirName, content, createdFiles, errors);
+          } else if (platform === "universal") {
+            await installForUniversal(rootUri, dirName, content, createdFiles, errors);
+          } else if (platform === "windsurf") {
+            await installForWindsurf(rootUri, dirName, content, createdFiles, errors);
+          } else if (platform === "vscode-copilot") {
+            await installForCopilot(rootUri, skillInfo.name, content, createdFiles);
+          }
+        } catch (err: any) {
+          errors.push(`${dirName} (${platform}): ${err.message}`);
+          anyError = true;
         }
-        view.webview.postMessage({ command: "aiToolsProgress", item: dirName, status: "done" });
-      } catch (err: any) {
-        errors.push(`${dirName}: ${err.message}`);
-        view.webview.postMessage({ command: "aiToolsProgress", item: dirName, status: "error" });
       }
+      view.webview.postMessage({
+        command: "aiToolsProgress",
+        item: dirName,
+        status: anyError ? "error" : "done",
+      });
     }
 
-    // Install MCP servers
     if (mcpServers.length > 0) {
       const editor = detectEditor();
       const createdFiles: string[] = [];
@@ -900,9 +863,7 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
       }
     }
 
-    // Invalidate cached skills so next open re-reads disk
     this._cachedSkills = undefined;
-
     view.webview.postMessage({ command: "aiToolsResult", errors });
   }
 }

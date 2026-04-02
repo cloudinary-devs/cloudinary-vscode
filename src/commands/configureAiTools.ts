@@ -104,7 +104,7 @@ function registerConfigureAiTools(context: vscode.ExtensionContext): void {
         });
         if (!ideTarget) { return; }
 
-        const installedDirNames = await readInstalledSkillDirNames(rootUri, ideTarget.label, skills);
+        const installedDirNames = await readInstalledSkillDirNames(rootUri, ideTarget.label as any, skills);
 
         const pickedSkills = await vscode.window.showQuickPick(
           skills.map((s) => ({
