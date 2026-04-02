@@ -106,7 +106,6 @@ function registerConfigureAiTools(context: vscode.ExtensionContext): void {
 
         const platformForStatus: Record<string, import("../aiToolsService").PlatformId | undefined> = {
           "Claude Code": "claude-code",
-          "Cursor": "universal",       // Cursor's new canonical path is .agents/skills/
           "VS Code (Copilot)": "vscode-copilot",
         };
         const pid = platformForStatus[ideTarget.label];

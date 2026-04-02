@@ -825,6 +825,7 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
       const createdFiles: string[] = [];
       let anyError = false;
       for (const platform of platforms) {
+        const errsBefore = errors.length;
         try {
           if (platform === "claude-code") {
             await installForClaudeCode(rootUri, dirName, content, createdFiles, errors);
@@ -837,6 +838,9 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
           }
         } catch (err: any) {
           errors.push(`${dirName} (${platform}): ${err.message}`);
+          anyError = true;
+        }
+        if (errors.length > errsBefore) {
           anyError = true;
         }
       }
