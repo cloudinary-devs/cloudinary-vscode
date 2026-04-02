@@ -64,7 +64,7 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
     });
 
     webviewView.webview.onDidReceiveMessage(
-      (message: { command: string; skills?: string[]; ideTarget?: string; mcpServers?: string[] }) => {
+      async (message: { command: string; skills?: string[]; ideTarget?: string; mcpServers?: string[] }) => {
         switch (message.command) {
           case "openGlobalConfig":
             vscode.commands.executeCommand("cloudinary.openGlobalConfig");
@@ -79,10 +79,10 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
             vscode.commands.executeCommand("cloudinary.openWelcomeScreen");
             break;
           case "aiToolsExpanded":
-            this._handleAiToolsExpanded();
+            await this._handleAiToolsExpanded();
             break;
           case "installAiTools":
-            this._handleInstallAiTools(
+            await this._handleInstallAiTools(
               message.skills ?? [],
               message.ideTarget ?? "Claude Code",
               message.mcpServers ?? []
