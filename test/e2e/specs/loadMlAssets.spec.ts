@@ -1,5 +1,5 @@
-import { activityBarUtils } from '../../src/utils/ActivityBarUtils'
-import { sideBarViewUtils } from '../../src/utils/SideBarViewUtils'
+import { activityBarUtils } from '../src/utils/ActivityBarUtils.js'
+import { sideBarViewUtils } from '../src/utils/SideBarViewUtils.js'
 
 /**
  * Asset Explorer: 
