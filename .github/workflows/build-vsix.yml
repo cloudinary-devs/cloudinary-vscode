@@ -1,9 +1,10 @@
 name: Build VSIX
 
 on:
-  push:
-    branches-ignore:
+  pull_request:
+    branches:
       - main
+    types: [opened, synchronize, reopened]
 
 jobs:
   build-vsix:
@@ -26,12 +27,16 @@ jobs:
       - name: Run linting
         run: npm run lint
 
+      - name: Sanitize branch name
+        id: branch
+        run: echo "name=$(echo '${{ github.head_ref }}' | tr '/' '-')" >> "$GITHUB_OUTPUT"
+
       - name: Package extension
-        run: npx vsce package --no-dependencies -o cloudinary-${{ github.ref_name }}.vsix
+        run: npx @vscode/vsce package --no-dependencies -o cloudinary-${{ steps.branch.outputs.name }}.vsix
 
       - name: Upload VSIX artifact
         uses: actions/upload-artifact@v4
         with:
-          name: cloudinary-${{ github.ref_name }}
-          path: cloudinary-${{ github.ref_name }}.vsix
+          name: cloudinary-${{ steps.branch.outputs.name }}
+          path: cloudinary-${{ steps.branch.outputs.name }}.vsix
           retention-days: 14
