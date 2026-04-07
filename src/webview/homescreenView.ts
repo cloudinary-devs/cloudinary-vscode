@@ -5,8 +5,9 @@
 
 import * as vscode from "vscode";
 import { CloudinaryTreeDataProvider } from "../tree/treeDataProvider";
-import { createWebviewDocument, getScriptUri } from "./webviewUtils";
+import { createWebviewDocument, getScriptUri, getStyleUri } from "./webviewUtils";
 import { escapeHtml } from "./utils/helpers";
+import { loadEnvironments } from "../config/configUtils";
 import {
   PlatformId,
   PLATFORMS,
@@ -37,13 +38,24 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
 
   private _webviewView: vscode.WebviewView | undefined;
   private _cachedSkills: SkillInfo[] | undefined;
+  private _environmentNames: string[] = [];
 
-  resolveWebviewView(
+  private async _loadEnvironments(): Promise<void> {
+    try {
+      const envs = await loadEnvironments();
+      this._environmentNames = Object.keys(envs);
+    } catch {
+      this._environmentNames = [];
+    }
+  }
+
+  async resolveWebviewView(
     webviewView: vscode.WebviewView,
     _context: vscode.WebviewViewResolveContext,
     _token: vscode.CancellationToken
-  ): void {
+  ): Promise<void> {
     this._webviewView = webviewView;
+    await this._loadEnvironments();
 
     webviewView.onDidDispose(() => {
       this._webviewView = undefined;
@@ -59,17 +71,23 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
       this._extensionUri,
       "homescreen.js"
     );
+    const homescreenCssUri = getStyleUri(
+      webviewView.webview,
+      this._extensionUri,
+      "homescreen.css"
+    );
 
     webviewView.webview.html = createWebviewDocument({
       title: "Cloudinary",
       webview: webviewView.webview,
       extensionUri: this._extensionUri,
       bodyContent: this._getBodyContent(),
+      additionalStyles: [homescreenCssUri],
       additionalScripts: [scriptUri],
     });
 
     webviewView.webview.onDidReceiveMessage(
-      async (message: { command: string; skills?: string[]; platforms?: string[]; mcpServers?: string[] }) => {
+      async (message: { command: string; data?: string; skills?: string[]; platforms?: string[]; mcpServers?: string[] }) => {
         switch (message.command) {
           case "openGlobalConfig":
             vscode.commands.executeCommand("cloudinary.openGlobalConfig");
@@ -82,6 +100,18 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
             break;
           case "openWelcomeScreen":
             vscode.commands.executeCommand("cloudinary.openWelcomeScreen");
+            break;
+          case "searchAssets":
+            if (message.data?.trim()) {
+              this._provider.refresh({ searchQuery: message.data.trim() });
+              vscode.commands.executeCommand("cloudinary.showLibrary");
+            }
+            break;
+          case "clearSearch":
+            this._provider.refresh({ searchQuery: null });
+            break;
+          case "switchEnvironment":
+            vscode.commands.executeCommand("cloudinary.switchEnvironment");
             break;
           case "aiToolsExpanded":
             await this._handleAiToolsExpanded();
@@ -99,23 +129,44 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
   }
 
   /**
+   * Switches to the homescreen view and moves keyboard focus to the search input.
+   */
+  focusSearch(): void {
+    // Set context first so the homescreen view's `when` condition becomes true
+    vscode.commands.executeCommand("setContext", "cloudinary.activeView", "homescreen");
+    // Then bring the sidebar into focus (mirrors what showLibrary does)
+    vscode.commands.executeCommand("workbench.view.extension.cloudinary");
+    // Post focusSearch after the view has had time to become visible
+    setTimeout(() => {
+      this._webviewView?.webview.postMessage({ command: "focusSearch" });
+    }, 250);
+  }
+
+  /**
    * Re-renders the homescreen HTML with current credentials.
    * Safe to call at any time; no-ops if the view has not been resolved yet.
    */
-  refresh(): void {
+  async refresh(): Promise<void> {
     if (!this._webviewView) {
       return;
     }
+    await this._loadEnvironments();
     const scriptUri = getScriptUri(
       this._webviewView.webview,
       this._extensionUri,
       "homescreen.js"
+    );
+    const homescreenCssUri = getStyleUri(
+      this._webviewView.webview,
+      this._extensionUri,
+      "homescreen.css"
     );
     this._webviewView.webview.html = createWebviewDocument({
       title: "Cloudinary",
       webview: this._webviewView.webview,
       extensionUri: this._extensionUri,
       bodyContent: this._getBodyContent(),
+      additionalStyles: [homescreenCssUri],
       additionalScripts: [scriptUri],
     });
   }
@@ -123,534 +174,32 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
   private _getBodyContent(): string {
     const hasConfig = !!(this._provider.cloudName && this._provider.apiKey);
     const cloudName = escapeHtml(this._provider.cloudName || "");
+    const folderMode = this._provider.dynamicFolders ? "Dynamic folders" : "Fixed folders";
 
     return `
-      <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-
-        body { background: var(--vscode-sideBar-background); }
-
-        .hs-root {
-          display: flex;
-          flex-direction: column;
-          min-height: 100vh;
-          font-family: var(--vscode-font-family);
-          font-size: var(--vscode-font-size);
-        }
-
-        /* ── Header ── */
-        .hs-header {
-          padding: 18px 16px 16px;
-          background: linear-gradient(145deg, #1e3a8a 0%, #3448C5 55%, #5b73f0 100%);
-          position: relative;
-          overflow: hidden;
-          flex-shrink: 0;
-        }
-        .hs-header::before {
-          content: '';
-          position: absolute;
-          top: -24px; right: -24px;
-          width: 110px; height: 110px;
-          background: rgba(255,255,255,0.06);
-          border-radius: 50%;
-          pointer-events: none;
-        }
-        .hs-header::after {
-          content: '';
-          position: absolute;
-          bottom: -32px; left: 30px;
-          width: 70px; height: 70px;
-          background: rgba(255,255,255,0.04);
-          border-radius: 50%;
-          pointer-events: none;
-        }
-
-        .hs-brand {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          margin-bottom: 10px;
-          position: relative;
-        }
-        .hs-brand-icon { width: 22px; height: 22px; flex-shrink: 0; }
-        .hs-brand-name {
-          font-size: 11px;
-          font-weight: 700;
-          letter-spacing: 1.2px;
-          text-transform: uppercase;
-          color: rgba(255,255,255,0.95);
-        }
-
-        .hs-cloud-row {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          position: relative;
-        }
-        .hs-cloud-name {
-          font-size: 15px;
-          font-weight: 600;
-          color: #fff;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-          max-width: 160px;
-        }
-        .hs-cloud-name--placeholder {
-          font-size: 13px;
-          font-weight: 400;
-          color: rgba(255,255,255,0.6);
-          font-style: italic;
-        }
-        .hs-status-pill {
-          display: inline-flex;
-          align-items: center;
-          gap: 5px;
-          padding: 3px 9px;
-          border-radius: 20px;
-          font-size: 10px;
-          font-weight: 500;
-          letter-spacing: 0.2px;
-          color: rgba(255,255,255,0.92);
-          background: rgba(255,255,255,0.14);
-          flex-shrink: 0;
-        }
-        .hs-status-dot {
-          width: 6px; height: 6px;
-          border-radius: 50%;
-          background: #4ade80;
-          box-shadow: 0 0 5px rgba(74,222,128,0.8);
-          flex-shrink: 0;
-        }
-        .hs-status-dot--warn {
-          background: #fbbf24;
-          box-shadow: 0 0 5px rgba(251,191,36,0.8);
-        }
-
-        /* ── Setup banner ── */
-        .hs-setup-banner {
-          margin: 10px 10px 0;
-          padding: 9px 11px;
-          border-radius: 8px;
-          background: rgba(251,191,36,0.08);
-          border: 1px solid rgba(251,191,36,0.22);
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          animation: hs-in 0.2s ease both;
-        }
-        .hs-setup-banner-icon {
-          font-size: 13px;
-          flex-shrink: 0;
-          line-height: 1;
-        }
-        .hs-setup-banner-text {
-          flex: 1;
-          font-size: 11px;
-          color: var(--vscode-foreground);
-          opacity: 0.85;
-          line-height: 1.4;
-        }
-        .hs-setup-banner-btn {
-          flex-shrink: 0;
-          font-size: 11px;
-          font-weight: 600;
-          color: #f59e0b;
-          background: rgba(251,191,36,0.14);
-          border: 1px solid rgba(251,191,36,0.3);
-          border-radius: 5px;
-          padding: 3px 9px;
-          cursor: pointer;
-          font-family: var(--vscode-font-family);
-          transition: background 0.12s;
-        }
-        .hs-setup-banner-btn:hover { background: rgba(251,191,36,0.24); }
-
-        /* ── Actions ── */
-        .hs-actions {
-          padding: 8px;
-          flex: 1;
-          display: flex;
-          flex-direction: column;
-          gap: 1px;
-          animation: hs-in 0.22s ease 0.04s both;
-        }
-
-        .hs-action {
-          display: flex;
-          align-items: center;
-          gap: 11px;
-          width: 100%;
-          padding: 9px 10px;
-          border: none;
-          border-radius: 7px;
-          background: transparent;
-          color: var(--vscode-foreground);
-          cursor: pointer;
-          font-family: var(--vscode-font-family);
-          text-align: left;
-          transition: background 0.12s ease;
-        }
-        .hs-action:hover { background: var(--vscode-list-hoverBackground); }
-        .hs-action:focus-visible {
-          outline: 1px solid var(--vscode-focusBorder);
-          outline-offset: -1px;
-          border-radius: 7px;
-        }
-        .hs-action:disabled {
-          cursor: default;
-          opacity: 0.55;
-        }
-        .hs-action:disabled:hover { background: transparent; }
-
-        .hs-action-icon {
-          width: 30px; height: 30px;
-          border-radius: 7px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          flex-shrink: 0;
-        }
-        .hs-action-icon--blue {
-          background: rgba(52,72,197,0.14);
-          color: #3448C5;
-        }
-        .hs-action-icon--green {
-          background: rgba(16,185,129,0.12);
-          color: #10b981;
-        }
-        .hs-action-icon--violet {
-          background: rgba(139,92,246,0.12);
-          color: #8b5cf6;
-        }
-
-        .hs-action-text { flex: 1; min-width: 0; }
-        .hs-action-title {
-          font-size: 12.5px;
-          font-weight: 500;
-          color: var(--vscode-foreground);
-          line-height: 1.3;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-        .hs-action-desc {
-          font-size: 10.5px;
-          color: var(--vscode-descriptionForeground);
-          line-height: 1.3;
-          margin-top: 1px;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-
-        .hs-chip {
-          flex-shrink: 0;
-          font-size: 9px;
-          font-weight: 700;
-          letter-spacing: 0.4px;
-          text-transform: uppercase;
-          padding: 2px 6px;
-          border-radius: 4px;
-          background: rgba(139,92,246,0.14);
-          color: #8b5cf6;
-          border: 1px solid rgba(139,92,246,0.2);
-        }
-
-        .hs-chevron {
-          flex-shrink: 0;
-          color: var(--vscode-descriptionForeground);
-          opacity: 0.4;
-          transition: transform 0.2s;
-        }
-        .hs-chevron--open { transform: rotate(90deg); }
-
-        .hs-section-divider {
-          height: 1px;
-          margin: 4px 6px;
-          background: var(--vscode-panel-border, rgba(128,128,128,0.14));
-        }
-
-        /* ── Footer ── */
-        .hs-footer {
-          padding: 8px 16px 12px;
-          border-top: 1px solid var(--vscode-panel-border, rgba(128,128,128,0.12));
-          animation: hs-in 0.22s ease 0.08s both;
-        }
-        .hs-footer-link {
-          display: inline-flex;
-          align-items: center;
-          gap: 5px;
-          font-size: 11px;
-          color: var(--vscode-textLink-foreground);
-          cursor: pointer;
-          text-decoration: none;
-          background: none;
-          border: none;
-          font-family: var(--vscode-font-family);
-          padding: 0;
-        }
-        .hs-footer-link:hover { text-decoration: underline; }
-        .hs-footer-link:focus-visible { outline: 1px solid var(--vscode-focusBorder); }
-
-        @keyframes hs-in {
-          from { opacity: 0; transform: translateY(6px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
-        .hs-header { animation: hs-in 0.18s ease both; }
-
-        /* ── AI Tools accordion ── */
-        #hs-btn-ai-tools { user-select: none; }
-        #hs-btn-ai-tools.expanded {
-          background: var(--vscode-list-hoverBackground);
-          border-radius: 7px 7px 0 0;
-        }
-
-        .hs-ai-panel {
-          overflow: hidden;
-          max-height: 0;
-          transition: max-height 0.28s cubic-bezier(0.4, 0, 0.2, 1);
-          border-radius: 0 0 7px 7px;
-          background: rgba(255,255,255,0.02);
-          border-top: 1px solid transparent;
-        }
-        .hs-ai-panel.open {
-          max-height: 520px;
-          border-top-color: var(--vscode-panel-border, rgba(128,128,128,0.14));
-        }
-        .hs-ai-panel-inner {
-          padding: 10px 10px 12px;
-          display: flex;
-          flex-direction: column;
-          gap: 10px;
-        }
-
-        /* Loading skeletons */
-        .hs-ai-loading { display: flex; flex-direction: column; gap: 6px; }
-        .hs-skeleton {
-          height: 22px;
-          border-radius: 4px;
-          background: linear-gradient(
-            90deg,
-            rgba(255,255,255,0.04) 0%,
-            rgba(255,255,255,0.09) 50%,
-            rgba(255,255,255,0.04) 100%
-          );
-          background-size: 200% 100%;
-          animation: shimmer 1.4s ease infinite;
-        }
-        .hs-skeleton--short { width: 55%; }
-        .hs-skeleton--label { height: 10px; width: 38%; margin-bottom: 4px; }
-        @keyframes shimmer {
-          0%   { background-position: 200% 0; }
-          100% { background-position: -200% 0; }
-        }
-
-        /* Section headers */
-        .hs-ai-section-head {
-          display: flex;
-          align-items: center;
-          gap: 7px;
-          font-size: 9.5px;
-          font-weight: 700;
-          letter-spacing: 0.9px;
-          text-transform: uppercase;
-          color: var(--vscode-descriptionForeground);
-          opacity: 0.8;
-          margin-bottom: 5px;
-        }
-        .hs-ai-section-head::after {
-          content: '';
-          flex: 1;
-          height: 1px;
-          background: var(--vscode-panel-border, rgba(128,128,128,0.14));
-        }
-
-        /* Checklist items */
-        .hs-ai-item {
-          display: flex;
-          align-items: center;
-          gap: 7px;
-          padding: 3px 4px 3px 2px;
-          border-radius: 4px;
-          transition: background 0.1s;
-          cursor: pointer;
-          animation: hs-row-in 0.18s ease both;
-        }
-        .hs-ai-item:hover { background: var(--vscode-list-hoverBackground); }
-        .hs-ai-item:nth-child(1) { animation-delay: .05s; }
-        .hs-ai-item:nth-child(2) { animation-delay: .09s; }
-        .hs-ai-item:nth-child(3) { animation-delay: .13s; }
-        .hs-ai-item:nth-child(4) { animation-delay: .17s; }
-        .hs-ai-item:nth-child(5) { animation-delay: .21s; }
-        @keyframes hs-row-in {
-          from { opacity: 0; transform: translateX(-4px); }
-          to   { opacity: 1; transform: translateX(0); }
-        }
-
-        /* Custom checkbox */
-        .hs-ai-cb {
-          appearance: none;
-          -webkit-appearance: none;
-          width: 12px;
-          height: 12px;
-          flex-shrink: 0;
-          border: 1.5px solid var(--vscode-checkbox-border);
-          border-radius: 2px;
-          background: var(--vscode-checkbox-background);
-          cursor: pointer;
-          position: relative;
-          transition: border-color 0.1s, background 0.1s;
-        }
-        .hs-ai-cb:checked {
-          background: var(--vscode-button-background);
-          border-color: var(--vscode-button-background);
-        }
-        .hs-ai-cb:checked::after {
-          content: '';
-          position: absolute;
-          left: 2px; top: -1px;
-          width: 5px; height: 8px;
-          border: 1.5px solid var(--vscode-button-foreground);
-          border-top: none;
-          border-left: none;
-          transform: rotate(45deg);
-        }
-        .hs-ai-cb:focus-visible {
-          outline: 1px solid var(--vscode-focusBorder);
-          outline-offset: 1px;
-        }
-
-        .hs-ai-item-name {
-          flex: 1;
-          font-size: 11px;
-          color: var(--vscode-foreground);
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-          cursor: pointer;
-        }
-
-        /* Status indicator */
-        .hs-ai-item-status {
-          flex-shrink: 0;
-          display: flex;
-          align-items: center;
-          gap: 4px;
-          font-size: 9.5px;
-          color: var(--vscode-descriptionForeground);
-          white-space: nowrap;
-        }
-        .hs-ai-item-status::before {
-          content: '';
-          display: inline-block;
-          width: 5px;
-          height: 5px;
-          border-radius: 1px;
-          flex-shrink: 0;
-        }
-        .hs-ai-item-status--ok::before   { background: #4ade80; }
-        .hs-ai-item-status--none::before { background: rgba(255,255,255,0.15); }
-        .hs-ai-platform-badge {
-          font-size: 9px;
-          font-weight: 400;
-          color: var(--vscode-descriptionForeground);
-          margin-left: 4px;
-        }
-        .hs-ai-platform-sub {
-          display: block;
-          font-size: 9px;
-          font-weight: 400;
-          color: var(--vscode-descriptionForeground);
-          margin-top: 1px;
-        }
-
-        .hs-ai-item input[type="checkbox"]:disabled { opacity: 0.5; cursor: default; }
-        .hs-ai-hint {
-          font-size: 9px;
-          color: var(--vscode-descriptionForeground);
-          margin: 3px 0 0 0;
-          padding: 0;
-        }
-
-        /* Progress tick */
-        .hs-ai-item-tick {
-          flex-shrink: 0;
-          width: 13px;
-          height: 13px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 9px;
-          animation: tick-in 0.2s cubic-bezier(0.34,1.56,0.64,1) both;
-        }
-        @keyframes tick-in {
-          from { opacity: 0; transform: scale(0); }
-          to   { opacity: 1; transform: scale(1); }
-        }
-        .hs-ai-item-tick--ok  { color: #4ade80; }
-        .hs-ai-item-tick--err { color: var(--vscode-errorForeground); }
-
-        /* Apply button */
-        .hs-ai-apply {
-          width: 100%;
-          padding: 6px 0;
-          font-size: 11px;
-          font-weight: 600;
-          letter-spacing: 0.3px;
-          color: var(--vscode-button-foreground);
-          background: var(--vscode-button-background);
-          border: none;
-          border-radius: 5px;
-          cursor: pointer;
-          font-family: var(--vscode-font-family);
-          transition: opacity 0.12s;
-          position: relative;
-          overflow: hidden;
-          margin-top: 2px;
-        }
-        .hs-ai-apply::after {
-          content: '';
-          position: absolute;
-          inset: 0;
-          background: rgba(255,255,255,0);
-          transition: background 0.12s;
-        }
-        .hs-ai-apply:hover::after { background: rgba(255,255,255,0.08); }
-        .hs-ai-apply:disabled { opacity: 0.35; cursor: default; }
-        .hs-ai-apply:disabled::after { background: none; }
-        .hs-ai-apply:focus-visible {
-          outline: 1px solid var(--vscode-focusBorder);
-          outline-offset: 2px;
-        }
-
-        /* Error banner */
-        .hs-ai-error {
-          font-size: 10.5px;
-          color: var(--vscode-errorForeground);
-          padding: 5px 7px;
-          border-radius: 4px;
-          background: rgba(241,76,76,0.08);
-          border: 1px solid rgba(241,76,76,0.2);
-        }
-
-        .hidden { display: none !important; }
-      </style>
 
       <div class="hs-root">
         <div class="hs-header">
           <div class="hs-brand">
-            <svg class="hs-brand-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-              <path d="M19.5 9.5a6.5 6.5 0 0 0-12.47-2A5 5 0 0 0 7 17.5h12a4.5 4.5 0 0 0 .5-8.97z" fill="rgba(255,255,255,0.9)" stroke="rgba(255,255,255,0.2)" stroke-width="0.5"/>
-            </svg>
-            <span class="hs-brand-name">Cloudinary</span>
-          </div>
-          <div class="hs-cloud-row">
-            <span class="hs-cloud-name${hasConfig ? "" : " hs-cloud-name--placeholder"}">${hasConfig ? cloudName : "Not configured"}</span>
+            <div class="hs-brand-left">
+              <svg class="hs-brand-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <path d="M19.5 9.5a6.5 6.5 0 0 0-12.47-2A5 5 0 0 0 7 17.5h12a4.5 4.5 0 0 0 .5-8.97z" fill="rgba(255,255,255,0.9)" stroke="rgba(255,255,255,0.2)" stroke-width="0.5"/>
+              </svg>
+              <span class="hs-brand-name">Cloudinary</span>
+            </div>
             <span class="hs-status-pill">
               <span class="hs-status-dot${hasConfig ? "" : " hs-status-dot--warn"}"></span>
               ${hasConfig ? "Connected" : "Setup needed"}
             </span>
+          </div>
+          <div class="hs-cloud-row">
+            <div class="hs-cloud-col">
+              <span class="hs-cloud-name${hasConfig ? "" : " hs-cloud-name--placeholder"}">${hasConfig ? cloudName : "Not configured"}</span>
+              ${hasConfig ? `<span class="hs-folder-mode">${folderMode}</span>` : ""}
+            </div>
+            <button id="hs-btn-header-configure" class="hs-configure-btn" title="Open configuration file" aria-label="Open configuration file">
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 4.754a3.246 3.246 0 1 0 0 6.492 3.246 3.246 0 0 0 0-6.492M5.754 8a2.246 2.246 0 1 1 4.492 0 2.246 2.246 0 0 1-4.492 0"/><path d="M9.796 1.343c-.527-1.79-3.065-1.79-3.592 0l-.094.319a.873.873 0 0 1-1.255.52l-.292-.16c-1.64-.892-3.433.902-2.54 2.541l.159.292a.873.873 0 0 1-.52 1.255l-.319.094c-1.79.527-1.79 3.065 0 3.592l.319.094a.873.873 0 0 1 .52 1.255l-.16.292c-.892 1.64.901 3.434 2.541 2.54l.292-.159a.873.873 0 0 1 1.255.52l.094.319c.527 1.79 3.065 1.79 3.592 0l.094-.319a.873.873 0 0 1 1.255-.52l.292.16c1.64.893 3.434-.902 2.54-2.541l-.159-.292a.873.873 0 0 1 .52-1.255l.319-.094c1.79-.527 1.79-3.065 0-3.592l-.319-.094a.873.873 0 0 1-.52-1.255l.16-.292c.893-1.64-.902-3.433-2.541-2.54l-.292.159a.873.873 0 0 1-1.255-.52zm-2.633.283c.246-.835 1.428-.835 1.674 0l.094.319a1.873 1.873 0 0 0 2.693 1.115l.291-.16c.764-.415 1.6.42 1.184 1.185l-.159.292a1.873 1.873 0 0 0 1.116 2.692l.318.094c.835.246.835 1.428 0 1.674l-.319.094a1.873 1.873 0 0 0-1.115 2.693l.16.291c.415.764-.42 1.6-1.185 1.184l-.291-.159a1.873 1.873 0 0 0-2.693 1.116l-.094.318c-.246.835-1.428.835-1.674 0l-.094-.319a1.873 1.873 0 0 0-2.692-1.115l-.292.16c-.764.415-1.6-.42-1.184-1.185l.159-.291A1.873 1.873 0 0 0 1.945 8.93l-.319-.094c-.835-.246-.835-1.428 0-1.674l.319-.094A1.873 1.873 0 0 0 3.06 4.474l-.16-.292c-.415-.764.42-1.6 1.185-1.184l.292.159a1.873 1.873 0 0 0 2.692-1.115z"/></svg>
+            </button>
           </div>
         </div>
 
@@ -659,6 +208,26 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
           <span class="hs-setup-banner-icon">⚠</span>
           <span class="hs-setup-banner-text">Add your API credentials to connect</span>
           <button id="hs-btn-configure" class="hs-setup-banner-btn" data-command="openGlobalConfig">Configure</button>
+        </div>
+        ` : ""}
+
+        ${hasConfig ? `
+        <div class="hs-search" role="search" aria-label="Search media library">
+          <div class="hs-search-wrap">
+            <svg class="hs-search-icon" width="12" height="12" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+              <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001q.044.06.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1 1 0 0 0-.115-.099zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0"/>
+            </svg>
+            <input
+              id="hs-search-input"
+              class="hs-search-input"
+              type="text"
+              placeholder="Search library…"
+              autocomplete="off"
+              spellcheck="false"
+              aria-label="Search media library"
+            />
+            <button id="hs-search-clear" class="hs-search-clear hidden" title="Clear search" aria-label="Clear search">✕</button>
+          </div>
         </div>
         ` : ""}
 
@@ -684,6 +253,19 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
             </span>
             <svg class="hs-chevron" width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M4.5 3L7.5 6L4.5 9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </button>
+
+          ${this._environmentNames.length > 1 ? `
+          <button id="hs-btn-switch-env" class="hs-action" data-command="switchEnvironment">
+            <span class="hs-action-icon hs-action-icon--amber" aria-hidden="true">
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M1 11.5a.5.5 0 0 0 .5.5h11.793l-3.147 3.146a.5.5 0 0 0 .708.708l4-4a.5.5 0 0 0 0-.708l-4-4a.5.5 0 0 0-.708.708L13.293 11H1.5a.5.5 0 0 0-.5.5m14-7a.5.5 0 0 1-.5.5H2.707l3.147 3.146a.5.5 0 1 1-.708.708l-4-4a.5.5 0 0 1 0-.708l4-4a.5.5 0 1 1 .708.708L2.707 4H14.5a.5.5 0 0 1 .5.5"/></svg>
+            </span>
+            <span class="hs-action-text">
+              <span class="hs-action-title">Switch Environment</span>
+              <span class="hs-action-desc">${this._environmentNames.length} environments available</span>
+            </span>
+            <svg class="hs-chevron" width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M4.5 3L7.5 6L4.5 9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          ` : ""}
 
           <div class="hs-section-divider" role="separator"></div>
 

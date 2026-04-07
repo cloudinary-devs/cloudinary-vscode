@@ -105,7 +105,7 @@ export async function activate(context: vscode.ExtensionContext) {
       "cloudinaryMediaLibrary",
       cloudinaryProvider
     );
-    registerAllCommands(context, cloudinaryProvider, statusBar);
+    registerAllCommands(context, cloudinaryProvider, statusBar, homescreenProvider);
     return;
   }
 
@@ -237,7 +237,7 @@ export async function activate(context: vscode.ExtensionContext) {
     "cloudinaryMediaLibrary",
     cloudinaryProvider
   );
-  registerAllCommands(context, cloudinaryProvider, statusBar);
+  registerAllCommands(context, cloudinaryProvider, statusBar, homescreenProvider);
 }
 
 /**

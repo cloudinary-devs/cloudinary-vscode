@@ -9,17 +9,20 @@ import registerClearSearch from "./clearSearch";
 import registerWelcomeScreen from "./welcomeScreen";
 import registerConfigureAiTools from "./configureAiTools";
 import { CloudinaryTreeDataProvider } from "../tree/treeDataProvider";
+import { HomescreenViewProvider } from "../webview/homescreenView";
 
 /**
  * Registers all Cloudinary-related commands with the VS Code command registry.
  * @param context - The extension context.
  * @param provider - The Cloudinary tree data provider.
  * @param statusBar - Status bar item to show current environment.
+ * @param homescreenProvider - The homescreen webview view provider.
  */
 function registerAllCommands(
   context: vscode.ExtensionContext,
   provider: CloudinaryTreeDataProvider,
-  statusBar: vscode.StatusBarItem
+  statusBar: vscode.StatusBarItem,
+  homescreenProvider: HomescreenViewProvider
 ) {
   context.subscriptions.push(
     vscode.commands.registerCommand("cloudinary.showHomescreen", () => {
@@ -45,7 +48,7 @@ function registerAllCommands(
     )
   );
 
-  registerSearch(context, provider);
+  registerSearch(context, provider, homescreenProvider);
   registerClearSearch(context, provider);
   registerViewOptions(context, provider);
   registerPreview(context);

@@ -273,6 +273,45 @@ function handleAiToolsResult(_msg: AiToolsResultMessage): void {
   getVSCode()?.postMessage({ command: "aiToolsExpanded" });
 }
 
+// ── Search ────────────────────────────────────────────────────────────────────
+
+function initSearch(): void {
+  const input = document.getElementById("hs-search-input") as HTMLInputElement | null;
+  const clearBtn = document.getElementById("hs-search-clear") as HTMLButtonElement | null;
+
+  if (!input) { return; }
+
+  // Show/hide clear button based on input value
+  input.addEventListener("input", () => {
+    if (clearBtn) {
+      clearBtn.classList.toggle("hidden", input.value.trim() === "");
+    }
+  });
+
+  // Submit search on Enter
+  input.addEventListener("keydown", (e: KeyboardEvent) => {
+    if (e.key === "Enter") {
+      const query = input.value.trim();
+      if (query) {
+        getVSCode()?.postMessage({ command: "searchAssets", data: query });
+      }
+    }
+    if (e.key === "Escape") {
+      input.value = "";
+      clearBtn?.classList.add("hidden");
+      getVSCode()?.postMessage({ command: "clearSearch" });
+    }
+  });
+
+  // Clear search
+  clearBtn?.addEventListener("click", () => {
+    input.value = "";
+    clearBtn.classList.add("hidden");
+    input.focus();
+    getVSCode()?.postMessage({ command: "clearSearch" });
+  });
+}
+
 // ── Init ──────────────────────────────────────────────────────────────────────
 
 function init(): void {
@@ -285,10 +324,25 @@ function init(): void {
     });
   });
 
-  // Configure credentials button (uses hs-setup-banner-btn, not hs-action)
+  // Configure credentials button (setup banner, not hs-action)
   document.getElementById("hs-btn-configure")?.addEventListener("click", () => {
     getVSCode()?.postMessage({ command: "openGlobalConfig" });
   });
+
+  // Header configure button (gear icon in cloud row)
+  document.getElementById("hs-btn-header-configure")?.addEventListener("click", () => {
+    getVSCode()?.postMessage({ command: "openGlobalConfig" });
+  });
+
+  // Footer links (use data-command like hs-action but have a different class)
+  document.querySelectorAll<HTMLElement>(".hs-footer-link[data-command]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      getVSCode()?.postMessage({ command: btn.dataset.command });
+    });
+  });
+
+  // Search input
+  initSearch();
 
   // Accordion toggle
   el("hs-btn-ai-tools").addEventListener("click", toggleAccordion);
@@ -297,9 +351,17 @@ function init(): void {
   el<HTMLButtonElement>("hs-ai-apply")?.addEventListener("click", handleApply);
 
   // VS Code → webview messages
-  window.addEventListener("message", (event: MessageEvent<InboundMessage>) => {
+  window.addEventListener("message", (event: MessageEvent<InboundMessage | { command: string }>) => {
     const msg = event.data;
     switch (msg.command) {
+      case "focusSearch": {
+        const input = document.getElementById("hs-search-input") as HTMLInputElement | null;
+        if (input) {
+          input.focus();
+          input.select();
+        }
+        break;
+      }
       case "aiToolsData":
         handleAiToolsData(msg as AiToolsDataMessage);
         break;

@@ -70,6 +70,19 @@ export function getScriptUri(
 }
 
 /**
+ * Get a stylesheet URI from media/styles/.
+ */
+export function getStyleUri(
+  webview: vscode.Webview,
+  extensionUri: vscode.Uri,
+  cssName: string
+): vscode.Uri {
+  return getWebviewUri(webview, extensionUri, [
+    "media", "styles", cssName
+  ]);
+}
+
+/**
  * Generate Content Security Policy for a webview.
  */
 export function getCSP(webview: vscode.Webview, nonce: string): string {
@@ -92,6 +105,7 @@ export interface WebviewDocumentOptions {
   extensionUri: vscode.Uri;
   bodyContent: string;
   bodyClass?: string;
+  additionalStyles?: vscode.Uri[];
   additionalScripts?: vscode.Uri[];
   inlineScript?: string;
 }
@@ -106,6 +120,7 @@ export function createWebviewDocument(options: WebviewDocumentOptions): string {
     extensionUri,
     bodyContent,
     bodyClass = "",
+    additionalStyles = [],
     additionalScripts = [],
     inlineScript = "",
   } = options;
@@ -113,6 +128,10 @@ export function createWebviewDocument(options: WebviewDocumentOptions): string {
   const nonce = getNonce();
   const { tokensUri, baseUri, componentsUri } = getMediaUris(webview, extensionUri);
   const csp = getCSP(webview, nonce);
+
+  const extraStyleTags = additionalStyles
+    .map((uri) => `  <link rel="stylesheet" href="${uri}">`)
+    .join("\n");
 
   const scriptTags = additionalScripts
     .map((uri) => `<script nonce="${nonce}" src="${uri}"></script>`)
@@ -131,6 +150,7 @@ export function createWebviewDocument(options: WebviewDocumentOptions): string {
   <link rel="stylesheet" href="${tokensUri}">
   <link rel="stylesheet" href="${baseUri}">
   <link rel="stylesheet" href="${componentsUri}">
+${extraStyleTags}
   <title>${escapeHtml(title)}</title>
 </head>
 <body${bodyClass ? ` class="${bodyClass}"` : ""}>
