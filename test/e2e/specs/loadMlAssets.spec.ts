@@ -9,14 +9,16 @@ import { pathUtils } from '../src/utils/pathUtils.js';
 describe('Asset Explorer Tetsts', () => {
 
     let cloudinarySDK = new CloudinarySDK();
-    let assetPublicID = `e2e-test-ae-${crypto.randomUUID().substring(0, 8)}`;
+    let firstAssetPublicID = `e2e-test-ae-${crypto.randomUUID().substring(0, 8)}`;
+    let secondAssetPublicID = `e2e-test-ae-${crypto.randomUUID().substring(0, 8)}`;
 
     beforeEach(async () => {
-        await cloudinarySDK.V2.uploader.upload(path.join(pathUtils.getTestAssetsPath(), 'sample_png.png'), { public_id: assetPublicID });
+        await cloudinarySDK.V2.uploader.upload(path.join(pathUtils.getTestAssetsPath(), 'sample_png.png'), { public_id: firstAssetPublicID });
+        await cloudinarySDK.V2.uploader.upload(path.join(pathUtils.getTestAssetsPath(), 'sample_png.png'), { public_id: secondAssetPublicID });
     });
 
     afterEach(async () => {
-        await cloudinarySDK.V2.api.delete_resources([assetPublicID]);
+        await cloudinarySDK.V2.api.delete_resources([firstAssetPublicID, secondAssetPublicID]);
     });
 
     /**
@@ -25,7 +27,7 @@ describe('Asset Explorer Tetsts', () => {
      */
     it('should load cloudinary media library', async () => {
         const expectedTitle = 'CLOUDINARY';
-        const expectedItems = [assetPublicID];
+        const expectedItems = [firstAssetPublicID, secondAssetPublicID];
         
         await activityBarUtils.openView('Cloudinary');
 
