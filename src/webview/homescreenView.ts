@@ -310,6 +310,9 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
             <div class="hs-ai-panel-inner" id="hs-ai-state-loading">
               <div class="hs-ai-loading">
                 <div class="hs-skeleton hs-skeleton--label"></div>
+                <div class="hs-skeleton hs-skeleton--short"></div>
+                <div style="height:6px"></div>
+                <div class="hs-skeleton hs-skeleton--label"></div>
                 <div class="hs-skeleton"></div>
                 <div class="hs-skeleton"></div>
                 <div class="hs-skeleton hs-skeleton--short"></div>
@@ -322,22 +325,35 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
 
             <!-- Ready / applying state -->
             <div class="hs-ai-panel-inner hidden" id="hs-ai-state-ready">
-              <div>
-                <div class="hs-ai-section-head">Skills <span class="hs-ai-platform-badge" id="hs-ai-skills-platform"></span></div>
-                <div id="hs-ai-skills-list"></div>
-                <div class="hs-ai-hint">Installed skills are locked. Delete files to uninstall.</div>
-                <div class="hs-ai-section-head" style="margin-top:8px">Also install for</div>
-                <div id="hs-ai-platform-list"></div>
+
+              <!-- Control bar: platform dropdown + scope toggle -->
+              <div class="hs-ai-controls">
+                <div class="hs-ai-control-row">
+                  <span class="hs-ai-control-label">Platform</span>
+                  <select id="hs-ai-platform-select" class="hs-ai-platform-select" aria-label="Select platform"></select>
+                </div>
+                <div class="hs-ai-platform-covers hidden" id="hs-ai-platform-covers"></div>
+                <div class="hs-ai-control-row">
+                  <span class="hs-ai-control-label">Scope</span>
+                  <div class="hs-ai-scope-toggle" role="group" aria-label="Installation scope">
+                    <button class="hs-ai-scope-btn active" data-scope="project">Project</button>
+                    <button class="hs-ai-scope-btn" data-scope="global">Global</button>
+                  </div>
+                </div>
               </div>
-              <div>
-                <div class="hs-ai-section-head">MCP Servers</div>
-                <div id="hs-ai-mcp-list"></div>
-                <div class="hs-ai-hint">Configured servers are locked. Delete config entries to remove.</div>
-              </div>
+
+              <!-- Skills -->
+              <div class="hs-ai-section-head">Skills</div>
+              <div id="hs-ai-skills-list"></div>
+              <div class="hs-ai-hint">Re-select installed skills to update them. Delete files to uninstall.</div>
+
+              <!-- MCP Servers -->
+              <div class="hs-ai-section-head" style="margin-top:8px">MCP Servers</div>
+              <div id="hs-ai-mcp-list"></div>
+              <div class="hs-ai-hint">Delete config entries to remove.</div>
+
               <button class="hs-ai-apply" id="hs-ai-apply" disabled>Apply</button>
             </div>
-
-
 
             <!-- Error state -->
             <div class="hs-ai-panel-inner hidden" id="hs-ai-state-error">
@@ -363,10 +379,7 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
 
     const workspaceFolders = vscode.workspace.workspaceFolders;
     if (!workspaceFolders || workspaceFolders.length === 0) {
-      view.webview.postMessage({
-        command: "aiToolsData",
-        error: "Please open a workspace folder first.",
-      });
+      view.webview.postMessage({ command: "aiToolsData", error: "Please open a workspace folder first." });
       return;
     }
     const rootUri = workspaceFolders[0].uri;
@@ -377,20 +390,17 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
       }
       const skills = this._cachedSkills;
 
-      const primaryPlatform = detectEditorPlatform();
-      const [installedOnPrimarySet, activePlatforms] = await Promise.all([
-        readInstalledSkillDirNames(rootUri, primaryPlatform, skills),
-        detectActivePlatforms(rootUri),
-      ]);
+      const platform = getPlatformEntry(this._currentPlatform);
+      if (!platform) {
+        view.webview.postMessage({ command: "aiToolsData", error: `Unknown platform: ${this._currentPlatform}` });
+        return;
+      }
 
-      const additionalPlatforms = PLATFORMS
-        .filter((p) => p.id !== primaryPlatform)
-        .map((p) => ({
-          id: p.id,
-          label: p.label,
-          sublabel: p.sublabel,
-          locked: activePlatforms.includes(p.id as PlatformId),
-        }));
+      const { project, global: globalSet } = await readInstalledSkillDirNames(rootUri, platform, skills);
+      const inScope = this._currentScope === "project" ? project   : globalSet;
+      const inOther = this._currentScope === "project" ? globalSet : project;
+
+      const covers = getPlatformCovers(platform, this._currentScope);
 
       const editor = detectEditor();
       const mcpFilePath = getMcpFilePath(editor);
@@ -399,24 +409,34 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
 
       view.webview.postMessage({
         command: "aiToolsData",
-        skills: skills.map((s) => ({ name: s.name, description: s.description, dirName: s.dirName })),
-        primaryPlatform,
-        installedOnPrimary: [...installedOnPrimarySet],
-        additionalPlatforms,
-        mcpServers: MCP_SERVERS.map((s) => ({ key: s.key, label: s.label, description: s.description })),
-        configuredMcpKeys: [...configuredMcpSet],
+        platform: this._currentPlatform,
+        scope: this._currentScope,
+        platformLabel: platform.name,
+        platformCovers: covers,
+        allPlatforms: (skillsConfig.platforms as PlatformEntry[]).map((p) => ({ id: p.id, name: p.name })),
+        skills: skills.map((s) => ({
+          name: s.name,
+          description: s.description,
+          dirName: s.dirName,
+          installedInScope: inScope.has(s.dirName),
+          installedInOtherScope: inOther.has(s.dirName),
+        })),
+        mcpServers: MCP_SERVERS.map((s) => ({
+          key: s.key,
+          label: s.label,
+          description: s.description,
+          configured: configuredMcpSet.has(s.key),
+        })),
       });
     } catch (err: any) {
-      view.webview.postMessage({
-        command: "aiToolsData",
-        error: err.message ?? String(err),
-      });
+      view.webview.postMessage({ command: "aiToolsData", error: err.message ?? String(err) });
     }
   }
 
   private async _handleInstallAiTools(
     skills: string[],
-    platforms: string[],
+    platformId: string,
+    scope: Scope,
     mcpServers: string[]
   ): Promise<void> {
     const view = this._webviewView;
@@ -430,6 +450,12 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
     const rootUri = workspaceFolders[0].uri;
     const errors: string[] = [];
     const cachedSkills = this._cachedSkills ?? [];
+    const platform = getPlatformEntry(platformId);
+
+    if (!platform) {
+      view.webview.postMessage({ command: "aiToolsResult", errors: [`Unknown platform: ${platformId}`] });
+      return;
+    }
 
     for (const dirName of skills) {
       const skillInfo = cachedSkills.find((s) => s.dirName === dirName);
@@ -445,31 +471,16 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
       }
 
       const createdFiles: string[] = [];
-      let anyError = false;
-      for (const platform of platforms) {
-        const errsBefore = errors.length;
-        try {
-          if (platform === "claude-code") {
-            await installForClaudeCode(rootUri, dirName, content, createdFiles, errors);
-          } else if (platform === "universal") {
-            await installForUniversal(rootUri, dirName, content, createdFiles, errors);
-          } else if (platform === "windsurf") {
-            await installForWindsurf(rootUri, dirName, content, createdFiles, errors);
-          } else if (platform === "vscode-copilot") {
-            await installForCopilot(rootUri, skillInfo.name, content, createdFiles);
-          }
-        } catch (err: any) {
-          errors.push(`${dirName} (${platform}): ${err.message}`);
-          anyError = true;
-        }
-        if (errors.length > errsBefore) {
-          anyError = true;
-        }
+      const errsBefore = errors.length;
+      try {
+        await installSkill(rootUri, platform, scope, dirName, content, createdFiles, errors);
+      } catch (err: any) {
+        errors.push(`${dirName}: ${err.message}`);
       }
       view.webview.postMessage({
         command: "aiToolsProgress",
         item: dirName,
-        status: anyError ? "error" : "done",
+        status: errors.length > errsBefore ? "error" : "done",
       });
     }
 
@@ -493,3 +504,4 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
     view.webview.postMessage({ command: "aiToolsResult", errors });
   }
 }
+
