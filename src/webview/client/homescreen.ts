@@ -82,8 +82,6 @@ function showPanelState(state: "loading" | "ready" | "done" | "error"): void {
   }
 }
 
-// ── Helper functions ──────────────────────────────────────────────────────────
-
 // ── Platform rendering ────────────────────────────────────────────────────────
 
 function renderPlatformDropdown(allPlatforms: { id: string; name: string }[], currentPlatform: string): void {
