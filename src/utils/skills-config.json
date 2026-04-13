@@ -1,0 +1,149 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$comment": "Cloudinary agent skills installation config. Single source of truth consumed by VS Code extension, React starter kit CLI, and other CLIs.",
+
+  "canonical": {
+    "project": ".agents/skills",
+    "global": "~/.agents/skills"
+  },
+
+  "scopes": {
+    "project": {
+      "description": "Installed in the current project directory, committed to version control",
+      "basePath": "."
+    },
+    "global": {
+      "description": "Installed in the user's home directory, available across all projects",
+      "basePath": "~"
+    }
+  },
+
+  "platforms": [
+    {
+      "id": "amp",
+      "name": "Amp",
+      "skillsDir": ".agents/skills",
+      "globalSkillsDir": "~/.agents/skills",
+      "isUniversal": true
+    },
+    {
+      "id": "claude-code",
+      "name": "Claude Code",
+      "skillsDir": ".claude/skills",
+      "globalSkillsDir": "~/.claude/skills",
+      "isUniversal": false
+    },
+    {
+      "id": "cursor",
+      "name": "Cursor",
+      "skillsDir": ".cursor/skills",
+      "globalSkillsDir": "~/.cursor/skills",
+      "isUniversal": false
+    },
+    {
+      "id": "codex",
+      "name": "Codex",
+      "skillsDir": ".agents/skills",
+      "globalSkillsDir": "~/.agents/skills",
+      "isUniversal": true
+    },
+    {
+      "id": "cline",
+      "name": "Cline",
+      "skillsDir": ".agents/skills",
+      "globalSkillsDir": "~/.agents/skills",
+      "isUniversal": true
+    },
+    {
+      "id": "github-copilot",
+      "name": "GitHub Copilot",
+      "skillsDir": ".agents/skills",
+      "globalSkillsDir": "~/.agents/skills",
+      "isUniversal": true
+    },
+    {
+      "id": "gemini-cli",
+      "name": "Gemini CLI",
+      "skillsDir": ".agents/skills",
+      "globalSkillsDir": "~/.agents/skills",
+      "isUniversal": true
+    },
+    {
+      "id": "opencode",
+      "name": "OpenCode",
+      "skillsDir": ".opencode/skills",
+      "globalSkillsDir": "~/.config/opencode/skills",
+      "isUniversal": false
+    },
+    {
+      "id": "windsurf",
+      "name": "Windsurf",
+      "skillsDir": ".windsurf/skills",
+      "globalSkillsDir": "~/.windsurf/skills",
+      "isUniversal": false
+    },
+    {
+      "id": "antigravity",
+      "name": "Antigravity",
+      "skillsDir": ".agent/skills",
+      "globalSkillsDir": "~/.agent/skills",
+      "isUniversal": false
+    },
+    {
+      "id": "augment",
+      "name": "Augment",
+      "skillsDir": ".augment/skills",
+      "globalSkillsDir": "~/.augment/skills",
+      "isUniversal": false
+    },
+    {
+      "id": "continue",
+      "name": "Continue",
+      "skillsDir": ".continue/skills",
+      "globalSkillsDir": "~/.continue/skills",
+      "isUniversal": false
+    },
+    {
+      "id": "kiro-cli",
+      "name": "Kiro CLI",
+      "skillsDir": ".agents/skills",
+      "globalSkillsDir": "~/.agents/skills",
+      "isUniversal": true
+    },
+    {
+      "id": "roo",
+      "name": "Roo",
+      "skillsDir": ".roo/skills",
+      "globalSkillsDir": "~/.roo/skills",
+      "isUniversal": false
+    },
+    {
+      "id": "warp",
+      "name": "Warp",
+      "skillsDir": ".agents/skills",
+      "globalSkillsDir": "~/.agents/skills",
+      "isUniversal": true
+    },
+    {
+      "id": "codebuddy",
+      "name": "CodeBuddy",
+      "skillsDir": ".codebuddy/skills",
+      "globalSkillsDir": "~/.codebuddy/skills",
+      "isUniversal": false
+    },
+    {
+      "id": "command-code",
+      "name": "Command Code",
+      "skillsDir": ".commandcode/skills",
+      "globalSkillsDir": "~/.commandcode/skills",
+      "isUniversal": false
+    },
+    {
+      "id": "cortex-code",
+      "name": "Cortex Code",
+      "skillsDir": ".cortex/skills",
+      "globalSkillsDir": "~/.cortex/skills",
+      "isUniversal": false
+    }
+  ]
+}

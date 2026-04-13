@@ -8,7 +8,8 @@
     "rootDir": "src",
     "skipLibCheck": true,
     "esModuleInterop": true,
-    "strict": true
+    "strict": true,
+    "resolveJsonModule": true
   },
   "exclude": [
     "src/webview/client/**/*"
