@@ -2,39 +2,36 @@ import { initCommon, getVSCode } from "./common";
 
 // ── Types (mirrored from aiToolsService — no import possible in webview client) ──
 
-interface SkillInfo {
+interface SkillStatusInfo {
   name: string;
   description: string;
   dirName: string;
+  installedInScope: boolean;
+  installedInOtherScope: boolean;
 }
 
 interface McpServerInfo {
   key: string;
   label: string;
   description: string;
-}
-
-interface AdditionalPlatform {
-  id: string;
-  label: string;
-  sublabel?: string;
-  locked: boolean;
+  configured: boolean;
 }
 
 interface AiToolsDataMessage {
   command: "aiToolsData";
-  skills: SkillInfo[];
-  primaryPlatform: string;
-  installedOnPrimary: string[];
-  additionalPlatforms: AdditionalPlatform[];
+  platform: string;
+  scope: "project" | "global";
+  platformLabel: string;
+  platformCovers?: string;
+  allPlatforms: { id: string; name: string }[];
+  skills: SkillStatusInfo[];
   mcpServers: McpServerInfo[];
-  configuredMcpKeys: string[];
   error?: string;
 }
 
 interface AiToolsProgressMessage {
   command: "aiToolsProgress";
-  item: string;   // skill dirName or MCP key
+  item: string;
   status: "done" | "error";
 }
 
@@ -50,6 +47,7 @@ type InboundMessage = AiToolsDataMessage | AiToolsProgressMessage | AiToolsResul
 let _isOpen = false;
 let _dataFetched = false;
 let _cachedData: Omit<AiToolsDataMessage, "command"> | null = null;
+
 
 // ── DOM helpers ───────────────────────────────────────────────────────────────
 
@@ -88,44 +86,31 @@ function showPanelState(state: "loading" | "ready" | "done" | "error"): void {
 
 // ── Platform rendering ────────────────────────────────────────────────────────
 
-const PLATFORM_LABELS: Record<string, string> = {
-  "universal":      "Universal",
-  "claude-code":    "Claude Code",
-  "vscode-copilot": "VS Code (Copilot)",
-  "windsurf":       "Windsurf",
-};
-
-function renderAdditionalPlatformRows(platforms: AdditionalPlatform[]): void {
-  const list = el("hs-ai-platform-list");
-  if (!list) { return; }
-  list.innerHTML = platforms.map((p) => {
-    const sublabel = p.sublabel
-      ? `<span class="hs-ai-platform-sub">${escapeHtml(p.sublabel)}</span>`
-      : "";
-    return `<label class="hs-ai-item hs-ai-platform-row">
-      <input type="checkbox" class="hs-ai-cb hs-ai-platform-cb" data-platform="${escapeHtml(p.id)}" ${p.locked ? "checked disabled" : ""}>
-      <span class="hs-ai-item-name">${escapeHtml(p.label)}${sublabel}</span>
-    </label>`;
-  }).join("");
-  list.querySelectorAll<HTMLInputElement>(".hs-ai-platform-cb").forEach((cb) => {
-    cb.addEventListener("change", updateApplyButton);
-  });
+function renderPlatformDropdown(allPlatforms: { id: string; name: string }[], currentPlatform: string): void {
+  const select = el<HTMLSelectElement>("hs-ai-platform-select");
+  if (!select) { return; }
+  select.innerHTML = allPlatforms
+    .map((p) => `<option value="${escapeHtml(p.id)}"${p.id === currentPlatform ? " selected" : ""}>${escapeHtml(p.name)}</option>`)
+    .join("");
 }
 
 // ── Checklist rendering ───────────────────────────────────────────────────────
 
-function renderSkillRows(skills: SkillInfo[], installedOnPrimary: string[]): void {
+function renderSkillRows(skills: SkillStatusInfo[], scope: "project" | "global"): void {
   const list = el("hs-ai-skills-list");
   if (!list) { return; }
-  const installedSet = new Set(installedOnPrimary);
+  const otherScope = scope === "project" ? "global" : "project";
   list.innerHTML = skills.map((s) => {
-    const isInstalled = installedSet.has(s.dirName);
+    const isInstalled = s.installedInScope;
     const statusClass = isInstalled ? "hs-ai-item-status--ok" : "hs-ai-item-status--none";
     const statusText = isInstalled ? "installed" : "—";
+    const otherHint = s.installedInOtherScope
+      ? `<span class="hs-ai-item-status-other">· also ${escapeHtml(otherScope)}</span>`
+      : "";
     return `<label class="hs-ai-item">
       <input type="checkbox" class="hs-ai-cb" data-skill="${escapeHtml(s.dirName)}" ${isInstalled ? "checked disabled" : ""}>
       <span class="hs-ai-item-name" title="${escapeHtml(s.description)}">${escapeHtml(s.name)}</span>
-      <span class="hs-ai-item-status ${statusClass}">${statusText}</span>
+      <span class="hs-ai-item-status ${statusClass}">${statusText}${otherHint}</span>
     </label>`;
   }).join("");
   list.querySelectorAll<HTMLInputElement>(".hs-ai-cb").forEach((cb) => {
@@ -133,25 +118,19 @@ function renderSkillRows(skills: SkillInfo[], installedOnPrimary: string[]): voi
   });
 }
 
-function renderMcpRows(
-  servers: McpServerInfo[],
-  configuredKeys: string[]
-): void {
+function renderMcpRows(servers: McpServerInfo[]): void {
   const list = el("hs-ai-mcp-list");
   if (!list) { return; }
-  const configuredSet = new Set(configuredKeys);
-  list.innerHTML = servers
-    .map((s) => {
-      const isConfigured = configuredSet.has(s.key);
-      const statusClass = isConfigured ? "hs-ai-item-status--ok" : "hs-ai-item-status--none";
-      const statusText = isConfigured ? "configured" : "—";
-      return `<label class="hs-ai-item">
-        <input type="checkbox" class="hs-ai-cb" data-mcp="${escapeHtml(s.key)}" ${isConfigured ? "checked disabled" : ""}>
-        <span class="hs-ai-item-name" title="${escapeHtml(s.description)}">${escapeHtml(s.label)}</span>
-        <span class="hs-ai-item-status ${statusClass}">${statusText}</span>
-      </label>`;
-    })
-    .join("");
+  list.innerHTML = servers.map((s) => {
+    const isConfigured = s.configured;
+    const statusClass = isConfigured ? "hs-ai-item-status--ok" : "hs-ai-item-status--none";
+    const statusText = isConfigured ? "configured" : "—";
+    return `<label class="hs-ai-item">
+      <input type="checkbox" class="hs-ai-cb" data-mcp="${escapeHtml(s.key)}" ${isConfigured ? "checked disabled" : ""}>
+      <span class="hs-ai-item-name" title="${escapeHtml(s.description)}">${escapeHtml(s.label)}</span>
+      <span class="hs-ai-item-status ${statusClass}">${statusText}</span>
+    </label>`;
+  }).join("");
   list.querySelectorAll<HTMLInputElement>(".hs-ai-cb").forEach((cb) => {
     cb.addEventListener("change", updateApplyButton);
   });
@@ -192,14 +171,10 @@ function handleApply(): void {
   if (!_cachedData) { return; }
 
   const skillCheckboxes = document.querySelectorAll<HTMLInputElement>(".hs-ai-cb[data-skill]");
-  const mcpCheckboxes = document.querySelectorAll<HTMLInputElement>(".hs-ai-cb[data-mcp]");
+  const mcpCheckboxes   = document.querySelectorAll<HTMLInputElement>(".hs-ai-cb[data-mcp]");
 
-  const platformCheckboxes = document.querySelectorAll<HTMLInputElement>(".hs-ai-cb[data-platform]");
-
-  const selectedSkills = [...skillCheckboxes].filter((c) => c.checked).map((c) => c.dataset.skill!);
-  const selectedMcpKeys = [...mcpCheckboxes].filter((c) => c.checked).map((c) => c.dataset.mcp!);
-  const additionalPlatforms = [...platformCheckboxes].filter((c) => c.checked).map((c) => c.dataset.platform!);
-  const platforms = [_cachedData.primaryPlatform, ...additionalPlatforms];
+  const selectedSkills  = [...skillCheckboxes].filter((c) => c.checked && !c.disabled).map((c) => c.dataset.skill!);
+  const selectedMcpKeys = [...mcpCheckboxes].filter((c) => c.checked && !c.disabled).map((c) => c.dataset.mcp!);
 
   document.querySelectorAll<HTMLInputElement>(".hs-ai-cb").forEach((c) => { c.disabled = true; });
   const applyBtn = el<HTMLButtonElement>("hs-ai-apply");
@@ -210,8 +185,9 @@ function handleApply(): void {
 
   getVSCode()?.postMessage({
     command: "installAiTools",
-    skills: selectedSkills,
-    platforms,
+    platform: _cachedData.platform,
+    scope:    _cachedData.scope,
+    skills:   selectedSkills,
     mcpServers: selectedMcpKeys,
   });
 }
@@ -226,21 +202,45 @@ function handleAiToolsData(msg: AiToolsDataMessage): void {
     return;
   }
 
+  // Preserve pending skill selections across scope changes
+  const previouslyChecked = new Set(
+    [...document.querySelectorAll<HTMLInputElement>(".hs-ai-cb[data-skill]:not(:disabled)")]
+      .filter((c) => c.checked)
+      .map((c) => c.dataset.skill!)
+  );
+
   _cachedData = {
+    platform: msg.platform,
+    scope: msg.scope,
+    platformLabel: msg.platformLabel,
+    platformCovers: msg.platformCovers,
+    allPlatforms: msg.allPlatforms,
     skills: msg.skills,
-    primaryPlatform: msg.primaryPlatform,
-    installedOnPrimary: msg.installedOnPrimary,
-    additionalPlatforms: msg.additionalPlatforms,
     mcpServers: msg.mcpServers,
-    configuredMcpKeys: msg.configuredMcpKeys,
   };
 
-  const platformLabel = el("hs-ai-skills-platform");
-  if (platformLabel) { platformLabel.textContent = `(${PLATFORM_LABELS[msg.primaryPlatform] ?? msg.primaryPlatform})`; }
+  // Sync scope toggle buttons
+  document.querySelectorAll<HTMLButtonElement>(".hs-ai-scope-btn").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.scope === msg.scope);
+  });
 
-  renderAdditionalPlatformRows(msg.additionalPlatforms);
-  renderSkillRows(msg.skills, msg.installedOnPrimary);
-  renderMcpRows(msg.mcpServers, msg.configuredMcpKeys);
+  // Update "also covers" note
+  const coversEl = el("hs-ai-platform-covers");
+  if (coversEl) {
+    coversEl.textContent = msg.platformCovers ?? "";
+    coversEl.classList.toggle("hidden", !msg.platformCovers);
+  }
+
+  renderPlatformDropdown(msg.allPlatforms, msg.platform);
+  renderSkillRows(msg.skills, msg.scope);
+  renderMcpRows(msg.mcpServers);
+
+  // Re-apply pending selections that survived the re-render
+  previouslyChecked.forEach((dirName) => {
+    const cb = document.querySelector<HTMLInputElement>(`.hs-ai-cb[data-skill="${dirName}"]:not(:disabled)`);
+    if (cb) { cb.checked = true; }
+  });
+
   const applyBtn = el<HTMLButtonElement>("hs-ai-apply");
   if (applyBtn) { applyBtn.textContent = "Apply"; }
   showPanelState("ready");
@@ -271,6 +271,31 @@ function handleAiToolsResult(_msg: AiToolsResultMessage): void {
   _cachedData = null;
   showPanelState("loading");
   getVSCode()?.postMessage({ command: "aiToolsExpanded" });
+}
+
+// ── Platform dropdown ─────────────────────────────────────────────────────────
+
+function initPlatformDropdown(): void {
+  const select = el<HTMLSelectElement>("hs-ai-platform-select");
+  if (!select) { return; }
+  select.addEventListener("change", () => {
+    // Clear pending checkbox selections on platform switch
+    document.querySelectorAll<HTMLInputElement>(".hs-ai-cb:not(:disabled)").forEach((cb) => { cb.checked = false; });
+    showPanelState("loading");
+    getVSCode()?.postMessage({ command: "changePlatform", platform: select.value });
+  });
+}
+
+// ── Scope toggle ──────────────────────────────────────────────────────────────
+
+function initScopeToggle(): void {
+  document.querySelectorAll<HTMLButtonElement>(".hs-ai-scope-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const scope = btn.dataset.scope as "project" | "global";
+      showPanelState("loading");
+      getVSCode()?.postMessage({ command: "changeScope", scope });
+    });
+  });
 }
 
 // ── Search ────────────────────────────────────────────────────────────────────
@@ -343,6 +368,8 @@ function init(): void {
 
   // Search input
   initSearch();
+  initPlatformDropdown();
+  initScopeToggle();
 
   // Accordion toggle
   el("hs-btn-ai-tools").addEventListener("click", toggleAccordion);
