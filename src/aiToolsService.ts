@@ -457,64 +457,37 @@ export async function installSkill(
 
 export async function readInstalledSkillDirNames(
   rootUri: vscode.Uri,
-  platform: string,
+  platform: PlatformEntry,
   skills: SkillInfo[]
-): Promise<Set<string>> {
-  const installed = new Set<string>();
+): Promise<{ project: Set<string>; global: Set<string> }> {
+  const projectBase = rootUri.fsPath;
+  const globalBase = os.homedir();
 
-  if (platform === "vscode-copilot") {
-    try {
-      const uri = vscode.Uri.joinPath(rootUri, ".github/copilot-instructions.md");
-      const bytes = await vscode.workspace.fs.readFile(uri);
-      const content = Buffer.from(bytes).toString("utf-8");
-      for (const skill of skills) {
-        if (content.includes(`## ${skill.name}`)) {
+  async function checkScope(base: string, dir: string): Promise<Set<string>> {
+    const installed = new Set<string>();
+    await Promise.all(
+      skills.map(async (skill) => {
+        try {
+          const skillUri = vscode.Uri.file(path.join(base, dir, skill.dirName, "SKILL.md"));
+          await vscode.workspace.fs.stat(skillUri);
           installed.add(skill.dirName);
+        } catch {
+          // not installed
         }
-      }
-    } catch {
-      // file not found — nothing installed
-    }
+      })
+    );
     return installed;
   }
 
-  const pathPrefix =
-    platform === "claude-code" ? ".claude/skills" :
-    platform === "universal"   ? ".agents/skills" :
-    /* windsurf */               ".windsurf/skills";
+  const projectDir = platform.skillsDir;
+  const globalDir = platform.globalSkillsDir.replace(/^~\/?/, "");
 
-  await Promise.all(
-    skills.map(async (skill) => {
-      try {
-        await vscode.workspace.fs.stat(
-          vscode.Uri.joinPath(rootUri, `${pathPrefix}/${skill.dirName}/SKILL.md`)
-        );
-        installed.add(skill.dirName);
-      } catch {
-        // not installed
-      }
-    })
-  );
-  return installed;
-}
+  const [project, global] = await Promise.all([
+    checkScope(projectBase, projectDir),
+    checkScope(globalBase, globalDir),
+  ]);
 
-export async function detectActivePlatforms(rootUri: vscode.Uri): Promise<string[]> {
-  const checks: Array<{ id: string; path: string }> = [
-    { id: "universal",      path: ".agents/skills" },
-    { id: "claude-code",    path: ".claude/skills" },
-    { id: "vscode-copilot", path: ".github/copilot-instructions.md" },
-    { id: "windsurf",       path: ".windsurf/skills" },
-  ];
-  const active = new Set<string>([detectEditorPlatform()]);
-  await Promise.all(
-    checks.map(async ({ id, path }) => {
-      try {
-        await vscode.workspace.fs.stat(vscode.Uri.joinPath(rootUri, path));
-        active.add(id);
-      } catch { /* not present */ }
-    })
-  );
-  return [...active];
+  return { project, global };
 }
 
 export async function readConfiguredMcpServerKeys(

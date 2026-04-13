@@ -14,6 +14,7 @@ import {
   readInstalledSkillDirNames,
   readConfiguredMcpServerKeys,
   installMcpServers,
+  getPlatformEntry,
 } from "../aiToolsService";
 
 // ── MCP Config (QuickPick flow) ───────────────────────────────────────────────
@@ -109,9 +110,11 @@ function registerConfigureAiTools(context: vscode.ExtensionContext): void {
           "VS Code (Copilot)": "vscode-copilot",
         };
         const pid = platformForStatus[ideTarget.label];
-        const installedDirNames = pid
-          ? await readInstalledSkillDirNames(rootUri, pid, skills)
-          : new Set<string>();
+        const platformEntry = pid ? getPlatformEntry(pid) : undefined;
+        const installedResult = platformEntry
+          ? await readInstalledSkillDirNames(rootUri, platformEntry, skills)
+          : { project: new Set<string>(), global: new Set<string>() };
+        const installedDirNames = installedResult.project;
 
         const pickedSkills = await vscode.window.showQuickPick(
           skills.map((s) => ({
