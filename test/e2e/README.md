@@ -9,6 +9,18 @@ cd test/e2e
 pnpm install
 ```
 
+## Environment variables
+
+End-to-end runs require Cloudinary credentials in `process.env`. The `onPrepare` hook in `wdio.conf.ts` reads `E2E_CLOUD`, `E2E_API_KEY`, and `E2E_API_SECRET`, then writes `~/.cloudinary/environments.json` in the shape the extension expects (cloud name as the top-level key, with `apiKey` and `apiSecret`).
+
+| Variable | Description |
+|----------|-------------|
+| `E2E_CLOUD` | Cloudinary cloud name |
+| `E2E_API_KEY` | API key |
+| `E2E_API_SECRET` | API secret |
+
+**Local:** add a `test/e2e/.env` file (gitignored) such as:
+
 ## Running Tests
 
 ```bash
@@ -18,7 +30,7 @@ pnpm test:e2e
 This will:
 1. Download a VS Code binary (if not already cached in `.wdio-vscode-service/`)
 2. Launch VS Code with the extension loaded
-3. Run all specs in `test/specs/`
+3. Run all specs in `specs/`
 
 ## Viewing Reports
 
@@ -35,8 +47,7 @@ test/e2e/
 ├── wdio.conf.ts              # WebdriverIO configuration
 ├── tsconfig.json              # TypeScript config for e2e tests
 ├── package.json               # Dependencies (separate from root)
-├── test/
-│   └── specs/                 # Test spec files
+├── specs/                     # Test spec files
 ├── src/
 │   └── utils/                 # Page object utilities
 ```
@@ -46,8 +57,8 @@ test/e2e/
 Tests use [Mocha](https://mochajs.org/) as the test framework and the `wdio-vscode-service` page objects to interact with VS Code.
 
 ```ts
-import { activityBarUtils } from '../../src/utils/ActivityBarUtils'
-import { sideBarViewUtils } from '../../src/utils/SideBarViewUtils'
+import { activityBarUtils } from '../src/utils/ActivityBarUtils.js'
+import { sideBarViewUtils } from '../src/utils/SideBarViewUtils.js'
 
 it('should open the Cloudinary view', async () => {
     await activityBarUtils.openView('Cloudinary')

@@ -59,3 +59,4 @@ temp/
 test/e2e/allure-results/
 test/e2e/allure-report/
 test/e2e/.wdio-vscode-service/
+test/e2e/.env

@@ -7,7 +7,7 @@ import { sideBarViewUtils } from '../src/utils/SideBarViewUtils.js'
  */
 it('should load cloudinary media library', async () => {
     const expectedTitle = 'CLOUDINARY';
-    const expectedItems = ['cats', 'dogs'];
+    const expectedItems = ['samples', 'sample'];
     
     await activityBarUtils.openView('Cloudinary');
 

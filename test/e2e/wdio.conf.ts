@@ -1,3 +1,5 @@
+import * as fs from 'node:fs';
+import * as os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import * as path from 'node:path';
 
@@ -169,8 +171,28 @@ export const config: WebdriverIO.Config = {
      * @param {object} config wdio configuration object
      * @param {Array.<Object>} capabilities list of capabilities details
      */
-    // onPrepare: function (config, capabilities) {
-    // },
+    onPrepare: function () {
+        /**
+         * Write the Cloudinary credentials to the global config file.
+         * the file location is ~/.cloudinary/environments.json
+         */
+        const cloudName = process.env.E2E_CLOUD;
+        const apiKey = process.env.E2E_API_KEY;
+        const apiSecret = process.env.E2E_API_SECRET;
+        if (!cloudName || !apiKey || !apiSecret) {
+            throw new Error(
+                'E2E setup requires E2E_CLOUD, E2E_API_KEY, and E2E_API_SECRET in the process environment.'
+            );
+        }
+        
+        const cloudinaryDir = path.join(os.homedir(), '.cloudinary');
+        fs.mkdirSync(cloudinaryDir, { recursive: true });
+        const outPath = path.join(cloudinaryDir, 'environments.json');
+        const environments = {
+            [cloudName]: { apiKey, apiSecret },
+        };
+        fs.writeFileSync(outPath, `${JSON.stringify(environments, null, 2)}\n`, 'utf-8');
+    },
     /**
      * Gets executed before a worker process is spawned and can be used to initialize specific service
      * for that worker as well as modify runtime environments in an async fashion.
