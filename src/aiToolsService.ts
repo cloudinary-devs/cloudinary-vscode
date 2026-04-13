@@ -73,7 +73,7 @@ export function detectEditorPlatform(): string {
     case "windsurf":    return "windsurf";
     case "antigravity": return "antigravity";
     case "vscode":
-    default:            return "claude-code";
+    default:            return "github-copilot";
   }
 }
 
