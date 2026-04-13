@@ -22,7 +22,7 @@ import {
   readConfiguredMcpServerKeys,
   installSkill,
   installMcpServers,
-  detectInstalledPlatform,
+  detectEditorPlatform,
   getPlatformEntry,
   getPlatformCovers,
 } from "../aiToolsService";
@@ -121,15 +121,11 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
           case "switchEnvironment":
             vscode.commands.executeCommand("cloudinary.switchEnvironment");
             break;
-          case "aiToolsExpanded": {
-            const rootUri = vscode.workspace.workspaceFolders?.[0]?.uri;
-            this._currentPlatform = rootUri
-              ? await detectInstalledPlatform(rootUri)
-              : "claude-code";
+          case "aiToolsExpanded":
+            this._currentPlatform = detectEditorPlatform();
             this._currentScope = "project";
             await this._handleAiToolsExpanded();
             break;
-          }
           case "changePlatform":
             if (message.platform) {
               this._currentPlatform = message.platform;
