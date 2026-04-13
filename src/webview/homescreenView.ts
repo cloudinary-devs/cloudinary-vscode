@@ -8,9 +8,10 @@ import { CloudinaryTreeDataProvider } from "../tree/treeDataProvider";
 import { createWebviewDocument, getScriptUri, getStyleUri } from "./webviewUtils";
 import { escapeHtml } from "./utils/helpers";
 import { loadEnvironments } from "../config/configUtils";
+import skillsConfig from "../utils/skills-config.json";
 import {
-  PlatformId,
-  PLATFORMS,
+  PlatformEntry,
+  Scope,
   SkillInfo,
   MCP_SERVERS,
   detectEditor,
@@ -19,13 +20,11 @@ import {
   fetchSkillContent,
   readInstalledSkillDirNames,
   readConfiguredMcpServerKeys,
-  installForClaudeCode,
-  installForCopilot,
-  installForUniversal,
-  installForWindsurf,
+  installSkill,
   installMcpServers,
-  detectActivePlatforms,
   detectEditorPlatform,
+  getPlatformEntry,
+  getPlatformCovers,
 } from "../aiToolsService";
 
 export class HomescreenViewProvider implements vscode.WebviewViewProvider {
@@ -38,6 +37,8 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
 
   private _webviewView: vscode.WebviewView | undefined;
   private _cachedSkills: SkillInfo[] | undefined;
+  private _currentPlatform: string = "claude-code";
+  private _currentScope: Scope = "project";
   private _environmentNames: string[] = [];
 
   private async _loadEnvironments(): Promise<void> {
@@ -87,7 +88,14 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
     });
 
     webviewView.webview.onDidReceiveMessage(
-      async (message: { command: string; data?: string; skills?: string[]; platforms?: string[]; mcpServers?: string[] }) => {
+      async (message: {
+        command: string;
+        data?: string;
+        skills?: string[];
+        platform?: string;
+        scope?: Scope;
+        mcpServers?: string[];
+      }) => {
         switch (message.command) {
           case "openGlobalConfig":
             vscode.commands.executeCommand("cloudinary.openGlobalConfig");
@@ -114,12 +122,27 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
             vscode.commands.executeCommand("cloudinary.switchEnvironment");
             break;
           case "aiToolsExpanded":
+            this._currentPlatform = detectEditorPlatform();
+            this._currentScope = "project";
             await this._handleAiToolsExpanded();
+            break;
+          case "changePlatform":
+            if (message.platform) {
+              this._currentPlatform = message.platform;
+              await this._handleAiToolsExpanded();
+            }
+            break;
+          case "changeScope":
+            if (message.scope) {
+              this._currentScope = message.scope;
+              await this._handleAiToolsExpanded();
+            }
             break;
           case "installAiTools":
             await this._handleInstallAiTools(
               message.skills ?? [],
-              message.platforms ?? [],
+              message.platform ?? this._currentPlatform,
+              message.scope ?? this._currentScope,
               message.mcpServers ?? []
             );
             break;
