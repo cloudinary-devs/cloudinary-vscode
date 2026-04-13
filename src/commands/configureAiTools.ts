@@ -104,7 +104,7 @@ function registerConfigureAiTools(context: vscode.ExtensionContext): void {
         });
         if (!ideTarget) { return; }
 
-        const platformForStatus: Record<string, import("../aiToolsService").PlatformId | undefined> = {
+        const platformForStatus: Record<string, string | undefined> = {
           "Claude Code": "claude-code",
           "VS Code (Copilot)": "vscode-copilot",
         };
