@@ -77,6 +77,38 @@ export function detectEditorPlatform(): string {
   }
 }
 
+export async function detectInstalledPlatform(rootUri: vscode.Uri): Promise<string> {
+  const platforms = skillsConfig.platforms as PlatformEntry[];
+  const editorDefault = detectEditorPlatform();
+
+  async function dirExists(platformId: string): Promise<boolean> {
+    const platform = platforms.find((p) => p.id === platformId);
+    if (!platform) { return false; }
+    try {
+      await vscode.workspace.fs.stat(vscode.Uri.joinPath(rootUri, platform.skillsDir));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  // Prefer the editor-specific platform if its skills dir is already set up
+  if (await dirExists(editorDefault)) { return editorDefault; }
+
+  // Otherwise pick the first platform whose skills dir exists in the workspace
+  for (const platform of platforms) {
+    if (platform.id === editorDefault) { continue; }
+    try {
+      await vscode.workspace.fs.stat(vscode.Uri.joinPath(rootUri, platform.skillsDir));
+      return platform.id;
+    } catch {
+      // not installed
+    }
+  }
+
+  return editorDefault;
+}
+
 export function getPlatformEntry(id: string): PlatformEntry | undefined {
   return (skillsConfig.platforms as PlatformEntry[]).find((p) => p.id === id);
 }
