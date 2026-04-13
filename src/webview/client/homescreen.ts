@@ -26,6 +26,7 @@ interface AiToolsDataMessage {
   allPlatforms: { id: string; name: string }[];
   skills: SkillStatusInfo[];
   mcpServers: McpServerInfo[];
+  mcpEditorLabel?: string;
   error?: string;
 }
 
@@ -215,6 +216,7 @@ function handleAiToolsData(msg: AiToolsDataMessage): void {
     allPlatforms: msg.allPlatforms,
     skills: msg.skills,
     mcpServers: msg.mcpServers,
+    mcpEditorLabel: msg.mcpEditorLabel,
   };
 
   // Sync scope toggle buttons
@@ -232,6 +234,13 @@ function handleAiToolsData(msg: AiToolsDataMessage): void {
   renderPlatformDropdown(msg.allPlatforms, msg.platform);
   renderSkillRows(msg.skills, msg.scope);
   renderMcpRows(msg.mcpServers);
+
+  // Update MCP editor note
+  const mcpNoteEl = el("hs-ai-mcp-editor-note");
+  if (mcpNoteEl) {
+    mcpNoteEl.textContent = msg.mcpEditorLabel ? `· for ${msg.mcpEditorLabel}` : "";
+    mcpNoteEl.classList.toggle("hidden", !msg.mcpEditorLabel);
+  }
 
   // Re-apply pending selections that survived the re-render
   previouslyChecked.forEach((dirName) => {

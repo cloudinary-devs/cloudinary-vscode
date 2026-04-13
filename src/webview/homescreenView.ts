@@ -349,6 +349,7 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
 
               <!-- MCP Servers -->
               <div class="hs-ai-section-head" style="margin-top:8px">MCP Servers</div>
+              <div id="hs-ai-mcp-editor-note" class="hs-ai-mcp-editor-note hidden"></div>
               <div id="hs-ai-mcp-list"></div>
               <div class="hs-ai-hint">Delete config entries to remove.</div>
 
@@ -407,6 +408,11 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
       const rootKey = editor === "vscode" ? "servers" : "mcpServers";
       const configuredMcpSet = await readConfiguredMcpServerKeys(rootUri, mcpFilePath, rootKey);
 
+      const editorLabels: Record<string, string> = {
+        vscode: "VS Code", cursor: "Cursor", windsurf: "Windsurf", antigravity: "Antigravity",
+      };
+      const mcpEditorLabel = editorLabels[editor];
+
       view.webview.postMessage({
         command: "aiToolsData",
         platform: this._currentPlatform,
@@ -427,6 +433,7 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
           description: s.description,
           configured: configuredMcpSet.has(s.key),
         })),
+        mcpEditorLabel,
       });
     } catch (err: any) {
       view.webview.postMessage({ command: "aiToolsData", error: err.message ?? String(err) });

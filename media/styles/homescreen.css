@@ -480,6 +480,15 @@ body { background: var(--vscode-sideBar-background); }
   outline-offset: -1px;
 }
 
+/* MCP editor note */
+.hs-ai-mcp-editor-note {
+  margin-top: -4px;
+  margin-bottom: 4px;
+  font-size: 9.5px;
+  color: var(--vscode-descriptionForeground);
+  opacity: 0.7;
+}
+
 /* Secondary scope status hint */
 .hs-ai-item-status-other {
   display: block;
