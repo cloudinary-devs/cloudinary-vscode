@@ -411,6 +411,48 @@ export async function installForWindsurf(
   }
 }
 
+export async function installSkill(
+  rootUri: vscode.Uri,
+  platform: PlatformEntry,
+  scope: Scope,
+  dirName: string,
+  content: string,
+  createdFiles: string[],
+  errors: string[]
+): Promise<void> {
+  const base = scope === "global" ? os.homedir() : rootUri.fsPath;
+  const rawDir = scope === "global" ? platform.globalSkillsDir : platform.skillsDir;
+  const dir = scope === "global" ? rawDir.replace(/^~\//, "") : rawDir;
+
+  // Write SKILL.md (silent overwrite — matches `npx skills add -y` behaviour)
+  const skillPath = path.join(dir, dirName, "SKILL.md");
+  const skillUri = vscode.Uri.file(path.join(base, skillPath));
+  await ensureDir(vscode.Uri.joinPath(skillUri, ".."));
+  await vscode.workspace.fs.writeFile(skillUri, Buffer.from(content, "utf-8"));
+  if (!createdFiles.includes(skillPath)) { createdFiles.push(skillPath); }
+
+  // Fetch and write reference files
+  let refs: Array<{ name: string; content: string }>;
+  try {
+    refs = await fetchReferenceFiles(dirName);
+  } catch (err: any) {
+    errors.push(`${dirName} references: ${err.message}`);
+    return;
+  }
+
+  for (const ref of refs) {
+    try {
+      const refPath = path.join(dir, dirName, "references", ref.name);
+      const refUri = vscode.Uri.file(path.join(base, refPath));
+      await ensureDir(vscode.Uri.joinPath(refUri, ".."));
+      await vscode.workspace.fs.writeFile(refUri, Buffer.from(ref.content, "utf-8"));
+      if (!createdFiles.includes(refPath)) { createdFiles.push(refPath); }
+    } catch (err: any) {
+      errors.push(`${dirName}/references/${ref.name}: ${err.message}`);
+    }
+  }
+}
+
 // ── Status detection ──────────────────────────────────────────────────────────
 
 export async function readInstalledSkillDirNames(
