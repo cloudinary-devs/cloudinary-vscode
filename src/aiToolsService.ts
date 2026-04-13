@@ -422,7 +422,7 @@ export async function installSkill(
 ): Promise<void> {
   const base = scope === "global" ? os.homedir() : rootUri.fsPath;
   const rawDir = scope === "global" ? platform.globalSkillsDir : platform.skillsDir;
-  const dir = scope === "global" ? rawDir.replace(/^~\//, "") : rawDir;
+  const dir = scope === "global" ? rawDir.replace(/^~\/?/, "") : rawDir;
 
   // Write SKILL.md (silent overwrite — matches `npx skills add -y` behaviour)
   const skillPath = path.join(dir, dirName, "SKILL.md");
