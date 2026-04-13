@@ -1,6 +1,19 @@
 import * as vscode from "vscode";
+import * as os from "os";
+import * as path from "path";
+import skillsConfig from "./utils/skills-config.json";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
+
+export type PlatformEntry = {
+  id: string;
+  name: string;
+  skillsDir: string;
+  globalSkillsDir: string;
+  isUniversal: boolean;
+};
+
+export type Scope = "project" | "global";
 
 export type EditorType = "cursor" | "vscode" | "windsurf" | "antigravity" | "unknown";
 
@@ -16,21 +29,6 @@ export type SkillInfo = {
   description: string;
   dirName: string;
 };
-
-export type PlatformId = "universal" | "claude-code" | "vscode-copilot" | "windsurf";
-
-export type PlatformDef = {
-  id: PlatformId;
-  label: string;
-  sublabel?: string;
-};
-
-export const PLATFORMS: PlatformDef[] = [
-  { id: "universal",      label: "Universal",        sublabel: "Cursor, Codex, Amp, Warp + more" },
-  { id: "claude-code",    label: "Claude Code" },
-  { id: "vscode-copilot", label: "VS Code (Copilot)" },
-  { id: "windsurf",       label: "Windsurf" },
-];
 
 type GitHubEntry = {
   name: string;
@@ -68,12 +66,31 @@ export function getMcpFilePath(editor: EditorType): string {
   }
 }
 
-export function detectEditorPlatform(): PlatformId {
+export function detectEditorPlatform(): string {
   const editor = detectEditor();
-  if (editor === "windsurf") { return "windsurf"; }
-  if (editor === "vscode")   { return "vscode-copilot"; }
-  if (editor === "cursor" || editor === "antigravity") { return "universal"; }
-  return "claude-code"; // claude-code, unknown
+  switch (editor) {
+    case "cursor":      return "cursor";
+    case "windsurf":    return "windsurf";
+    case "antigravity": return "antigravity";
+    case "vscode":
+    default:            return "claude-code";
+  }
+}
+
+export function getPlatformEntry(id: string): PlatformEntry | undefined {
+  return (skillsConfig.platforms as PlatformEntry[]).find((p) => p.id === id);
+}
+
+export function getPlatformCovers(platform: PlatformEntry, scope: Scope): string | undefined {
+  const dir = scope === "global" ? platform.globalSkillsDir : platform.skillsDir;
+  const others = (skillsConfig.platforms as PlatformEntry[])
+    .filter((p) => p.id !== platform.id && (scope === "global" ? p.globalSkillsDir : p.skillsDir) === dir)
+    .map((p) => p.name);
+  if (others.length === 0) { return undefined; }
+  const MAX_SHOWN = 3;
+  const shown = others.slice(0, MAX_SHOWN);
+  const rest = others.length - MAX_SHOWN;
+  return `Also covers: ${shown.join(", ")}${rest > 0 ? ` +${rest} more` : ""}`;
 }
 
 // ── GitHub API helpers ────────────────────────────────────────────────────────
@@ -398,7 +415,7 @@ export async function installForWindsurf(
 
 export async function readInstalledSkillDirNames(
   rootUri: vscode.Uri,
-  platform: PlatformId,
+  platform: string,
   skills: SkillInfo[]
 ): Promise<Set<string>> {
   const installed = new Set<string>();
@@ -439,14 +456,14 @@ export async function readInstalledSkillDirNames(
   return installed;
 }
 
-export async function detectActivePlatforms(rootUri: vscode.Uri): Promise<PlatformId[]> {
-  const checks: Array<{ id: PlatformId; path: string }> = [
+export async function detectActivePlatforms(rootUri: vscode.Uri): Promise<string[]> {
+  const checks: Array<{ id: string; path: string }> = [
     { id: "universal",      path: ".agents/skills" },
     { id: "claude-code",    path: ".claude/skills" },
     { id: "vscode-copilot", path: ".github/copilot-instructions.md" },
     { id: "windsurf",       path: ".windsurf/skills" },
   ];
-  const active = new Set<PlatformId>([detectEditorPlatform()]);
+  const active = new Set<string>([detectEditorPlatform()]);
   await Promise.all(
     checks.map(async ({ id, path }) => {
       try {
