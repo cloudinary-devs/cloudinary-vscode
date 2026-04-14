@@ -26,10 +26,8 @@ jobs:
         run: pnpm install
         working-directory: test/e2e
 
-      - name: Setup virtual display
-        run: |
-          sudo apt-get update -q
-          sudo apt-get install -y xvfb libgtk-3-0 libxss1 libgconf-2-4 libnss3 libasound2
+      - name: Install VS Code dependencies
+        run: sudo apt-get install -y libgtk-3-0 libxss1 libnss3 libasound2
 
       - name: Run E2E tests
         run: xvfb-run -a pnpm test:e2e
