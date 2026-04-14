@@ -18,12 +18,17 @@ jobs:
         with:
           node-version: "20"
 
+      - name: Install and compile extension
+        run: |
+          npm ci
+          npm run compile
+
       - name: Install pnpm
         uses: pnpm/action-setup@v4
         with:
           version: 10.24.0
 
-      - name: Install dependencies
+      - name: Install E2E dependencies
         run: pnpm install
         working-directory: test/e2e
 
