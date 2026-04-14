@@ -67,6 +67,7 @@ export const config: WebdriverIO.Config = {
         'wdio:vscodeOptions': {
             // points to directory where extension package.json is located
             extensionPath: path.resolve(__dirname, '../../'),
+            verboseLogging: true,
             // optional VS Code settings
             userSettings: {
                 "editor.fontSize": 14
@@ -148,7 +149,7 @@ export const config: WebdriverIO.Config = {
         ['allure', {
             outputDir: 'allure-results',
             disableWebdriverStepsReporting: true,
-            disableWebdriverScreenshotsReporting: true,
+            disableWebdriverScreenshotsReporting: false,
             addConsoleLogs: true,
         }],
         ['video', {
