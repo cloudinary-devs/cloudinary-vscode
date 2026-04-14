@@ -34,9 +34,9 @@ jobs:
         run: xvfb-run -a pnpm test:e2e
         working-directory: test/e2e
         env:
-          E2E_CLOUD: ${{ secrets.E2E_CLOUD }}
-          E2E_API_KEY: ${{ secrets.E2E_API_KEY }}
-          E2E_API_SECRET: ${{ secrets.E2E_API_SECRET }}
+          E2E_CLOUD: ${{ vars.E2E_CLOUD }}
+          E2E_API_KEY: ${{ vars.E2E_API_KEY }}
+          E2E_API_SECRET: ${{ vars.E2E_API_SECRET }}
           CI: true
 
       - name: Generate Allure report
