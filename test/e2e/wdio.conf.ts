@@ -148,7 +148,11 @@ export const config: WebdriverIO.Config = {
             disableWebdriverStepsReporting: true,
             disableWebdriverScreenshotsReporting: true,
             addConsoleLogs: true,
-        }]
+        }],
+        ['video', {
+            saveAllVideos: false,       // If true, also saves videos for successful test cases
+            videoSlowdownMultiplier: 3, // Higher to get slower videos, lower for faster videos [Value 1-100]
+        }],
     ],
 
     // Options to be passed to Mocha.
@@ -272,8 +276,11 @@ export const config: WebdriverIO.Config = {
      * @param {boolean} result.passed    true if test has passed, otherwise false
      * @param {object}  result.retries   information about spec related retries, e.g. `{ attempts: 0, limit: 0 }`
      */
-    // afterTest: function(test, context, { error, result, duration, passed, retries }) {
-    // },
+    afterTest: function(test, context, { error, result, duration, passed, retries }) {
+        if (error || !passed) {
+            browser.takeScreenshot();
+        }
+    },
 
 
     /**
