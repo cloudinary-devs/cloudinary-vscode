@@ -1,4 +1,4 @@
-import { browser } from "@wdio/globals"
+import { browser, expect } from "@wdio/globals"
 import { TreeItem } from "wdio-vscode-service"
 import allureReporter from '@wdio/allure-reporter'
 
@@ -56,6 +56,16 @@ class SideBarViewUtils {
         for (const expected of expectedItems) {
             expect(itemLabels).toContain(expected);
         }
+    }
+
+    /**
+     * Clicks the Config action button in the Side Bar View title.
+     */
+    public async clickConfigAction() {
+        await allureReporter.addStep('Click Config action button');
+        const configBtn =  browser.$('a[aria-label="Config"]');
+        await configBtn.waitForDisplayed({ timeout: 5000, timeoutMsg: 'Config button not found in the sidebar' });
+        await configBtn.click();
     }
 
     /**
