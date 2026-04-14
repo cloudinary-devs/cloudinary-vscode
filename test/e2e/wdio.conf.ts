@@ -149,7 +149,7 @@ export const config: WebdriverIO.Config = {
         ['allure', {
             outputDir: 'allure-results',
             disableWebdriverStepsReporting: true,
-            disableWebdriverScreenshotsReporting: false,
+            disableWebdriverScreenshotsReporting: true,
             addConsoleLogs: true,
         }],
         ['video', {
@@ -280,8 +280,21 @@ export const config: WebdriverIO.Config = {
      * @param {object}  result.retries   information about spec related retries, e.g. `{ attempts: 0, limit: 0 }`
      */
     afterTest: async function(test, context, { error, result, duration, passed, retries }) {
-        if (error || !passed) {
+        if (error) {
             allureReporter.addAttachment('Screenshot', Buffer.from(await browser.takeScreenshot(), 'base64'), 'image/png');
+            try {
+                const workbench = await browser.getWorkbench();
+                const bottomBar = workbench.getBottomBar();
+                const outputView = await bottomBar.openOutputView();
+                await outputView.selectChannel('Extension Host');
+                const logs = await outputView.getText();
+                console.log('Extension Logs:', logs);
+                if (logs) {
+                    allureReporter.addAttachment('Extension Logs', logs, 'text/plain');
+                }
+            } catch {
+                console.warn('Failed to get extension logs', error);
+            }
         }
     },
 
