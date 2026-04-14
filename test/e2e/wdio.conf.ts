@@ -153,7 +153,7 @@ export const config: WebdriverIO.Config = {
             addConsoleLogs: true,
         }],
         ['video', {
-            saveAllVideos: true,
+            saveAllVideos: false,
             videoSlowdownMultiplier: 3, // Higher to get slower videos, lower for faster videos [Value 1-100]
         }],
     ],
