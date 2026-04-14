@@ -2,6 +2,8 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import * as path from 'node:path';
+import allureReporter from '@wdio/allure-reporter'
+
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -276,9 +278,9 @@ export const config: WebdriverIO.Config = {
      * @param {boolean} result.passed    true if test has passed, otherwise false
      * @param {object}  result.retries   information about spec related retries, e.g. `{ attempts: 0, limit: 0 }`
      */
-    afterTest: function(test, context, { error, result, duration, passed, retries }) {
+    afterTest: async function(test, context, { error, result, duration, passed, retries }) {
         if (error || !passed) {
-            browser.takeScreenshot();
+            allureReporter.addAttachment('Screenshot', Buffer.from(await browser.takeScreenshot(), 'base64'), 'image/png');
         }
     },
 
