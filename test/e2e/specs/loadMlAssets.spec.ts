@@ -5,7 +5,9 @@ import { sideBarViewUtils } from '../src/utils/SideBarViewUtils.js'
 import crypto from 'node:crypto';
 import { pathUtils } from '../src/utils/pathUtils.js';
 
-
+/**
+ * Asset Explorer Tests: 
+ */
 describe('Asset Explorer Tetsts', () => {
 
     let cloudinarySDK = new CloudinarySDK();
@@ -22,7 +24,6 @@ describe('Asset Explorer Tetsts', () => {
     });
 
     /**
-     * Asset Explorer: 
      * Validates that the title and content of the Cloudinary media library are loaded correctly.
      */
     it('should load cloudinary media library', async () => {
