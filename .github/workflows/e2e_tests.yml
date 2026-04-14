@@ -28,7 +28,7 @@ jobs:
         working-directory: test/e2e
 
       - name: Install VS Code dependencies
-        run: sudo apt-get install -y libgtk-3-0 libxss1 libnss3 libasound2
+        run: sudo apt-get install -y libgtk-3-0 libxss1 libnss3 libasound2t64
 
       - name: Run E2E tests
         run: xvfb-run -a pnpm test:e2e
