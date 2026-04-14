@@ -65,10 +65,14 @@ export const config: WebdriverIO.Config = {
         browserVersion: 'stable', // also possible: "insiders" or a specific version e.g. "1.80.0"
         'wdio:enforceWebDriverClassic': true,
         'wdio:vscodeOptions': {
-            // points to directory where extension package.json is located
             extensionPath: path.resolve(__dirname, '../../'),
-            verboseLogging: true,
-            // optional VS Code settings
+            
+            ...(process.env.CI && {
+                vscodeArgs: {
+                    'disable-gpu': true,
+                    'disable-dev-shm-usage': true,
+                },
+            }),
             userSettings: {
                 "editor.fontSize": 14
             }
@@ -153,8 +157,8 @@ export const config: WebdriverIO.Config = {
             addConsoleLogs: true,
         }],
         ['video', {
-            saveAllVideos: false,
-            videoSlowdownMultiplier: 3, // Higher to get slower videos, lower for faster videos [Value 1-100]
+            saveAllVideos: true,
+            videoSlowdownMultiplier: 3,
         }],
     ],
 
