@@ -1,0 +1,56 @@
+name: 📊 E2E Tests
+
+on:
+  workflow_dispatch:
+
+jobs:
+  e2e:
+    name: E2E
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Install and compile extension
+        run: |
+          npm ci
+          npm run compile
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.24.0
+
+      - name: Install E2E dependencies
+        run: pnpm install
+        working-directory: test/e2e
+
+      - name: Run E2E tests
+        uses: GabrielBB/xvfb-action@v1
+        with:
+          run: pnpm test:e2e
+          working-directory: test/e2e
+        env:
+          E2E_CLOUD: ${{ secrets.E2E_CLOUD }}
+          E2E_API_KEY: ${{ secrets.E2E_API_KEY }}
+          E2E_API_SECRET: ${{ secrets.E2E_API_SECRET }}
+          CI: true
+
+      - name: Generate Allure report
+        if: always()
+        run: pnpm exec allure generate allure-results -o allure-report --clean
+        working-directory: test/e2e
+
+      - name: Upload Allure report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-report-${{ github.run_number }}
+          path: test/e2e/allure-report
+          retention-days: 30
