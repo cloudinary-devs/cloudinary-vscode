@@ -49,3 +49,11 @@ Thumbs.db
 # Internal development
 internal/**
 temp/**
+
+# Claude Code files
+.claude/**
+.agents/**
+CLAUDE.md
+
+# Development documentation
+docs/**
