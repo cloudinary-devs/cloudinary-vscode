@@ -48,6 +48,7 @@ Thumbs.db
 .cursor/
 .claude/
 CLAUDE.md
+docs/superpowers
 
 # Temporary files
 *.tmp
