@@ -1,0 +1,103 @@
+{
+  "Basic Transformation": {
+    "prefix": "cldt:transform",
+    "body": [
+      "transformation {",
+      "  width: ${1:300}",
+      "  height: ${2:300}",
+      "  crop: ${3|scale,fit,fill,limit|}",
+      "  gravity: ${4|center,face,auto|}",
+      "  quality: ${5:auto}",
+      "  format: ${6|auto,jpg,png,webp|}",
+      "}"
+    ],
+    "description": "Basic Cloudinary transformation"
+  },
+  "Resize": {
+    "prefix": "cldt:resize",
+    "body": [
+      "width: ${1:300}",
+      "height: ${2:300}",
+      "crop: ${3|scale,fit,fill,limit|}"
+    ],
+    "description": "Resize transformation"
+  },
+  "Effect": {
+    "prefix": "cldt:effect",
+    "body": [
+      "effect: ${1|blur,pixelate,sepia,grayscale,oil_paint,cartoonify,brightness,contrast|}:${2:50}"
+    ],
+    "description": "Apply an effect"
+  },
+  "Overlay": {
+    "prefix": "cldt:overlay",
+    "body": [
+      "overlay: {",
+      "  source: \"${1:image_id}\"",
+      "  width: ${2:100}",
+      "  height: ${3:100}",
+      "  gravity: ${4|center,north,south|}",
+      "  x: ${5:0}",
+      "  y: ${6:0}",
+      "}"
+    ],
+    "description": "Add overlay"
+  },
+  "Border": {
+    "prefix": "cldt:border",
+    "body": [
+      "border: ${1:5}px_solid_${2:rgb:000000}"
+    ],
+    "description": "Add border"
+  },
+  "Rounded Corners": {
+    "prefix": "cldt:radius",
+    "body": [
+      "radius: ${1|10,20,50,max|}"
+    ],
+    "description": "Add rounded corners"
+  },
+  "Quality": {
+    "prefix": "cldt:quality",
+    "body": [
+      "quality: ${1|auto,auto:best,auto:good,auto:eco,auto:low,100,90,80,70,60|}"
+    ],
+    "description": "Set quality"
+  },
+  "Format": {
+    "prefix": "cldt:format",
+    "body": [
+      "format: ${1|auto,jpg,png,webp,gif,svg,avif|}"
+    ],
+    "description": "Set output format"
+  },
+  "Conditional Transformation": {
+    "prefix": "cldt:if",
+    "body": [
+      "if: ${1:width > 500} {",
+      "  ${2:// transformation}",
+      "} else {",
+      "  ${3:// alternative}",
+      "}"
+    ],
+    "description": "Conditional transformation"
+  },
+  "Generative Fill": {
+    "prefix": "cldt:genfill",
+    "body": [
+      "effect: generative_fill",
+      "aspect_ratio: ${1:16:9}",
+      "gravity: ${2:auto}"
+    ],
+    "description": "Generative fill effect"
+  },
+  "Background Removal": {
+    "prefix": "cldt:bgremove",
+    "body": [
+      "effect: background_removal"
+    ],
+    "description": "Remove background"
+  }
+}
+
+

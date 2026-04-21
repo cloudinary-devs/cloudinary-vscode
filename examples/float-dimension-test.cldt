@@ -1,0 +1,3 @@
+# Test file for float dimensions (should trigger hints)
+https://res.cloudinary.com/demo/image/upload/w_500.5,h_300.75,c_fill/sample.jpg
+

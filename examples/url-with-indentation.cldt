@@ -1,0 +1,30 @@
+https://res.cloudinary.com/cld-daniel-dynamic-folders/image/upload/
+$titlerand_!Create%20scene%20from%20inspirational%20imagery!/
+if_isndef_$imgcovermrand/$imgcovermrand_!figma-exports:6410!/if_end/
+  $imgcovermrand_!figma-exports:6410!/
+if_end/
+
+if_isndef_$rectangle86/$rectangle86_!figma-exports:9a77287dc964f3be41be38f56980572465e6f4fe!/if_end/
+  $rectangle86_!figma-exports:9a77287dc964f3be41be38f56980572465e6f4fe!/
+if_end/
+
+b_rgb:ffffff,g_north_west,o_0,w_556,h_408/
+l_$imgcovermrand,c_fit/
+x_0,y_0,w_557,h_304,g_north_west,fl_layer_apply/
+
+l_$rectangle86,c_fit/
+x_-15,y_56,w_205,h_205,c_crop,g_north_west,fl_layer_apply/
+
+l_empty,b_rgb:00f189,c_fill/
+  bo_3px_solid_rgb:ffffff/
+x_136,y_120,w_28,h_33,g_north_west,fl_layer_apply/
+
+l_empty,b_rgb:ffffff,c_fill/
+x_0,y_275,w_108,h_52,g_north_west,fl_layer_apply/
+
+l_text:Raleway_24_bold_line_spacing_0_letter_spacing_0_left:$(titlerand),c_fit,w_509,co_rgb:212b36/
+x_24,y_337,g_north_west,fl_layer_apply/
+
+v0/
+sample
+
