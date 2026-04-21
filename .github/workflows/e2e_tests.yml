@@ -69,6 +69,13 @@ jobs:
           owner: cloudinary-devs
           repositories: cld-vscode-test-allure-reports
 
+        # How to update the GitHub App token:
+        # 1. Create a GitHub App at https://github.com/organizations/cloudinary-devs/settings/apps
+        #    - Name: cloudinary-devs-bot, Webhook: unchecked, Permissions: Contents (Read & write), Install: Only this account
+        # 2. Note the App ID, then generate a private key (Settings → Private keys → Generate). Save the .pem file.
+        # 3. Install the app: App settings → Install App → cloudinary-devs org → Only select repositories → cld-vscode-test-allure-reports
+        # 4. Add secrets to this repo (Settings → Secrets → Actions): APP_ID and APP_PRIVATE_KEY (.pem contents)
+        # 5. The token is generated above via actions/create-github-app-token using those secrets.
       - name: Pushes to reports repository.
         if: always()
         uses: cpina/github-action-push-to-another-repository@main
