@@ -1,102 +1,73 @@
 import * as vscode from "vscode";
 import { CloudinaryTreeDataProvider } from "../tree/treeDataProvider";
 import { v2 as cloudinary } from "cloudinary";
+import { Readable } from "stream";
+import {
+  createWebviewDocument,
+  getScriptUri,
+} from "../webview/webviewUtils";
+import { escapeHtml } from "../webview/utils/helpers";
 
 /**
- * Represents an upload preset from Cloudinary with its configuration.
+ * Represents a folder option for the upload destination.
  */
-interface UploadPreset {
-  name: string;
-  signed: boolean;
-  settings?: Record<string, any>;
+interface FolderOption {
+  path: string;
+  label: string;
 }
 
 /**
- * Configuration for the Cloudinary Upload Widget.
+ * Singleton panel instance for the upload widget.
  */
-interface WidgetConfig {
-  cloudName: string;
-  uploadPreset: string;
-  sources: string[];
-  multiple: boolean;
-  showAdvancedOptions: boolean;
-  resourceType: string;
-  inlineContainer: string;
-  folder?: string;
-  asset_folder?: string;
-  apiKey?: string;
-  timestamp?: number;
-  signature?: string;
-}
+let uploadPanel: vscode.WebviewPanel | undefined;
+
+/**
+ * Current folder path for uploads.
+ */
+let currentFolderPath = "";
+
+/**
+ * Size threshold for chunked upload (20 MB).
+ */
+const CHUNKED_UPLOAD_THRESHOLD = 20 * 1024 * 1024;
+
+/**
+ * Chunk size for chunked uploads (6 MB).
+ */
+const UPLOAD_CHUNK_SIZE = 6 * 1024 * 1024;
 
 /**
  * Registers commands for the Cloudinary upload widget.
- * - cloudinary.openUploadWidget: Opens the upload widget in the root folder
- * - cloudinary.uploadToFolder: Opens the upload widget in a specific folder
  */
 function registerUpload(
   context: vscode.ExtensionContext,
   provider: CloudinaryTreeDataProvider
 ) {
-  // Register command to open upload widget in root
   context.subscriptions.push(
     vscode.commands.registerCommand("cloudinary.openUploadWidget", async () => {
       try {
         await provider.fetchUploadPresets();
-        const uploadPreset = provider.getCurrentUploadPreset();
-
-        if (!uploadPreset) {
-          vscode.window.showErrorMessage("No upload presets available. Please create one in your Cloudinary account.");
-          return;
-        }
-
-        const panel = createUploadPanel(
-          "Upload to Cloudinary",
-          provider.cloudName!,
-          uploadPreset,
-          "",
-          provider,
-          context
-        );
-
-        setupMessageHandlers(panel);
+        openOrRevealUploadPanel("", provider, context);
       } catch (err: any) {
-        vscode.window.showErrorMessage(`Failed to open upload widget: ${err.message}`);
+        vscode.window.showErrorMessage(
+          `Failed to open upload widget: ${err.message}`
+        );
       }
     })
   );
 
-  // Register command to open upload widget in a specific folder
   context.subscriptions.push(
     vscode.commands.registerCommand(
       "cloudinary.uploadToFolder",
       async (folderItem: { label: string; data: { path?: string } }) => {
         try {
           await provider.fetchUploadPresets();
-          const uploadPreset = provider.getCurrentUploadPreset();
-
-          if (!uploadPreset) {
-            vscode.window.showErrorMessage("No upload presets available. Please create one in your Cloudinary account.");
-            return;
-          }
-
           const folderPath = folderItem.data.path || "";
-          const folderParam = provider.dynamicFolders
-            ? `asset_folder: "${folderPath}"`
-            : `folder: "${folderPath}"`;
-
-          const panel = createUploadPanel(
-            `Upload to ${folderItem.label}`,
-            provider.cloudName!,
-            uploadPreset,
-            folderParam,
-            provider,
-            context
-          );
-
-          setupMessageHandlers(panel, folderItem.label);
+          openOrRevealUploadPanel(folderPath, provider, context);
         } catch (err: any) {
-          vscode.window.showErrorMessage(`Failed to open upload widget: ${err.message}`);
+          vscode.window.showErrorMessage(
+            `Failed to open upload widget: ${err.message}`
+          );
         }
       }
     )
@@ -104,133 +75,317 @@ function registerUpload(
 }
 
 /**
- * Sets up message handlers for the upload panel.
- * Handles upload completion and error messages.
+ * Opens the upload panel or reveals it if already open.
  */
-function setupMessageHandlers(panel: vscode.WebviewPanel, folderName?: string) {
-  panel.webview.onDidReceiveMessage((message: { command: string }) => {
-    if (message.command === "uploadComplete") {
-      const message = folderName
-        ? `✅ Upload complete to "${folderName}"`
-        : "✅ Upload complete.";
-      vscode.window.showInformationMessage(message);
-      vscode.commands.executeCommand("cloudinary.refresh");
-    }
+function openOrRevealUploadPanel(
+  folderPath: string,
+  provider: CloudinaryTreeDataProvider,
+  context: vscode.ExtensionContext
+) {
+  currentFolderPath = folderPath;
+
+  if (uploadPanel) {
+    uploadPanel.reveal(vscode.ViewColumn.One);
+    uploadPanel.webview.postMessage({
+      command: "setFolder",
+      folderPath: folderPath,
+    });
+    return;
+  }
+
+  uploadPanel = createUploadPanel(provider, context);
+
+  uploadPanel.onDidDispose(() => {
+    uploadPanel = undefined;
   });
 }
 
 /**
- * Creates a webview panel containing the Cloudinary Upload Widget.
- * The widget supports both signed and unsigned uploads, and can be configured
- * to upload to specific folders.
+ * Uploads a file with progress tracking.
+ */
+async function uploadWithProgress(
+  panel: vscode.WebviewPanel,
+  dataUri: string,
+  options: Record<string, any>,
+  fileId: string
+): Promise<any> {
+  const base64Data = dataUri.split(",")[1];
+  const buffer = Buffer.from(base64Data, "base64");
+  const useChunkedUpload = buffer.length > CHUNKED_UPLOAD_THRESHOLD;
+
+  return new Promise((resolve, reject) => {
+    const uploadStream = useChunkedUpload
+      ? cloudinary.uploader.upload_chunked_stream(
+          { ...options, chunk_size: UPLOAD_CHUNK_SIZE },
+          (error, result) => (error ? reject(error) : resolve(result))
+        )
+      : cloudinary.uploader.upload_stream(options, (error, result) =>
+          error ? reject(error) : resolve(result)
+        );
+
+    let uploaded = 0;
+    const total = buffer.length;
+    const progressChunkSize = 64 * 1024;
+
+    const readable = new Readable({
+      read() {
+        const chunk = buffer.slice(uploaded, uploaded + progressChunkSize);
+        if (chunk.length > 0) {
+          uploaded += chunk.length;
+          const percent = Math.round((uploaded / total) * 100);
+          panel.webview.postMessage({
+            command: "uploadProgress",
+            fileId,
+            percent,
+          });
+          this.push(chunk);
+        } else {
+          this.push(null);
+        }
+      },
+    });
+
+    readable.pipe(uploadStream);
+  });
+}
+
+/**
+ * Collects folder options from the provider's cache.
+ */
+function collectFolderOptions(provider: CloudinaryTreeDataProvider): FolderOption[] {
+  const folders: FolderOption[] = [{ path: "", label: "/ (root)" }];
+  for (const folder of provider.getAvailableFolders()) {
+    folders.push({ path: folder.path, label: folder.path });
+  }
+  return folders;
+}
+
+/**
+ * Creates upload options for the Cloudinary API.
+ */
+function getUploadOptions(
+  provider: CloudinaryTreeDataProvider,
+  presetName: string | null | undefined,
+  folder: string,
+  publicId?: string,
+  tags?: string,
+  fileName?: string
+): Record<string, any> {
+  const options: Record<string, any> = { resource_type: "auto" };
+
+  if (presetName?.trim()) {
+    options.upload_preset = presetName;
+  }
+
+  if (folder) {
+    if (provider.dynamicFolders) {
+      options.asset_folder = folder;
+    } else {
+      options.folder = folder;
+    }
+  }
+
+  if (fileName) {
+    options.filename_override = fileName;
+    if (provider.dynamicFolders) {
+      options.display_name = fileName.replace(/\.[^/.]+$/, "");
+    }
+  }
+
+  if (publicId?.trim()) {
+    options.public_id = publicId.trim();
+  }
+
+  if (tags?.trim()) {
+    options.tags = tags
+      .split(",")
+      .map((t) => t.trim())
+      .filter((t) => t);
+  }
+
+  return options;
+}
+
+/**
+ * Creates the webview panel with custom upload UI.
  */
 function createUploadPanel(
-  title: string,
-  cloudName: string,
-  uploadPreset: string,
-  folderParam = "",
   provider: CloudinaryTreeDataProvider,
   context: vscode.ExtensionContext
 ): vscode.WebviewPanel {
   const panel = vscode.window.createWebviewPanel(
     "cloudinaryUploadWidget",
-    title,
+    "Upload to Cloudinary",
     vscode.ViewColumn.One,
-    { enableScripts: true, retainContextWhenHidden: false }
+    {
+      enableScripts: true,
+      retainContextWhenHidden: true,
+      localResourceRoots: [
+        vscode.Uri.joinPath(context.extensionUri, "media"),
+      ],
+    }
   );
 
-  let currentPreset = uploadPreset;
+  panel.iconPath = vscode.Uri.joinPath(
+    context.extensionUri,
+    "resources",
+    "cloudinary_icon_blue.png"
+  );
 
-  /**
-   * Generates the widget configuration based on the selected preset.
-   * For signed uploads, includes API key and signature generation.
-   */
-  async function getWidgetConfig(presetName: string): Promise<WidgetConfig> {
-    const preset = provider.uploadPresets.find(p => p.name === presetName);
-    if (!preset) {
-      throw new Error(`Preset ${presetName} not found`);
-    }
+  const currentPreset = provider.getCurrentUploadPreset() || "";
+  const cloudName = provider.cloudName!;
+  const folders = collectFolderOptions(provider);
 
-    const config: WidgetConfig = {
-      cloudName,
-      uploadPreset: presetName,
-      sources: ["local", "url", "camera", "image_search"],
-      multiple: true,
-      showAdvancedOptions: true,
-      resourceType: "auto",
-      inlineContainer: "#upload-area"
-    };
+  const uploadScriptUri = getScriptUri(
+    panel.webview,
+    context.extensionUri,
+    "upload-widget.js"
+  );
 
-    // Add folder configuration if specified
-    if (folderParam) {
-      const key = folderParam.includes('asset_folder') ? 'asset_folder' : 'folder';
-      const pathValue = folderParam.split(':')[1]?.trim().replace(/"/g, '') || '';
-      config[key] = pathValue;
-    }
+  // Configuration to pass to the webview
+  const presetsJson = JSON.stringify(provider.uploadPresets);
+  const initScript = `
+    initUploadWidget({
+      cloudName: ${JSON.stringify(cloudName)},
+      presets: ${presetsJson}
+    });
+  `;
 
-    // Add signed upload configuration if needed
-    if (preset.signed) {
-      const apiSecret = provider.apiSecret;
-      const apiKey = provider.apiKey;
-      if (!apiSecret || !apiKey) {
-        throw new Error('API Key and Secret are required for signed uploads');
-      }
-
-      const timestamp = Math.floor(Date.now() / 1000);
-      const params = {
-        timestamp,
-        upload_preset: presetName,
-        ...(config.folder && { folder: config.folder }),
-        ...(config.asset_folder && { asset_folder: config.asset_folder })
-      };
-
-      try {
-        const signature = cloudinary.utils.api_sign_request(params, apiSecret);
-        config.apiKey = apiKey;
-        config.timestamp = timestamp;
-        config.signature = signature;
-      } catch (err: any) {
-        vscode.window.showErrorMessage(`Failed to generate upload signature: ${err.message}`);
-        throw err;
-      }
-    }
-
-    return config;
-  }
-
-  // Set up the webview HTML content
-  panel.webview.html = getWebviewContent(title, currentPreset, provider, folderParam, cloudName);
+  panel.webview.html = createWebviewDocument({
+    title: "Upload to Cloudinary",
+    webview: panel.webview,
+    extensionUri: context.extensionUri,
+    bodyContent: getUploadContent(currentPreset, provider, currentFolderPath, folders),
+    bodyClass: "layout-centered",
+    additionalScripts: [uploadScriptUri],
+    inlineScript: initScript,
+  });
 
   // Handle messages from the webview
-  panel.webview.onDidReceiveMessage(async (message: {
-    command: string;
-    params?: any;
-    error?: string;
-  }) => {
-    if (message.command === 'generateSignature' && message.params) {
-      try {
-        const apiSecret = provider.apiSecret;
-        if (!apiSecret) {
-          throw new Error('API Secret is required for signed uploads');
-        }
+  panel.webview.onDidReceiveMessage(async (message: any) => {
+    if (message.command === "folderChanged" && message.folderPath !== undefined) {
+      currentFolderPath = message.folderPath;
+      return;
+    }
 
-        const signature = cloudinary.utils.api_sign_request(
-          { ...message.params, source: 'uw' },
-          apiSecret
-        );
+    if (message.command === "uploadFile" && message.dataUri && message.fileId) {
+      const presetName = message.preset !== undefined ? message.preset : currentPreset;
+      const folder = message.folderPath !== undefined ? message.folderPath : currentFolderPath;
+      const options = getUploadOptions(
+        provider,
+        presetName,
+        folder,
+        message.publicId,
+        message.tags,
+        message.fileName
+      );
+
+      try {
+        panel.webview.postMessage({ command: "uploadStarted", fileId: message.fileId });
+
+        const result = await uploadWithProgress(panel, message.dataUri, options, message.fileId);
+        result._uploadedToFolder = folder || "(root)";
+        result._originalFileName = message.fileName;
 
         panel.webview.postMessage({
-          command: 'signatureGenerated',
-          signature
+          command: "uploadComplete",
+          fileId: message.fileId,
+          asset: result,
         });
+
+        vscode.commands.executeCommand("cloudinary.refresh");
       } catch (err: any) {
         panel.webview.postMessage({
-          command: 'uploadError',
-          error: `Failed to generate signature: ${err.message}`
+          command: "uploadError",
+          fileId: message.fileId,
+          error: err.message || "Upload failed",
         });
+        vscode.window.showErrorMessage(`Upload failed: ${err.message}`);
       }
-    } else if (message.command === 'uploadError') {
-      vscode.window.showErrorMessage(`Upload failed: ${message.error}`);
+    }
+
+    if (message.command === "uploadUrl" && message.url) {
+      const presetName = message.preset !== undefined ? message.preset : currentPreset;
+      const folder = message.folderPath !== undefined ? message.folderPath : currentFolderPath;
+
+      let urlFileName: string | undefined;
+      try {
+        const urlPath = new URL(message.url).pathname;
+        const lastSegment = urlPath.split("/").pop();
+        if (lastSegment?.includes(".")) {
+          urlFileName = lastSegment;
+        }
+      } catch {
+        // Invalid URL
+      }
+
+      const options = getUploadOptions(
+        provider,
+        presetName,
+        folder,
+        message.publicId,
+        message.tags,
+        urlFileName
+      );
+      const fileId = message.fileId || `url-${Date.now()}`;
+
+      try {
+        panel.webview.postMessage({ command: "uploadStarted", fileId, fileName: message.url });
+        panel.webview.postMessage({ command: "uploadProgress", fileId, percent: 50 });
+
+        const result = await cloudinary.uploader.upload(message.url, options);
+        result._uploadedToFolder = folder || "(root)";
+        result._originalFileName = urlFileName;
+
+        panel.webview.postMessage({ command: "uploadComplete", fileId, asset: result });
+        vscode.commands.executeCommand("cloudinary.refresh");
+      } catch (err: any) {
+        panel.webview.postMessage({
+          command: "uploadError",
+          fileId,
+          error: err.message || "Upload failed",
+        });
+        vscode.window.showErrorMessage(`Upload failed: ${err.message}`);
+      }
+    }
+
+    if (message.command === "copyToClipboard" && message.text) {
+      await vscode.env.clipboard.writeText(message.text);
+    }
+
+    if (message.command === "refreshFolders") {
+      const updatedFolders = collectFolderOptions(provider);
+      panel.webview.postMessage({ command: "updateFolders", folders: updatedFolders });
+    }
+
+    if (message.command === "openAsset" && message.asset) {
+      const asset = message.asset;
+      const assetType = asset.resource_type || "raw";
+
+      const optimizedUrl =
+        assetType === "raw"
+          ? cloudinary.url(asset.public_id, { resource_type: "raw", type: asset.type })
+          : cloudinary.url(asset.public_id, {
+              resource_type: assetType,
+              type: asset.type,
+              transformation: [
+                { fetch_format: assetType === "video" ? "auto:video" : "auto" },
+                { quality: "auto" },
+              ],
+            });
+
+      const filename =
+        asset._originalFileName ||
+        (asset.original_filename !== "file" ? asset.original_filename : null) ||
+        asset.public_id.split("/").pop() ||
+        asset.public_id;
+
+      vscode.commands.executeCommand("cloudinary.openAsset", {
+        ...asset,
+        displayType: assetType,
+        optimized_url: optimizedUrl,
+        filename,
+      });
     }
   });
 
@@ -238,321 +393,111 @@ function createUploadPanel(
 }
 
 /**
- * Generates the HTML content for the upload widget webview.
- * Includes styles, widget container, and JavaScript for widget management.
+ * Generates the body content for the upload webview.
  */
-function getWebviewContent(
-  title: string,
+function getUploadContent(
   currentPreset: string,
   provider: CloudinaryTreeDataProvider,
-  folderParam: string,
-  cloudName: string
+  initialFolderPath: string,
+  folders: FolderOption[]
 ): string {
+  const folderOptionsHtml = folders
+    .map(
+      (f) => `<option value="${escapeHtml(f.path)}" ${f.path === initialFolderPath ? "selected" : ""}>${escapeHtml(f.label)}</option>`
+    )
+    .join("");
+
+  const presetOptionsHtml = provider.uploadPresets
+    .map(
+      (p) => `<option value="${escapeHtml(p.name)}" ${p.name === currentPreset ? "selected" : ""}>${escapeHtml(p.name)} (${p.signed ? "Signed" : "Unsigned"})</option>`
+    )
+    .join("");
+
   return `
-  <!DOCTYPE html>
-  <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <script src="https://widget.cloudinary.com/v2.0/global/all.js" type="text/javascript"></script>
-    <title>${title}</title>
-    <style>
-      /* Base styles */
-      body {
-        font-family: var(--vscode-font-family);
-        background-color: var(--vscode-editor-background);
-        color: var(--vscode-editor-foreground);
-        margin: 0;
-        padding: 2rem;
-        display: flex;
-        justify-content: center;
-        align-items: flex-start;
-        min-height: 100vh;
-      }
+    <div class="panel panel--lg">
+      <h2 class="panel__title">Upload to Cloudinary</h2>
 
-      /* Card container */
-      .card {
-        background-color: var(--vscode-editorWidget-background);
-        padding: 1.5rem;
-        border-radius: 12px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-        max-width: 900px;
-        width: 100%;
-      }
+      <div class="settings-row mb-lg">
+        <div class="setting-card">
+          <div class="form-group">
+            <label class="form-group__label" for="folderSelect">Destination Folder</label>
+            <select id="folderSelect" class="select">${folderOptionsHtml}</select>
+          </div>
+        </div>
 
-      /* Upload area */
-      #upload-area {
-        min-height: 500px;
-        border: 1px dashed var(--vscode-editorWidget-border);
-        padding: 1rem;
-        border-radius: 8px;
-        background-color: var(--vscode-editor-background);
-      }
-
-      /* Preset selector */
-      .preset-selector {
-        margin-bottom: 1.5rem;
-        background-color: var(--vscode-editorWidget-background);
-        border-radius: 8px;
-        padding: 1rem;
-        border: 1px solid var(--vscode-editorWidget-border);
-      }
-
-      .preset-label {
-        font-size: 0.9rem;
-        font-weight: 600;
-        margin-bottom: 0.5rem;
-      }
-
-      .preset-selector select {
-        background-color: var(--vscode-dropdown-background);
-        color: var(--vscode-dropdown-foreground);
-        border: 1px solid var(--vscode-dropdown-border);
-        padding: 0.5rem;
-        border-radius: 4px;
-        font-size: 0.9rem;
-        width: 100%;
-        max-width: 400px;
-        margin-bottom: 0.75rem;
-      }
-
-      /* Preset details */
-      .preset-details {
-        margin-top: 0.75rem;
-        padding: 0.75rem;
-        background-color: var(--vscode-editor-background);
-        border-radius: 4px;
-        font-size: 0.85rem;
-        white-space: pre-wrap;
-        max-height: 200px;
-        overflow-y: auto;
-        border: 1px solid var(--vscode-editorWidget-border);
-        display: none;
-      }
-
-      .preset-details.visible {
-        display: block;
-      }
-
-      /* Upload info */
-      .upload-info {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 1rem;
-        padding: 0.5rem;
-        background-color: var(--vscode-editor-background);
-        border-radius: 4px;
-      }
-
-      .upload-info code {
-        background-color: var(--vscode-badge-background);
-        color: var(--vscode-badge-foreground);
-        padding: 0.2rem 0.4rem;
-        border-radius: 3px;
-        font-size: 0.85rem;
-      }
-
-      /* Buttons and controls */
-      .preset-details-toggle {
-        background: none;
-        border: none;
-        color: var(--vscode-textLink-foreground);
-        cursor: pointer;
-        padding: 0;
-        font-size: 0.85rem;
-        display: flex;
-        align-items: center;
-        gap: 0.25rem;
-      }
-
-      .preset-details-toggle::before {
-        content: '▶';
-        font-size: 0.7rem;
-        transition: transform 0.2s;
-      }
-
-      .preset-details-toggle.expanded::before {
-        transform: rotate(90deg);
-      }
-    </style>
-  </head>
-  <body>
-    <div class="card">
-      <h2>${title}</h2>
-      <div class="preset-selector">
-        <div class="preset-label">Upload Preset</div>
-        <select id="presetSelect" onchange="handlePresetChange(this.value)">
-          ${provider.uploadPresets.map(preset => `
-            <option value="${preset.name}" ${preset.name === currentPreset ? 'selected' : ''}>
-              ${preset.name} (${preset.signed ? 'Signed' : 'Unsigned'})
-            </option>
-          `).join('')}
-        </select>
-        <div class="preset-details-container">
-          <button id="presetDetailsToggle" class="preset-details-toggle" onclick="togglePresetDetails()">
-            Show Settings
-          </button>
-          <div id="presetDetails" class="preset-details"></div>
+        <div class="setting-card">
+          <div class="form-group">
+            <div class="preset-toggle">
+              <label class="form-group__label" for="presetSelect">Upload Preset <span style="opacity: 0.7; font-weight: normal;">(optional)</span></label>
+              ${provider.uploadPresets.length > 0 ? '<button class="preset-toggle__btn" id="presetDetailsToggle">Settings</button>' : ""}
+            </div>
+            <select id="presetSelect" class="select">
+              <option value="">No preset (signed upload)</option>
+              ${presetOptionsHtml}
+            </select>
+            <div class="preset-details" id="presetDetails"></div>
+          </div>
         </div>
       </div>
-      <div class="upload-info">
-        <p>Uploading to: <code>${folderParam.replace(/"/g, "") || "root"}</code></p>
+
+      <div class="collapsible mb-lg">
+        <div class="collapsible__header" id="advancedHeader">
+          <span class="collapsible__title">Advanced Options</span>
+        </div>
+        <div class="collapsible__content" id="advancedContent">
+          <div class="settings-row">
+            <div class="form-group">
+              <label class="form-group__label" for="publicIdInput">Custom Public ID</label>
+              <input type="text" id="publicIdInput" class="input" placeholder="Leave empty for auto-generated" />
+              <div class="form-group__hint">Only applied to single file uploads</div>
+            </div>
+            <div class="form-group">
+              <label class="form-group__label" for="tagsInput">Tags</label>
+              <input type="text" id="tagsInput" class="input" placeholder="tag1, tag2, tag3" />
+              <div class="form-group__hint">Comma-separated list of tags</div>
+            </div>
+          </div>
+        </div>
       </div>
-      <div id="upload-area"></div>
+
+      <div class="tabs" role="tablist">
+        <nav class="tabs__nav">
+          <button class="tabs__btn active" data-tab="local" role="tab">Local Files</button>
+          <button class="tabs__btn" data-tab="url" role="tab">Remote URL</button>
+        </nav>
+
+        <div class="tabs__content active" id="tab-local" role="tabpanel">
+          <div class="drop-zone" id="dropZone">
+            <div class="drop-zone__icon">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z"/>
+              </svg>
+            </div>
+            <p class="drop-zone__text">Drag & drop files here</p>
+            <p class="drop-zone__hint">— or —</p>
+            <button class="btn btn--primary drop-zone__button" id="browseBtn">Browse Files</button>
+            <input type="file" id="fileInput" class="drop-zone__input" multiple />
+          </div>
+        </div>
+
+        <div class="tabs__content" id="tab-url" role="tabpanel">
+          <div class="url-input-group">
+            <input type="text" class="input" id="urlInput" placeholder="https://example.com/image.jpg" />
+            <button class="btn btn--primary" id="uploadUrlBtn">Upload</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="upload-queue" id="upload-queue"></div>
+
+      <div id="uploaded-assets" class="uploaded-assets hidden">
+        <div class="uploaded-assets__header">
+          <h3 class="uploaded-assets__title">Uploaded Assets</h3>
+          <button class="btn btn--secondary btn--sm" id="clearBtn">Clear All</button>
+        </div>
+        <div id="asset-grid" class="asset-grid"></div>
+      </div>
     </div>
-
-    <script>
-      // Initialize state
-      let currentPreset = "${currentPreset}";
-      let widget = null;
-      const presets = ${JSON.stringify(provider.uploadPresets)};
-      const vscode = acquireVsCodeApi();
-
-      /**
-       * Formats preset settings for display
-       */
-      function formatPresetDetails(settings) {
-        if (!settings) return 'No specific settings';
-        
-        const processedSettings = Object.entries(settings).reduce((acc, [key, value]) => {
-          // Convert string booleans and numbers to actual booleans
-          if (value === "0" || value === 0) acc[key] = false;
-          else if (value === "1" || value === 1) acc[key] = true;
-          else if (value === "true") acc[key] = true;
-          else if (value === "false") acc[key] = false;
-          else acc[key] = value;
-          return acc;
-        }, {});
-
-        return Object.entries(processedSettings)
-          .map(([key, value]) => {
-            const formattedKey = key.replace(/_/g, ' ').replace(/\\b\\w/g, l => l.toUpperCase());
-            const formattedValue = Array.isArray(value) 
-              ? value.join(', ') 
-              : typeof value === 'object' 
-                ? JSON.stringify(value) 
-                : value;
-            return \`\${formattedKey}: \${formattedValue}\`;
-          })
-          .join('\\n');
-      }
-
-      /**
-       * Toggles the visibility of preset details
-       */
-      function togglePresetDetails() {
-        const detailsDiv = document.getElementById('presetDetails');
-        const toggleBtn = document.getElementById('presetDetailsToggle');
-        const isVisible = detailsDiv.classList.toggle('visible');
-        toggleBtn.classList.toggle('expanded');
-        toggleBtn.textContent = isVisible ? 'Hide Settings' : 'Show Settings';
-      }
-
-      /**
-       * Creates and initializes the Cloudinary Upload Widget
-       */
-      function createWidget(presetName) {
-        const preset = presets.find(p => p.name === presetName);
-        if (!preset) return;
-
-        const baseConfig = {
-          cloudName: "${cloudName}",
-          uploadPreset: presetName,
-          sources: ["local", "url", "camera", "image_search"],
-          multiple: true,
-          showAdvancedOptions: true,
-          resourceType: "auto",
-          inlineContainer: "#upload-area"
-        };
-
-        // Add folder configuration if specified
-        ${folderParam ? (() => {
-      const key = folderParam.includes('asset_folder') ? 'asset_folder' : 'folder';
-      const pathValue = folderParam.split(':')[1]?.trim().replace(/"/g, '') || '';
-      return `baseConfig.${key} = "${pathValue}";`;
-    })() : ''}
-
-        // Add signed upload configuration if needed
-        if (preset.signed) {
-          baseConfig.apiKey = "${provider.apiKey}";
-          baseConfig.uploadSignature = function(callback, params_to_sign) {
-            vscode.postMessage({ 
-              command: 'generateSignature',
-              params: params_to_sign
-            });
-
-            window.addEventListener('message', function signatureHandler(event) {
-              if (event.data.command === 'signatureGenerated') {
-                window.removeEventListener('message', signatureHandler);
-                callback(event.data.signature);
-              }
-            });
-          };
-        }
-
-        // Create and open the widget
-        widget = cloudinary.createUploadWidget(
-          baseConfig,
-          function(error, result) {
-            if (!error && result && result.event === "success") {
-              vscode.postMessage({ command: "uploadComplete" });
-            } else if (error) {
-              vscode.postMessage({ 
-                command: "uploadError",
-                error: error.message || 'Upload failed'
-              });
-            }
-          }
-        );
-
-        widget.open();
-      }
-
-      /**
-       * Handles preset selection changes
-       */
-      function handlePresetChange(presetName) {
-        const preset = presets.find(p => p.name === presetName);
-        if (!preset) return;
-
-        currentPreset = presetName;
-        
-        // Update preset details display
-        const detailsDiv = document.getElementById('presetDetails');
-        const details = formatPresetDetails(preset.settings);
-        detailsDiv.textContent = details;
-        
-        // Reset toggle state if no settings
-        if (details === 'No specific settings') {
-          detailsDiv.classList.remove('visible');
-          const toggleBtn = document.getElementById('presetDetailsToggle');
-          toggleBtn.classList.remove('expanded');
-          toggleBtn.textContent = 'Show Settings';
-        }
-
-        // Recreate widget with new preset
-        if (widget) {
-          widget.destroy();
-        }
-        createWidget(presetName);
-      }
-
-      // Initialize on page load
-      window.addEventListener("DOMContentLoaded", function() {
-        // Show initial preset details
-        const initialPreset = presets.find(p => p.name === currentPreset);
-        if (initialPreset) {
-          const details = formatPresetDetails(initialPreset.settings);
-          document.getElementById('presetDetails').textContent = details;
-        }
-        
-        // Create initial widget
-        createWidget(currentPreset);
-      });
-    </script>
-  </body>
-  </html>
   `;
 }
 

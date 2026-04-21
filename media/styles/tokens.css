@@ -1,0 +1,90 @@
+/**
+ * Design tokens for the Cloudinary VS Code extension webviews.
+ * Based on Cloudinary Brand Guidelines: https://brand-guidelines.cloudinary.com/
+ */
+
+:root {
+  /* ========================================
+     Cloudinary Brand Colors
+     ======================================== */
+  --cld-brand-blue: #3448C5;
+  --cld-sky-blue: #0D9AFF;
+  --cld-grey: #E3E9EF;
+  --cld-aegean: #23436A;
+  --cld-cetacean: #1B295D;
+
+  /* Accent colors */
+  --cld-turquoise: #48C4D8;
+  --cld-pink: #FE5981;
+  --cld-green: #D5FDA1;
+  --cld-teal: #60CFB7;
+  --cld-purple: #A15EE4;
+
+  /* ========================================
+     Semantic Color Mappings
+     Maps VS Code variables with Cloudinary fallbacks
+     ======================================== */
+  
+  /* Primary accent - used for links, active states */
+  --color-accent: var(--vscode-textLink-foreground, var(--cld-sky-blue));
+  --color-accent-hover: var(--vscode-textLink-activeForeground, var(--cld-sky-blue));
+
+  /* Status colors */
+  --color-success: var(--vscode-testing-iconPassed, var(--cld-teal));
+  --color-error: var(--vscode-testing-iconFailed, var(--cld-pink));
+  --color-warning: var(--cld-pink);
+  --color-info: var(--cld-turquoise);
+
+  /* Surface colors */
+  --color-surface: var(--vscode-editor-background);
+  --color-surface-elevated: var(--vscode-editorWidget-background);
+  --color-border: var(--vscode-editorWidget-border);
+
+  /* Text colors */
+  --color-text: var(--vscode-editor-foreground);
+  --color-text-muted: var(--vscode-descriptionForeground);
+
+  /* ========================================
+     Spacing Scale
+     ======================================== */
+  --space-xs: 0.25rem;
+  --space-sm: 0.5rem;
+  --space-md: 0.75rem;
+  --space-lg: 1rem;
+  --space-xl: 1.5rem;
+  --space-xxl: 2rem;
+
+  /* ========================================
+     Border Radius
+     ======================================== */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 10px;
+  --radius-xxl: 12px;
+  --radius-full: 50%;
+
+  /* ========================================
+     Font Sizes
+     ======================================== */
+  --font-xs: 0.65rem;
+  --font-sm: 0.75rem;
+  --font-md: 0.85rem;
+  --font-lg: 1rem;
+  --font-xl: 1.15rem;
+  --font-xxl: 1.25rem;
+
+  /* ========================================
+     Transitions
+     ======================================== */
+  --transition-fast: 0.1s;
+  --transition-normal: 0.15s;
+  --transition-slow: 0.2s;
+
+  /* ========================================
+     Shadows
+     ======================================== */
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.15);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.2);
+  --shadow-lg: 0 4px 20px rgba(0, 0, 0, 0.25);
+}

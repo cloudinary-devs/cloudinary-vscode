@@ -2,7 +2,7 @@
 import * as vscode from 'vscode';
 import { v2 as cloudinary } from 'cloudinary';
 
-export type CloudinaryItemType = 'asset' | 'folder' | 'loadMore' | 'divider' | 'clearSearch';
+export type CloudinaryItemType = 'asset' | 'folder' | 'divider' | 'clearSearch' | 'loading';
 
 interface AssetData {
   public_id: string;
@@ -18,12 +18,7 @@ interface FolderData {
   [key: string]: any;
 }
 
-interface LoadMoreData {
-  folderPath: string;
-  nextCursor: string;
-}
-
-export type ItemData = AssetData | FolderData | LoadMoreData | Record<string, unknown>;
+export type ItemData = AssetData | FolderData | Record<string, unknown>;
 
 /**
  * Represents a single item in the Cloudinary Tree View.
@@ -102,17 +97,6 @@ class CloudinaryItem extends vscode.TreeItem {
       this.iconPath = new vscode.ThemeIcon('folder');
     }
 
-    // === LOAD MORE NODE ===
-    else if (type === 'loadMore') {
-      this.contextValue = 'loadMore';
-      this.iconPath = new vscode.ThemeIcon('sync');
-      this.command = {
-        command: 'cloudinary.loadMoreAssets',
-        title: 'Load More',
-        arguments: [(data as LoadMoreData).folderPath, (data as LoadMoreData).nextCursor],
-      };
-    }
-
     // === DIVIDER NODE ===
     else if (type === 'divider') {
       this.contextValue = undefined;
@@ -128,6 +112,12 @@ class CloudinaryItem extends vscode.TreeItem {
         command: 'cloudinary.clearSearch',
         title: 'Clear Search',
       };
+    }
+    // === LOADING INDICATOR NODE ===
+    else if (type === 'loading') {
+      this.contextValue = undefined;
+      this.iconPath = new vscode.ThemeIcon('loading~spin');
+      this.tooltip = 'Loading additional assets in the background...';
     }
   }
 }

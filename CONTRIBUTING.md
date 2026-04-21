@@ -44,13 +44,14 @@ Before you begin, ensure you have the following installed:
 
    ```json
    {
-     "test-cloud": {
-       "apiKey": "your-test-api-key",
-       "apiSecret": "your-test-api-secret",
-       "uploadPreset": "your-test-upload-preset"
+     "your-cloud-name": {
+       "apiKey": "your-api-key",
+       "apiSecret": "your-api-secret"
      }
    }
    ```
+   
+   > **Note:** The **cloud name is the key** (the property name). You can optionally add `"uploadPreset"` if you want a default preset.
 
 4. **Build the extension**
    ```bash

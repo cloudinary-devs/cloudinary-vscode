@@ -6,7 +6,7 @@ import * as vscode from 'vscode';
 export interface CloudinaryEnvironment {
   apiKey: string;
   apiSecret: string;
-  uploadPreset: string;  // Default upload preset to use
+  uploadPreset?: string;  // Optional: Default upload preset to use (signed uploads work without it)
 }
 
 /**
@@ -23,12 +23,14 @@ export function isPlaceholderConfig(
 ): boolean {
   const placeholderPatterns = [
     'your-cloud-name',
-    '<your-api-key>',
-    '<your-api-secret>',
-    '<your-default-upload-preset>',
+    'your_cloud_name',
+    'replace_with_your_cloud_name',
     'your-api-key',
+    'your_api_key',
+    'replace_with_your_api_key',
     'your-api-secret',
-    'your-default-upload-preset',
+    'your_api_secret',
+    'replace_with_your_api_secret',
   ];
 
   const values = [cloudName, apiKey, apiSecret].filter(Boolean) as string[];
@@ -54,19 +56,16 @@ export function getGlobalConfigPath(): string {
   }
 
   if (!fs.existsSync(envPath)) {
-    const template: Record<string, CloudinaryEnvironment> = {
-      'your-cloud-name-1': {
-        apiKey: '<your-api-key>',
-        apiSecret: '<your-api-secret>',
-        uploadPreset: '<your-default-upload-preset>'  // Default preset to use
-      },
-      'your-cloud-name-2': {
-        apiKey: '<your-api-key>',
-        apiSecret: '<your-api-secret>',
-        uploadPreset: '<your-default-upload-preset>'  // Default preset to use
-      },
-    };
-    fs.writeFileSync(envPath, JSON.stringify(template, null, 2), 'utf-8');
+    // Create template with clear placeholders
+    // Note: Cloud name is the KEY (e.g., "my-cloud-name"), not a value inside the object
+    const templateContent = `{
+  "REPLACE_WITH_YOUR_CLOUD_NAME": {
+    "apiKey": "REPLACE_WITH_YOUR_API_KEY",
+    "apiSecret": "REPLACE_WITH_YOUR_API_SECRET"
+  }
+}
+`;
+    fs.writeFileSync(envPath, templateContent, 'utf-8');
 
     vscode.window.showInformationMessage(
       '✅ Created global Cloudinary config at ~/.cloudinary/environments.json'

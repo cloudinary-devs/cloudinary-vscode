@@ -8,7 +8,7 @@ import { generateUserAgent } from "../utils/userAgent";
 interface CloudinaryEnvironment {
   apiKey: string;
   apiSecret: string;
-  uploadPreset: string;
+  uploadPreset?: string;  // Optional: Default upload preset
 }
 
 /**
@@ -44,7 +44,7 @@ function registerSwitchEnv(
           provider.cloudName = selected;
           provider.apiKey = env.apiKey;
           provider.apiSecret = env.apiSecret;
-          provider.uploadPreset = env.uploadPreset;
+          provider.uploadPreset = env.uploadPreset || null;
 
           const cacheKey = `cloudinary.dynamicFolders.${selected}`;
           const cachedFolderMode = context.globalState.get(cacheKey) as boolean | undefined;
@@ -68,7 +68,13 @@ function registerSwitchEnv(
             api_secret: env.apiSecret,
           });
 
-          statusBar.text = `$(cloud) ${selected}`;
+          // Update status bar with folder mode indicator
+          const folderMode = provider.dynamicFolders ? "Dynamic" : "Fixed";
+          statusBar.text = `$(cloud) ${selected} $(folder) ${folderMode}`;
+          statusBar.tooltip = provider.dynamicFolders
+            ? "Click to switch Cloudinary environment\n\nDynamic Folders: Assets can be organized independently of their public ID"
+            : "Click to switch Cloudinary environment\n\nFixed Folders: Asset folder is determined by public ID path";
+
           provider.refresh({
             folderPath: '',
             nextCursor: null,
