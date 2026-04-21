@@ -541,7 +541,7 @@ export class CldtPreviewProvider {
   }
 
   private loadTemplate(templateName: string, replacements?: IPreviewHtmlContext | undefined): string {
-    const templatePath = path.join(__dirname, "..", "src", "templates", templateName);
+    const templatePath = path.join(__dirname, "..", "src","cldt", "templates", templateName);
     let template = fs.readFileSync(templatePath, "utf8");
 
     // Replace all placeholders
