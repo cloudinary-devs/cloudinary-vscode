@@ -27,6 +27,12 @@ End-to-end runs require Cloudinary credentials in `process.env`. The `onPrepare`
 pnpm test:e2e
 ```
 
+To run a specific test file:
+
+```bash
+pnpm test:e2e --spec [FILE_PATH]
+```
+
 This will:
 1. Download a VS Code binary (if not already cached in `.wdio-vscode-service/`)
 2. Launch VS Code with the extension loaded
