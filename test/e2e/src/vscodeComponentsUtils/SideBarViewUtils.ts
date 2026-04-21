@@ -3,6 +3,15 @@ import { TreeItem } from "wdio-vscode-service"
 import allureReporter from '@wdio/allure-reporter'
 
 /**
+ * Actions available in the Side Bar View.
+ */
+export enum SideBarViewActions {
+    UPLOAD = ' Upload',
+    SEARCH = ' Search',
+    REFRESH = '  Refresh',
+}
+
+/**
  * Utility class for interacting with the Side Bar View in VS Code.
  */
 class SideBarViewUtils {
@@ -61,6 +70,15 @@ class SideBarViewUtils {
     /**
      * Waits for the content of the Side Bar View to load.
      */
+    public async clickAction(action: SideBarViewActions) {
+        await allureReporter.addStep(`Click the "${action.trim()}" action button`);
+        const sideBarView = await this.getSideBarView();
+        const titlePart = sideBarView.getTitlePart();
+        const actionButton = await titlePart.elem.$(`.//*[@title='${action}' or @aria-label='${action}']`);
+        await actionButton.waitForClickable();
+        await actionButton.click();
+    }
+
     public async waitContentToLoad() {
         await allureReporter.addStep('Wait for content to load');
         await browser.waitUntil(async () => {
