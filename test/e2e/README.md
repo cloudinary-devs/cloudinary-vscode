@@ -56,6 +56,9 @@ test/e2e/
 
 Tests use [Mocha](https://mochajs.org/) as the test framework and the `wdio-vscode-service` page objects to interact with VS Code.
 
+VS Code page object references:
+- [wdio-vscode-service API](https://webdriverio-community.github.io/wdio-vscode-service/modules.html) — full API reference for the WebdriverIO VS Code service.
+- [vscode-extension-tester Wiki](https://github.com/redhat-developer/vscode-extension-tester/wiki) — documentation for page objects like ActivityBar, SideBarView, EditorView, WebView, etc.
 ```ts
 import { activityBarUtils } from '../src/utils/ActivityBarUtils.js'
 import { sideBarViewUtils } from '../src/utils/SideBarViewUtils.js'
