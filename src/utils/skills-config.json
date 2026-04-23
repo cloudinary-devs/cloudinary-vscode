@@ -56,7 +56,7 @@
     },
     {
       "id": "github-copilot",
-      "name": "GitHub Copilot",
+      "name": "VS Code (Copilot)",
       "skillsDir": ".agents/skills",
       "globalSkillsDir": "~/.agents/skills",
       "isUniversal": true

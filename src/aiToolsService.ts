@@ -99,22 +99,7 @@ export function getPlatformCovers(platform: PlatformEntry, scope: Scope): string
 const SKILLS_BASE = "https://api.github.com/repos/cloudinary-devs/skills/contents";
 
 export async function githubFetchJson<T>(url: string): Promise<T> {
-  const baseHeaders: Record<string, string> = { Accept: "application/vnd.github+json" };
-
-  let response = await fetch(url, { headers: baseHeaders });
-
-  if (!response.ok && [401, 403, 404].includes(response.status)) {
-    try {
-      const session = await vscode.authentication.getSession("github", ["repo"], { createIfNone: true });
-      if (session) {
-        response = await fetch(url, {
-          headers: { ...baseHeaders, Authorization: `Bearer ${session.accessToken}` },
-        });
-      }
-    } catch {
-      // auth declined or unavailable — fall through with original error
-    }
-  }
+  const response = await fetch(url, { headers: { Accept: "application/vnd.github+json" } });
 
   if (!response.ok) {
     throw new Error(`GitHub API ${response.status}: ${url}`);
