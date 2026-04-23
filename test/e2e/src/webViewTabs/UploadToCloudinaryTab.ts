@@ -1,34 +1,14 @@
 import { browser } from "@wdio/globals"
 import allureReporter from '@wdio/allure-reporter'
-import { webViewUtils } from "../vscodeComponentsUtils/WebViewUtils.js";
-import { WebView } from "wdio-vscode-service";
+import { WebViewTabBase } from "./WebViewTabBase.js";
 
 /**
  * Utility class for interacting with the Upload to Cloudinary webview.
  */
-class UploadToCloudinaryTab {
+class UploadToCloudinaryTab extends WebViewTabBase {
 
-    private webview: WebView | null = null;
-
-    /**
-     * Opens the Upload to Cloudinary webview.
-     * Must be called before any other interaction methods.
-     */
-    public async open() {
-        this.webview = await webViewUtils.getWebView('Upload to Cloudinary');
-        await this.webview.open();
-    }
-
-    /**
-     * Closes the Upload to Cloudinary webview.
-     * Uses the stored reference from open() to avoid re-fetching from inside the iframe.
-     */
-    public async close() {
-        if (!this.webview) {
-            throw new Error('WebView not opened. Call open() first.');
-        }
-        await this.webview.close();
-        this.webview = null;
+    constructor() {
+        super('Upload to Cloudinary');
     }
 
     /**

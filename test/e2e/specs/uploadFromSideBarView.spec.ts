@@ -39,13 +39,13 @@ describe('Upload asset from side bar Upload button', () => {
         await activityBarUtils.openView('Cloudinary');
         await sideBarViewUtils.clickAction(SideBarViewActions.UPLOAD);
 
-        await uploadToCloudinaryTab.open();
+        await uploadToCloudinaryTab.switchTo();
         await uploadToCloudinaryTab.openAdvancedOptions();
         await uploadToCloudinaryTab.fillCustomPublicId(firstAssetPublicID);
         
         await uploadToCloudinaryTab.uploadLocalFile(newFilePath);
 
-        await uploadToCloudinaryTab.close();
+        await uploadToCloudinaryTab.switchBack();
 
         await activityBarUtils.openView('Cloudinary');
         
