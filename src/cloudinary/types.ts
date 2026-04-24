@@ -40,6 +40,7 @@ export type SortDirection = 'asc' | 'desc';
 export interface FetchChildrenOpts {
   resourceTypeFilter: ResourceTypeFilter;
   sortDirection: SortDirection;
+  /** Pass a cursor from a previous ChildrenPage. Omit (or pass `undefined`) to start from the beginning. */
   nextCursor?: string;
 }
 
