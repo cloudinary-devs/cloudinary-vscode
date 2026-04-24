@@ -30,6 +30,14 @@ interface AiToolsDataMessage {
   error?: string;
 }
 
+interface HomescreenDataMessage {
+  command: "homescreenData";
+  hasConfig: boolean;
+  cloudName: string;
+  folderMode: string;
+  envCount: number;
+}
+
 interface AiToolsProgressMessage {
   command: "aiToolsProgress";
   item: string;
@@ -280,6 +288,34 @@ function handleAiToolsResult(_msg: AiToolsResultMessage): void {
   getVSCode()?.postMessage({ command: "aiToolsExpanded" });
 }
 
+// ── Homescreen data ───────────────────────────────────────────────────────────
+
+function handleHomescreenData(msg: HomescreenDataMessage): void {
+  const statusDot = document.getElementById("hs-status-dot");
+  const statusText = document.getElementById("hs-status-text");
+  const cloudNameEl = document.getElementById("hs-cloud-name");
+  const folderModeEl = document.getElementById("hs-folder-mode");
+  const setupBanner = document.getElementById("hs-setup-banner");
+  const searchEl = document.getElementById("hs-search");
+  const switchEnvBtn = document.getElementById("hs-btn-switch-env");
+  const envCountEl = document.getElementById("hs-env-count");
+
+  statusDot?.classList.toggle("hs-status-dot--warn", !msg.hasConfig);
+  if (statusText) { statusText.textContent = msg.hasConfig ? "Connected" : "Setup needed"; }
+  if (cloudNameEl) {
+    cloudNameEl.textContent = msg.hasConfig ? msg.cloudName : "Not configured";
+    cloudNameEl.classList.toggle("hs-cloud-name--placeholder", !msg.hasConfig);
+  }
+  if (folderModeEl) {
+    folderModeEl.textContent = msg.folderMode;
+    folderModeEl.classList.toggle("hidden", !msg.hasConfig);
+  }
+  setupBanner?.classList.toggle("hidden", msg.hasConfig);
+  searchEl?.classList.toggle("hidden", !msg.hasConfig);
+  switchEnvBtn?.classList.toggle("hidden", msg.envCount <= 1);
+  if (envCountEl) { envCountEl.textContent = String(msg.envCount); }
+}
+
 // ── Platform dropdown ─────────────────────────────────────────────────────────
 
 function initPlatformDropdown(): void {
@@ -378,6 +414,9 @@ function init(): void {
   initPlatformDropdown();
   initScopeToggle();
 
+  // Signal ready so the extension host can push dynamic data immediately
+  getVSCode()?.postMessage({ command: "ready" });
+
   // Accordion toggle
   el("hs-btn-ai-tools").addEventListener("click", toggleAccordion);
 
@@ -396,6 +435,9 @@ function init(): void {
         }
         break;
       }
+      case "homescreenData":
+        handleHomescreenData(msg as HomescreenDataMessage);
+        break;
       case "aiToolsData":
         handleAiToolsData(msg as AiToolsDataMessage);
         break;

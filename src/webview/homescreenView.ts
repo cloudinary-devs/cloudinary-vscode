@@ -6,7 +6,6 @@
 import * as vscode from "vscode";
 import { CloudinaryTreeDataProvider } from "../tree/treeDataProvider";
 import { createWebviewDocument, getScriptUri, getStyleUri } from "./webviewUtils";
-import { escapeHtml } from "./utils/helpers";
 import { loadEnvironments } from "../config/configUtils";
 import skillsConfig from "../utils/skills-config.json";
 import {
@@ -39,16 +38,6 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
   private _cachedSkills: SkillInfo[] | undefined;
   private _currentPlatform: string = "claude-code";
   private _currentScope: Scope = "project";
-  private _environmentNames: string[] = [];
-
-  private async _loadEnvironments(): Promise<void> {
-    try {
-      const envs = await loadEnvironments();
-      this._environmentNames = Object.keys(envs);
-    } catch {
-      this._environmentNames = [];
-    }
-  }
 
   async resolveWebviewView(
     webviewView: vscode.WebviewView,
@@ -56,7 +45,6 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
     _token: vscode.CancellationToken
   ): Promise<void> {
     this._webviewView = webviewView;
-    await this._loadEnvironments();
 
     webviewView.onDidDispose(() => {
       this._webviewView = undefined;
@@ -97,6 +85,9 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
         mcpServers?: string[];
       }) => {
         switch (message.command) {
+          case "ready":
+            await this._sendHomescreenData();
+            break;
           case "openGlobalConfig":
             vscode.commands.executeCommand("cloudinary.openGlobalConfig");
             break;
@@ -165,40 +156,28 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
     }, 250);
   }
 
-  /**
-   * Re-renders the homescreen HTML with current credentials.
-   * Safe to call at any time; no-ops if the view has not been resolved yet.
-   */
   async refresh(): Promise<void> {
-    if (!this._webviewView) {
-      return;
-    }
-    await this._loadEnvironments();
-    const scriptUri = getScriptUri(
-      this._webviewView.webview,
-      this._extensionUri,
-      "homescreen.js"
-    );
-    const homescreenCssUri = getStyleUri(
-      this._webviewView.webview,
-      this._extensionUri,
-      "homescreen.css"
-    );
-    this._webviewView.webview.html = createWebviewDocument({
-      title: "Cloudinary",
-      webview: this._webviewView.webview,
-      extensionUri: this._extensionUri,
-      bodyContent: this._getBodyContent(),
-      additionalStyles: [homescreenCssUri],
-      additionalScripts: [scriptUri],
-    });
+    await this._sendHomescreenData();
+  }
+
+  private async _sendHomescreenData(): Promise<void> {
+    const view = this._webviewView;
+    if (!view) { return; }
+
+    const hasConfig = !!(this._provider.cloudName && this._provider.apiKey);
+    const cloudName = this._provider.cloudName || "";
+    const folderMode = this._provider.dynamicFolders ? "Dynamic folders" : "Fixed folders";
+
+    let envCount = hasConfig ? 1 : 0;
+    try {
+      const envs = await loadEnvironments();
+      envCount = Object.keys(envs).length;
+    } catch { /* use default */ }
+
+    view.webview.postMessage({ command: "homescreenData", hasConfig, cloudName, folderMode, envCount });
   }
 
   private _getBodyContent(): string {
-    const hasConfig = !!(this._provider.cloudName && this._provider.apiKey);
-    const cloudName = escapeHtml(this._provider.cloudName || "");
-    const folderMode = this._provider.dynamicFolders ? "Dynamic folders" : "Fixed folders";
-
     return `
 
       <div class="hs-root">
@@ -211,14 +190,14 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
               <span class="hs-brand-name">Cloudinary</span>
             </div>
             <span class="hs-status-pill">
-              <span class="hs-status-dot${hasConfig ? "" : " hs-status-dot--warn"}"></span>
-              ${hasConfig ? "Connected" : "Setup needed"}
+              <span id="hs-status-dot" class="hs-status-dot"></span>
+              <span id="hs-status-text"></span>
             </span>
           </div>
           <div class="hs-cloud-row">
             <div class="hs-cloud-col">
-              <span class="hs-cloud-name${hasConfig ? "" : " hs-cloud-name--placeholder"}">${hasConfig ? cloudName : "Not configured"}</span>
-              ${hasConfig ? `<span class="hs-folder-mode">${folderMode}</span>` : ""}
+              <span id="hs-cloud-name" class="hs-cloud-name"></span>
+              <span id="hs-folder-mode" class="hs-folder-mode hidden"></span>
             </div>
             <button id="hs-btn-header-configure" class="hs-configure-btn" title="Open configuration file" aria-label="Open configuration file">
               <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 4.754a3.246 3.246 0 1 0 0 6.492 3.246 3.246 0 0 0 0-6.492M5.754 8a2.246 2.246 0 1 1 4.492 0 2.246 2.246 0 0 1-4.492 0"/><path d="M9.796 1.343c-.527-1.79-3.065-1.79-3.592 0l-.094.319a.873.873 0 0 1-1.255.52l-.292-.16c-1.64-.892-3.433.902-2.54 2.541l.159.292a.873.873 0 0 1-.52 1.255l-.319.094c-1.79.527-1.79 3.065 0 3.592l.319.094a.873.873 0 0 1 .52 1.255l-.16.292c-.892 1.64.901 3.434 2.541 2.54l.292-.159a.873.873 0 0 1 1.255.52l.094.319c.527 1.79 3.065 1.79 3.592 0l.094-.319a.873.873 0 0 1 1.255-.52l.292.16c1.64.893 3.434-.902 2.54-2.541l-.159-.292a.873.873 0 0 1 .52-1.255l.319-.094c1.79-.527 1.79-3.065 0-3.592l-.319-.094a.873.873 0 0 1-.52-1.255l.16-.292c.893-1.64-.902-3.433-2.541-2.54l-.292.159a.873.873 0 0 1-1.255-.52zm-2.633.283c.246-.835 1.428-.835 1.674 0l.094.319a1.873 1.873 0 0 0 2.693 1.115l.291-.16c.764-.415 1.6.42 1.184 1.185l-.159.292a1.873 1.873 0 0 0 1.116 2.692l.318.094c.835.246.835 1.428 0 1.674l-.319.094a1.873 1.873 0 0 0-1.115 2.693l.16.291c.415.764-.42 1.6-1.185 1.184l-.291-.159a1.873 1.873 0 0 0-2.693 1.116l-.094.318c-.246.835-1.428.835-1.674 0l-.094-.319a1.873 1.873 0 0 0-2.692-1.115l-.292.16c-.764.415-1.6-.42-1.184-1.185l.159-.291A1.873 1.873 0 0 0 1.945 8.93l-.319-.094c-.835-.246-.835-1.428 0-1.674l.319-.094A1.873 1.873 0 0 0 3.06 4.474l-.16-.292c-.415-.764.42-1.6 1.185-1.184l.292.159a1.873 1.873 0 0 0 2.692-1.115z"/></svg>
@@ -226,16 +205,13 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
           </div>
         </div>
 
-        ${!hasConfig ? `
-        <div class="hs-setup-banner">
+        <div id="hs-setup-banner" class="hs-setup-banner hidden">
           <span class="hs-setup-banner-icon">⚠</span>
           <span class="hs-setup-banner-text">Add your API credentials to connect</span>
           <button id="hs-btn-configure" class="hs-setup-banner-btn" data-command="openGlobalConfig">Configure</button>
         </div>
-        ` : ""}
 
-        ${hasConfig ? `
-        <div class="hs-search" role="search" aria-label="Search media library">
+        <div id="hs-search" class="hs-search hidden" role="search" aria-label="Search media library">
           <div class="hs-search-wrap">
             <svg class="hs-search-icon" width="12" height="12" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
               <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001q.044.06.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1 1 0 0 0-.115-.099zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0"/>
@@ -252,7 +228,6 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
             <button id="hs-search-clear" class="hs-search-clear hidden" title="Clear search" aria-label="Clear search">✕</button>
           </div>
         </div>
-        ` : ""}
 
         <div class="hs-actions">
           <button id="hs-btn-library" class="hs-action" data-command="showLibrary">
@@ -277,18 +252,16 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
             <svg class="hs-chevron" width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M4.5 3L7.5 6L4.5 9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </button>
 
-          ${this._environmentNames.length > 1 ? `
-          <button id="hs-btn-switch-env" class="hs-action" data-command="switchEnvironment">
+          <button id="hs-btn-switch-env" class="hs-action hidden" data-command="switchEnvironment">
             <span class="hs-action-icon hs-action-icon--amber" aria-hidden="true">
               <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M1 11.5a.5.5 0 0 0 .5.5h11.793l-3.147 3.146a.5.5 0 0 0 .708.708l4-4a.5.5 0 0 0 0-.708l-4-4a.5.5 0 0 0-.708.708L13.293 11H1.5a.5.5 0 0 0-.5.5m14-7a.5.5 0 0 1-.5.5H2.707l3.147 3.146a.5.5 0 1 1-.708.708l-4-4a.5.5 0 0 1 0-.708l4-4a.5.5 0 1 1 .708.708L2.707 4H14.5a.5.5 0 0 1 .5.5"/></svg>
             </span>
             <span class="hs-action-text">
               <span class="hs-action-title">Switch Environment</span>
-              <span class="hs-action-desc">${this._environmentNames.length} environments available</span>
+              <span class="hs-action-desc"><span id="hs-env-count">0</span> environments available</span>
             </span>
             <svg class="hs-chevron" width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M4.5 3L7.5 6L4.5 9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </button>
-          ` : ""}
 
           <div class="hs-section-divider" role="separator"></div>
 
