@@ -137,6 +137,40 @@ export class CloudinaryService {
     }
   }
 
+  async searchAssets(query: string, opts: FetchChildrenOpts): Promise<{ assets: ClientAsset[]; nextCursor: string | null }> {
+    const result = await this.sdk.search({
+      expression: `${query}*`,
+      sortBy: { field: 'created_at', direction: opts.sortDirection },
+      maxResults: 500,
+    });
+    const assets = (result.resources || []).map((a: any) => this.toClientAsset(a));
+    return { assets, nextCursor: result.next_cursor ?? null };
+  }
+
+  async prefetchSearchResults(
+    query: string,
+    startCursor: string,
+    opts: FetchChildrenOpts,
+    onBatch: (assets: ClientAsset[], hasMore: boolean) => void,
+    cap: number = 5000,
+  ): Promise<void> {
+    let cursor: string | null = startCursor;
+    let total = 0;
+    while (cursor && total < cap) {
+      const result: { resources: any[]; next_cursor: string | null } = await this.sdk.search({
+        expression: `${query}*`,
+        sortBy: { field: 'created_at', direction: opts.sortDirection },
+        maxResults: 500,
+        nextCursor: cursor,
+      });
+      const assets = (result.resources || []).map((a: any) => this.toClientAsset(a));
+      if (assets.length === 0) { break; }
+      total += assets.length;
+      cursor = result.next_cursor ?? null;
+      onBatch(assets, !!cursor && total < cap);
+    }
+  }
+
   private toClientAsset(a: any): ClientAsset {
     // Coerce unexpected resource_type values to 'image'; mirrors prior tree-provider fallback.
     const resourceType = (a.resource_type === 'video' || a.resource_type === 'raw') ? a.resource_type : 'image';

@@ -239,3 +239,29 @@ suite('CloudinaryService.prefetchRemaining', () => {
     assert.strictEqual(batches.length, 0, 'no batches should be delivered when all resources filter out');
   });
 });
+
+suite('CloudinaryService.searchAssets', () => {
+  test('returns results and pages via prefetch', async () => {
+    let call = 0;
+    const adapter = fakeAdapter({
+      search: async (opts) => {
+        call++;
+        assert.ok(opts.expression.startsWith('foo'));
+        if (call === 1) {
+          return { resources: [{ public_id: 'foo1', resource_type: 'image', type: 'upload', secure_url: 'x' }], next_cursor: 'c2' };
+        }
+        return { resources: [{ public_id: 'foo2', resource_type: 'image', type: 'upload', secure_url: 'x' }], next_cursor: null };
+      },
+    });
+    const svc = new CloudinaryService(adapter);
+    svc.setCredentials({ cloudName: 'demo', apiKey: 'k', apiSecret: 's', dynamicFolders: true });
+    const first = await svc.searchAssets('foo', { resourceTypeFilter: 'all', sortDirection: 'desc' });
+    assert.strictEqual(first.assets[0].public_id, 'foo1');
+    assert.strictEqual(first.nextCursor, 'c2');
+
+    const batches: ClientAsset[][] = [];
+    await svc.prefetchSearchResults('foo', 'c2', { resourceTypeFilter: 'all', sortDirection: 'desc' }, (a) => batches.push(a));
+    assert.strictEqual(batches.length, 1);
+    assert.strictEqual(batches[0][0].public_id, 'foo2');
+  });
+});
