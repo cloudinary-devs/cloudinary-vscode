@@ -48,7 +48,7 @@ function registerAllCommands(
     )
   );
 
-  registerSearch(context, provider, homescreenProvider);
+  registerSearch(context, homescreenProvider);
   registerClearSearch(context, provider);
   registerViewOptions(context, provider);
   registerPreview(context);

@@ -54,7 +54,6 @@ type InboundMessage = AiToolsDataMessage | AiToolsProgressMessage | AiToolsResul
 // ── Module state ──────────────────────────────────────────────────────────────
 
 let _isOpen = false;
-let _dataFetched = false;
 let _cachedData: Omit<AiToolsDataMessage, "command"> | null = null;
 
 
@@ -165,8 +164,7 @@ function toggleAccordion(): void {
   btn.setAttribute("aria-expanded", String(_isOpen));
   chevron.classList.toggle("hs-chevron--open", _isOpen);
 
-  if (_isOpen && !_dataFetched) {
-    _dataFetched = true;
+  if (_isOpen && !_cachedData) {
     showPanelState("loading");
     getVSCode()?.postMessage({ command: "aiToolsExpanded" });
   }
@@ -263,7 +261,6 @@ function handleAiToolsData(msg: AiToolsDataMessage): void {
 }
 
 function handleAiToolsProgress(msg: AiToolsProgressMessage): void {
-  // Find the row by data-skill or data-mcp attribute
   const cb = document.querySelector<HTMLInputElement>(
     `[data-skill="${msg.item}"], [data-mcp="${msg.item}"]`
   );
@@ -272,7 +269,6 @@ function handleAiToolsProgress(msg: AiToolsProgressMessage): void {
   const row = cb.closest(".hs-ai-item");
   if (!row) { return; }
 
-  // Remove existing tick if any
   row.querySelector(".hs-ai-item-tick")?.remove();
 
   const tick = document.createElement("span");
@@ -282,7 +278,6 @@ function handleAiToolsProgress(msg: AiToolsProgressMessage): void {
 }
 
 function handleAiToolsResult(_msg: AiToolsResultMessage): void {
-  _dataFetched = false;
   _cachedData = null;
   showPanelState("loading");
   getVSCode()?.postMessage({ command: "aiToolsExpanded" });
@@ -322,7 +317,6 @@ function initPlatformDropdown(): void {
   const select = el<HTMLSelectElement>("hs-ai-platform-select");
   if (!select) { return; }
   select.addEventListener("change", () => {
-    // Clear pending checkbox selections on platform switch
     document.querySelectorAll<HTMLInputElement>(".hs-ai-cb:not(:disabled)").forEach((cb) => { cb.checked = false; });
     showPanelState("loading");
     getVSCode()?.postMessage({ command: "changePlatform", platform: select.value });
@@ -349,14 +343,12 @@ function initSearch(): void {
 
   if (!input) { return; }
 
-  // Show/hide clear button based on input value
   input.addEventListener("input", () => {
     if (clearBtn) {
       clearBtn.classList.toggle("hidden", input.value.trim() === "");
     }
   });
 
-  // Submit search on Enter
   input.addEventListener("keydown", (e: KeyboardEvent) => {
     if (e.key === "Enter") {
       const query = input.value.trim();
@@ -371,7 +363,6 @@ function initSearch(): void {
     }
   });
 
-  // Clear search
   clearBtn?.addEventListener("click", () => {
     input.value = "";
     clearBtn.classList.add("hidden");

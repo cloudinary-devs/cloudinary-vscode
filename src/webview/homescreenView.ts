@@ -14,6 +14,8 @@ import {
   SkillInfo,
   MCP_SERVERS,
   detectEditor,
+  getMcpRootKey,
+  getEditorDisplayName,
   getMcpFilePath,
   fetchSkillList,
   fetchSkillContent,
@@ -370,21 +372,19 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
         return;
       }
 
-      const { project, global: globalSet } = await readInstalledSkillDirNames(rootUri, platform, skills);
-      const inScope = this._currentScope === "project" ? project   : globalSet;
-      const inOther = this._currentScope === "project" ? globalSet : project;
-
       const covers = getPlatformCovers(platform, this._currentScope);
 
       const editor = detectEditor();
       const mcpFilePath = getMcpFilePath(editor);
-      const rootKey = editor === "vscode" ? "servers" : "mcpServers";
-      const configuredMcpSet = await readConfiguredMcpServerKeys(rootUri, mcpFilePath, rootKey);
 
-      const editorLabels: Record<string, string> = {
-        vscode: "VS Code", cursor: "Cursor", windsurf: "Windsurf", antigravity: "Antigravity",
-      };
-      const mcpEditorLabel = editorLabels[editor];
+      const [{ project, global: globalSet }, configuredMcpSet] = await Promise.all([
+        readInstalledSkillDirNames(rootUri, platform, skills),
+        readConfiguredMcpServerKeys(rootUri, mcpFilePath, getMcpRootKey(editor)),
+      ]);
+      const inScope = this._currentScope === "project" ? project   : globalSet;
+      const inOther = this._currentScope === "project" ? globalSet : project;
+
+      const mcpEditorLabel = getEditorDisplayName(editor);
 
       view.webview.postMessage({
         command: "aiToolsData",
@@ -480,7 +480,6 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
       }
     }
 
-    this._cachedSkills = undefined;
     view.webview.postMessage({ command: "aiToolsResult", errors });
   }
 }

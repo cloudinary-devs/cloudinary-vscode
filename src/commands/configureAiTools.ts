@@ -6,6 +6,7 @@ import {
   MCP_SERVERS,
   detectEditor,
   getMcpFilePath,
+  getMcpRootKey,
   fetchSkillList,
   fetchSkillContent,
   installForClaudeCode,
@@ -25,8 +26,7 @@ async function createMcpConfig(
   mcpFilePath: string,
   createdFiles: string[]
 ): Promise<void> {
-  const rootKey = editor === "vscode" ? "servers" : "mcpServers";
-  const configuredKeys = await readConfiguredMcpServerKeys(rootUri, mcpFilePath, rootKey);
+  const configuredKeys = await readConfiguredMcpServerKeys(rootUri, mcpFilePath, getMcpRootKey(editor));
 
   const selected = await vscode.window.showQuickPick(
     MCP_SERVERS.map((s) => ({
