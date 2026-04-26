@@ -35,6 +35,6 @@ describe('Asset Explorer Tetsts', () => {
         await sideBarViewUtils.validateSideBarViewTitle(expectedTitle);
 
         await sideBarViewUtils.validateContentItemsExist(expectedItems);
-        });
+    });
 });
 
