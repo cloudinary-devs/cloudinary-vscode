@@ -62,6 +62,7 @@ class SideBarViewUtils {
         const itemLabels = await Promise.all(
             visibleItems.map(item => item.getLabel())
         );
+
         for (const expected of expectedItems) {
             expect(itemLabels).toContain(expected);
         }
@@ -79,6 +80,27 @@ class SideBarViewUtils {
         await actionButton.click();
     }
 
+    /**
+     * Validates that the Side Bar View contains exactly the expected items and no others.
+     */
+    public async validateContentItemsNumber(expectedItemsNumber: number) {
+        await allureReporter.addStep(`Validate only ${expectedItemsNumber} items are visible`);
+        await this.waitContentToLoad();
+        const content = await this.getSideBarViewContent();
+        const sections = await content.getSections();
+        const visibleItems = await sections[0].getVisibleItems() as TreeItem[];
+        const itemLabels = await Promise.all(
+            visibleItems.map(item => item.getLabel())
+        );
+
+        await browser.waitUntil(async () => {
+            return itemLabels.length === expectedItemsNumber;
+        }, { timeout: 15000, timeoutMsg: `Expected ${itemLabels.length} items, but got ${expectedItemsNumber} items` })
+    }
+
+    /**
+     * Waits for the content of the Side Bar View to load.
+     */
     public async waitContentToLoad() {
         await allureReporter.addStep('Wait for content to load');
         await browser.waitUntil(async () => {
