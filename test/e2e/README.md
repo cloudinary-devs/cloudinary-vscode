@@ -63,7 +63,7 @@ test/e2e/
 Tests use [Mocha](https://mochajs.org/) as the test framework and the `wdio-vscode-service` page objects to interact with VS Code.
 
 VS Code page object references:
-- [wdio-vscode-service API](https://s3-proxy.cloudinary.com/cld-web-pages/vscode-page-objects/index.html) — full API reference for the WebdriverIO VS Code service.
+- [wdio-vscode-service API](https://jubilant-broccoli-www5lem.pages.github.io/vscode-po/index.html) — full API reference for the WebdriverIO VS Code service.
 
 ```ts
 import { activityBarUtils } from '../src/utils/ActivityBarUtils.js'
