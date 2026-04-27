@@ -1,30 +1,30 @@
 # Architecture
 
-The extension is built on VS Code's extension API and integrates with Cloudinary's Admin and Upload APIs.
+The extension is a VS Code sidebar integration built around a shared `CloudinaryService` plus webview-based UI surfaces.
 
-### Core Components
+## Core Components
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────┐
-│                     VS Code Extension                        │
+│                     VS Code Extension                       │
 ├─────────────────────────────────────────────────────────────┤
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐       │
-│  │  Tree View   │  │   Webviews   │  │   Commands   │       │
-│  │  (Sidebar)   │  │  (Panels)    │  │  (Actions)   │       │
+│  │ Homescreen   │  │   Library    │  │   Commands   │       │
+│  │  Webview     │  │   Webview    │  │   & Panels   │       │
 │  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘       │
 │         │                 │                 │               │
 │         └────────────┬────┴────────────────┘               │
 │                      │                                      │
 │         ┌────────────▼────────────┐                        │
-│         │  CloudinaryTreeProvider │                        │
-│         │  (State & API Layer)    │                        │
+│         │    CloudinaryService    │                        │
+│         │  State + API boundary   │                        │
 │         └────────────┬────────────┘                        │
 │                      │                                      │
 ├──────────────────────┼──────────────────────────────────────┤
 │                      │                                      │
 │         ┌────────────▼────────────┐                        │
-│         │    Cloudinary SDK       │                        │
-│         │    (Node.js v2)         │                        │
+│         │ Cloudinary SDK Adapter  │                        │
+│         │  wraps Node SDK usage   │                        │
 │         └────────────┬────────────┘                        │
 │                      │                                      │
 └──────────────────────┼──────────────────────────────────────┘
@@ -37,17 +37,13 @@ The extension is built on VS Code's extension API and integrates with Cloudinary
            └───────────────────────┘
 ```
 
-### Key Design Decisions
+## Key Design Decisions
 
-1. **Configuration via files, not settings** - API secrets are stored in `~/.cloudinary/environments.json`, not VS Code settings (which could be committed to repos)
-
-2. **Singleton provider** - `CloudinaryTreeDataProvider` holds all state and manages API calls
-
-3. **External CSS/JS for webviews** - Styles and scripts are loaded from files, not embedded in HTML strings
-
-4. **Centralized icons** - SVG icons are defined once in `src/webview/icons.ts`
-
-5. **Shared utilities** - Common functions like `escapeHtml` are in `src/webview/utils/helpers.ts`
+1. Configuration lives in Cloudinary environment files, not VS Code settings.
+2. `CloudinaryService` owns runtime Cloudinary state such as credentials, folder mode, and upload presets.
+3. The sidebar is webview-driven: `cloudinaryHomescreen` and `cloudinaryMediaLibrary` are both webview views.
+4. Webview host code lives in `src/webview/*.ts`; browser-side behavior lives in `src/webview/client/*.ts`.
+5. The Cloudinary SDK is wrapped behind `createCloudinarySdkAdapter()` so service logic stays testable.
 
 ## Technology Stack
 
@@ -56,85 +52,89 @@ The extension is built on VS Code's extension API and integrates with Cloudinary
 | Language | TypeScript (strict mode) |
 | Build | esbuild |
 | Runtime | VS Code Extension Host (Node.js) |
-| API Client | Cloudinary Node.js SDK v2.x |
+| API Client | Cloudinary Node.js SDK v2.x via adapter |
 | Testing | Mocha + VS Code Test Electron |
 | Linting | ESLint |
 
 ## Data Flow
 
-### Configuration Loading
+### Activation and Configuration
 
-```
+```text
 1. Extension activates
-2. Check for workspace config (.cloudinary/environments.json)
-3. Fall back to global config (~/.cloudinary/environments.json)
-4. Validate credentials (reject placeholder values)
-5. Configure Cloudinary SDK
-6. Detect folder mode (dynamic vs fixed)
+2. Load environments from .cloudinary/environments.json or ~/.cloudinary/environments.json
+3. Validate credentials and configure the Cloudinary SDK
+4. Detect folder mode and cache it in global state
+5. Create shared CloudinaryService
+6. Register homescreen and library webview providers
+7. Register commands against the shared service/providers
 ```
 
-### Tree View Population
+### Library Loading
 
+```text
+1. Library webview posts "ready"
+2. LibraryWebviewViewProvider reads current view state
+3. Provider calls CloudinaryService for folders/assets/search results
+4. Provider posts root/search/folder messages to the client
+5. Client renders the virtualized tree/list UI
 ```
-1. VS Code calls provider.getChildren()
-2. Provider checks cache (assetMap)
-3. If not cached, fetch from API
-4. Transform to CloudinaryItem instances
-5. Return items to VS Code
-```
+
+The library renders a compact header (brand strip, action toolbar, filter controls, and search field) above the virtualized list:
+
+- **Brand strip** — Cloudinary logo, wordmark, and active cloud name pill. The pill is populated from the `envChanged` message posted on `ready` and on every environment switch.
+- **Action toolbar** — icon-button groups for navigation, refresh, upload, and configuration. Search and filtering are not toolbar toggles; those controls remain visible below the toolbar.
+- **Search and filter controls** — resource type, sort order, and search input stay visible so the core browse controls are always one interaction away.
+- **Row grid** — every row is 22px tall with three uniform 18px slots (twistie · icon · spacer) so folders, assets, loading, and clear-search rows share an exact rhythm. Row content is flex-centered so glyphs and labels sit in the middle of the selection band.
+- **Folder iconography** — separate closed (stroked outline) and open (filled, two-tone) glyphs so expand state reads from the icon as well as the chevron rotation.
+- **Authenticated delivery** — assets with `type: authenticated` are marked with a lock in the list and preview. The service signs the original delivery URL and reuses it for preview fields instead of generating dynamic optimization/thumbnail transformations.
+- **Hover preview** — narrow card with a brand-gradient hairline, 176×176 thumbnail, resource-type chip, and truncated caption. Smart left/right placement based on viewport edges.
+- **Welcome empty state** — gradient-edged card shown when no credentials are configured; CTA button posts `runToolbar` `openGlobalConfig`.
+- **Reduced motion** — all animations and transitions are disabled under `@media (prefers-reduced-motion: reduce)`.
 
 ### Webview Communication
 
+```text
+Extension host                     Webview client
+     │                                  │
+     │ webview.html = ...               │
+     │─────────────────────────────────>│
+     │                                  │
+     │ postMessage({ command: ... })    │
+     │─────────────────────────────────>│
+     │                                  │
+     │ onDidReceiveMessage(...)         │
+     │<─────────────────────────────────│
 ```
-Extension                          Webview
-    │                                  │
-    │  panel.webview.html = ...        │
-    │──────────────────────────────────>│
-    │                                  │
-    │  vscode.postMessage({...})       │
-    │<──────────────────────────────────│
-    │                                  │
-    │  panel.webview.postMessage({...})│
-    │──────────────────────────────────>│
-    │                                  │
-```
+
+The homescreen drives navigation and search entry points. The library handles browsing, filtering, sorting, selection, context actions, and scroll state.
+
+Both webview view providers route outbound messages through a defensive `safePost` helper that swallows `Webview is disposed` errors. This protects against late callbacks (search prefetches, upload progress, env-change refreshes) firing after a view collapses or the user dismisses an editor panel.
 
 ## VS Code Integration Points
 
-### Package.json Contributions
+### `package.json` Contributions
 
 | Contribution | Purpose |
 |--------------|---------|
-| `viewsContainers.activitybar` | Cloudinary icon in sidebar |
-| `views.cloudinary` | Tree view registration |
-| `commands` | Command definitions |
-| `menus.view/title` | Tree view title bar buttons |
-| `menus.view/item/context` | Right-click context menu |
+| `viewsContainers.activitybar` | Cloudinary icon in the activity bar |
+| `views.cloudinary` | Registers the homescreen and library webview views |
+| `commands` | Command definitions used by webviews and panels |
 
-### Tree Item Context Values
-
-| Context Value | Description |
-|---------------|-------------|
-| `asset` | Media file (enables copy commands) |
-| `folder` | Directory (enables upload to folder) |
-| `loadMore` | Pagination trigger |
-| `clearSearch` | Clear search results |
+Most toolbar and context actions are now implemented inside the library webview rather than through `contributes.menus`.
 
 ## Error Handling
 
-All Cloudinary API errors flow through `handleCloudinaryError()`:
+Cloudinary-facing failures should go through `handleCloudinaryError()`:
 
 ```typescript
-import { handleCloudinaryError } from '../utils/cloudinaryErrorHandler';
+import { handleCloudinaryError } from "../utils/cloudinaryErrorHandler";
 
 try {
-  await cloudinary.search.execute();
+  await cloudinaryService.searchAssets("hero");
 } catch (err: any) {
-  handleCloudinaryError('Failed to search assets', err);
+  handleCloudinaryError("Failed to search assets", err);
 }
 ```
 
-The handler:
-1. Extracts message from various error formats
-2. Shows VS Code error notification
-3. Offers "Open Global Config" action for credential errors
+The handler normalizes Cloudinary SDK errors and surfaces user-facing actions for common credential problems.

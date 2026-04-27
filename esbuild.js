@@ -26,6 +26,7 @@ async function main() {
       "src/webview/client/upload-widget.ts",
       "src/webview/client/welcome.ts",
       "src/webview/client/homescreen.ts",
+      "src/webview/client/library.ts",
     ],
     bundle: true,
     format: "iife",

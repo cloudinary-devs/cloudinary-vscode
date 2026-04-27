@@ -17,7 +17,9 @@ function fakeAdapter(overrides: Partial<CloudinarySdkAdapter> = {}): CloudinaryS
       if (flat.fetch_format) { parts.push(`f_${flat.fetch_format}`); }
       if (flat.quality) { parts.push(`q_${flat.quality}`); }
       const tail = parts.length ? `/${parts.join(',')}` : '';
-      return `https://res.cloudinary.com/demo/${opts.resource_type}/upload${tail}/${publicId}`;
+      const signature = opts.sign_url ? '/s--signed--' : '';
+      const format = opts.format ? `.${opts.format}` : '';
+      return `https://res.cloudinary.com/demo/${opts.resource_type}/${opts.type || 'upload'}${signature}${tail}/${publicId}${format}`;
     },
     ...overrides,
   };
@@ -131,6 +133,34 @@ suite('CloudinaryService.fetchChildren', () => {
     assert.strictEqual(page.assets[0].thumbnail_url, page.assets[0].optimized_url);
   });
 
+  test('authenticated asset uses signed original URL for preview fields', async () => {
+    const adapter = fakeAdapter({
+      search: async () => ({
+        resources: [
+          {
+            public_id: 'secure/sample',
+            resource_type: 'image',
+            type: 'authenticated',
+            format: 'jpg',
+            secure_url: 'https://res.cloudinary.com/demo/image/authenticated/secure/sample.jpg',
+          },
+        ],
+        next_cursor: null,
+      }),
+    });
+    const svc = new CloudinaryService(adapter);
+    svc.setCredentials({ cloudName: 'demo', apiKey: 'k', apiSecret: 's', dynamicFolders: true });
+    const page = await svc.fetchChildren('', { resourceTypeFilter: 'all', sortDirection: 'desc' });
+    const asset = page.assets[0];
+
+    assert.strictEqual(asset.type, 'authenticated');
+    assert.ok(asset.secure_url.includes('/authenticated/s--signed--/'), 'secure_url should be signed');
+    assert.strictEqual(asset.optimized_url, asset.secure_url);
+    assert.strictEqual(asset.thumbnail_url, asset.secure_url);
+    assert.ok(!asset.secure_url.includes('f_auto'), 'authenticated original URL should not add dynamic transformations');
+    assert.ok(asset.secure_url.endsWith('/secure/sample.jpg'));
+  });
+
   test('propagates nextCursor into the search call', async () => {
     let seenCursor: string | undefined;
     const adapter = fakeAdapter({
@@ -209,7 +239,7 @@ suite('CloudinaryService.prefetchRemaining', () => {
     assert.strictEqual(batches[0].hasMore, false, 'cap-terminated stream must report hasMore=false');
   });
 
-  test('empty filtered batch does not invoke onBatch and still terminates', async () => {
+  test('continues after empty filtered batch', async () => {
     let call = 0;
     const adapter = fakeAdapter({
       search: async () => {
@@ -224,7 +254,12 @@ suite('CloudinaryService.prefetchRemaining', () => {
             next_cursor: 'alive',
           };
         }
-        return { resources: [], next_cursor: null };
+        return {
+          resources: [
+            { public_id: 'root', resource_type: 'image', type: 'upload', secure_url: 'x' },
+          ],
+          next_cursor: null,
+        };
       },
     });
     const svc = new CloudinaryService(adapter);
@@ -236,7 +271,10 @@ suite('CloudinaryService.prefetchRemaining', () => {
       { resourceTypeFilter: 'all', sortDirection: 'desc' },
       (assets, hasMore) => batches.push({ count: assets.length, hasMore }),
     );
-    assert.strictEqual(batches.length, 0, 'no batches should be delivered when all resources filter out');
+    assert.strictEqual(call, 2);
+    assert.strictEqual(batches.length, 1);
+    assert.strictEqual(batches[0].count, 1);
+    assert.strictEqual(batches[0].hasMore, false);
   });
 });
 
@@ -263,5 +301,97 @@ suite('CloudinaryService.searchAssets', () => {
     await svc.prefetchSearchResults('foo', 'c2', { resourceTypeFilter: 'all', sortDirection: 'desc' }, (a) => batches.push(a));
     assert.strictEqual(batches.length, 1);
     assert.strictEqual(batches[0][0].public_id, 'foo2');
+  });
+
+  test('applies resourceTypeFilter to search results', async () => {
+    const adapter = fakeAdapter({
+      search: async () => ({
+        resources: [
+          { public_id: 'image-1', resource_type: 'image', type: 'upload', secure_url: 'x' },
+          { public_id: 'video-1', resource_type: 'video', type: 'upload', secure_url: 'x' },
+        ],
+        next_cursor: null,
+      }),
+    });
+    const svc = new CloudinaryService(adapter);
+    svc.setCredentials({ cloudName: 'demo', apiKey: 'k', apiSecret: 's', dynamicFolders: true });
+    const result = await svc.searchAssets('foo', { resourceTypeFilter: 'image', sortDirection: 'desc' });
+    assert.strictEqual(result.assets.length, 1);
+    assert.strictEqual(result.assets[0].public_id, 'image-1');
+  });
+
+  test('prefetchSearchResults continues after empty filtered batch', async () => {
+    let call = 0;
+    const adapter = fakeAdapter({
+      search: async () => {
+        call++;
+        if (call === 1) {
+          return {
+            resources: [
+              { public_id: 'video-1', resource_type: 'video', type: 'upload', secure_url: 'x' },
+            ],
+            next_cursor: 'c2',
+          };
+        }
+
+        return {
+          resources: [
+            { public_id: 'image-1', resource_type: 'image', type: 'upload', secure_url: 'x' },
+          ],
+          next_cursor: null,
+        };
+      },
+    });
+    const svc = new CloudinaryService(adapter);
+    svc.setCredentials({ cloudName: 'demo', apiKey: 'k', apiSecret: 's', dynamicFolders: true });
+    const batches: ClientAsset[][] = [];
+
+    await svc.prefetchSearchResults(
+      'foo',
+      'c1',
+      { resourceTypeFilter: 'image', sortDirection: 'desc' },
+      (assets) => batches.push(assets),
+    );
+
+    assert.strictEqual(call, 2);
+    assert.strictEqual(batches.length, 1);
+    assert.strictEqual(batches[0][0].public_id, 'image-1');
+  });
+});
+
+suite('CloudinaryService.uploadPresets', () => {
+  test('fetchUploadPresets stores result', async () => {
+    const adapter = fakeAdapter({
+      uploadPresets: async () => ({ presets: [
+        { name: 'preset1', unsigned: true, settings: { folder: 'x' } },
+        { name: 'preset2', unsigned: false },
+      ]}),
+    });
+    const svc = new CloudinaryService(adapter);
+    svc.setCredentials({ cloudName: 'demo', apiKey: 'k', apiSecret: 's' });
+    const presets = await svc.fetchUploadPresets();
+    assert.strictEqual(presets.length, 2);
+    assert.strictEqual(presets[0].signed, false);
+    assert.strictEqual(presets[1].signed, true);
+    assert.strictEqual(svc.uploadPresets.length, 2);
+  });
+
+  test('getCurrentUploadPreset returns configured preset when it exists', async () => {
+    const svc = new CloudinaryService(fakeAdapter());
+    svc.setCredentials({ cloudName: 'demo', apiKey: 'k', apiSecret: 's', uploadPreset: 'p1' });
+    svc.uploadPresets = [{ name: 'p1', signed: true }];
+    assert.strictEqual(svc.getCurrentUploadPreset(), 'p1');
+  });
+
+  test('getCurrentUploadPreset returns null when configured preset missing', async () => {
+    const svc = new CloudinaryService(fakeAdapter());
+    svc.setCredentials({ cloudName: 'demo', apiKey: 'k', apiSecret: 's', uploadPreset: 'ghost' });
+    svc.uploadPresets = [{ name: 'p1', signed: true }];
+    assert.strictEqual(svc.getCurrentUploadPreset(), null);
+  });
+
+  test('fetchUploadPresets throws when credentials missing', async () => {
+    const svc = new CloudinaryService(fakeAdapter());
+    await assert.rejects(svc.fetchUploadPresets(), /credentials/i);
   });
 });

@@ -85,9 +85,9 @@ npm test
 After making changes, verify:
 
 - [ ] Extension activates without errors
-- [ ] Tree view populates with folders/assets
+- [ ] Media library populates with folders/assets
 - [ ] Commands work from command palette
-- [ ] Context menus appear on correct items
+- [ ] Library context menu appears on asset and folder rows
 - [ ] Webviews display correctly in light and dark themes
 - [ ] Upload functionality works
 - [ ] Error messages are user-friendly
@@ -125,7 +125,7 @@ When debugging the extension:
 |---------|-------------|
 | `Developer: Reload Window` | Reload after code changes |
 | `Developer: Toggle Developer Tools` | Open browser dev tools for webviews |
-| `Cloudinary: Show Welcome` | Test the welcome screen |
+| `Cloudinary: Open Welcome Guide` | Test the welcome screen |
 | `Cloudinary: Upload` | Test the upload panel |
 
 ## Troubleshooting
@@ -136,7 +136,7 @@ When debugging the extension:
 2. Verify `main` in package.json points to `dist/extension.js`
 3. Run `npm run compile` to check for TypeScript errors
 
-### Tree View Empty
+### Media Library Empty
 
 1. Check credentials in config file
 2. Verify network connectivity
@@ -147,4 +147,3 @@ When debugging the extension:
 1. Open Developer Tools (`Help → Toggle Developer Tools`)
 2. Check Console tab for JavaScript errors
 3. Verify Content Security Policy allows your resources
-

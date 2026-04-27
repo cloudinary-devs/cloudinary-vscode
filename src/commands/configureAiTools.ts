@@ -171,7 +171,7 @@ function registerConfigureAiTools(context: vscode.ExtensionContext): void {
 
       if (createdFiles.length > 0) {
         const action = await vscode.window.showInformationMessage(
-          `✅ Configured AI tools: ${createdFiles.join(", ")}`,
+          `$(check) Configured AI tools: ${createdFiles.join(", ")}`,
           "Open File"
         );
         if (action === "Open File") {

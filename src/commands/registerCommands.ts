@@ -8,21 +8,24 @@ import registerSwitchEnv from "./switchEnvironment";
 import registerClearSearch from "./clearSearch";
 import registerWelcomeScreen from "./welcomeScreen";
 import registerConfigureAiTools from "./configureAiTools";
-import { CloudinaryTreeDataProvider } from "../tree/treeDataProvider";
+import { CloudinaryService } from "../cloudinary/cloudinaryService";
 import { HomescreenViewProvider } from "../webview/homescreenView";
+import { LibraryWebviewViewProvider } from "../webview/libraryView";
 
 /**
  * Registers all Cloudinary-related commands with the VS Code command registry.
  * @param context - The extension context.
- * @param provider - The Cloudinary tree data provider.
+ * @param cloudinaryService - The shared Cloudinary service.
  * @param statusBar - Status bar item to show current environment.
  * @param homescreenProvider - The homescreen webview view provider.
  */
 function registerAllCommands(
   context: vscode.ExtensionContext,
-  provider: CloudinaryTreeDataProvider,
+  cloudinaryService: CloudinaryService,
+  environmentTarget: Parameters<typeof registerSwitchEnv>[1],
   statusBar: vscode.StatusBarItem,
-  homescreenProvider: HomescreenViewProvider
+  homescreenProvider: HomescreenViewProvider,
+  libraryWebview?: LibraryWebviewViewProvider
 ) {
   context.subscriptions.push(
     vscode.commands.registerCommand("cloudinary.showHomescreen", () => {
@@ -38,24 +41,19 @@ function registerAllCommands(
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand("cloudinary.refresh", () =>
-      provider.refresh({
-        folderPath: '',
-        nextCursor: null,
-        searchQuery: null,
-        resourceTypeFilter: 'all'
-      })
-    )
+    vscode.commands.registerCommand("cloudinary.refresh", async () => {
+      await libraryWebview?.refresh();
+    })
   );
 
   registerSearch(context, homescreenProvider);
-  registerClearSearch(context, provider);
-  registerViewOptions(context, provider);
+  registerClearSearch(context, libraryWebview);
+  registerViewOptions(context, libraryWebview);
   registerPreview(context);
-  registerUpload(context, provider);
+  registerUpload(context, cloudinaryService);
   registerClipboard(context);
-  registerSwitchEnv(context, provider, statusBar);
-  registerWelcomeScreen(context, provider);
+  registerSwitchEnv(context, environmentTarget, statusBar);
+  registerWelcomeScreen(context, cloudinaryService);
   registerConfigureAiTools(context);
 }
 

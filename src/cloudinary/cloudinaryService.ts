@@ -21,7 +21,14 @@ export interface CloudinarySdkAdapter {
     withField?: string[];
   }): Promise<{ resources: any[]; next_cursor: string | null }>;
   uploadPresets(): Promise<{ presets: Array<{ name: string; unsigned: boolean; settings?: Record<string, unknown> }> }>;
-  urlFor(publicId: string, opts: { resource_type: string; type?: string; transformation?: unknown }): string;
+  urlFor(publicId: string, opts: {
+    resource_type: string;
+    type?: string;
+    transformation?: unknown;
+    sign_url?: boolean;
+    secure?: boolean;
+    format?: string;
+  }): string;
 }
 
 export interface Credentials {
@@ -130,9 +137,9 @@ export class CloudinaryService {
         return String(asset.resource_type).toLowerCase() === opts.resourceTypeFilter;
       });
       const assets = filtered.map((a: any) => this.toClientAsset(a));
-      if (assets.length === 0) { break; }
-      total += assets.length;
       cursor = result.next_cursor ?? null;
+      if (assets.length === 0) { continue; }
+      total += assets.length;
       onBatch(assets, !!cursor && total < cap);
     }
   }
@@ -142,8 +149,10 @@ export class CloudinaryService {
       expression: `${query}*`,
       sortBy: { field: 'created_at', direction: opts.sortDirection },
       maxResults: 500,
+      withField: ['tags', 'context', 'metadata'],
     });
-    const assets = (result.resources || []).map((a: any) => this.toClientAsset(a));
+    const assets = this.filterByResourceType(result.resources || [], opts.resourceTypeFilter)
+      .map((a: any) => this.toClientAsset(a));
     return { assets, nextCursor: result.next_cursor ?? null };
   }
 
@@ -162,42 +171,67 @@ export class CloudinaryService {
         sortBy: { field: 'created_at', direction: opts.sortDirection },
         maxResults: 500,
         nextCursor: cursor,
+        withField: ['tags', 'context', 'metadata'],
       });
-      const assets = (result.resources || []).map((a: any) => this.toClientAsset(a));
-      if (assets.length === 0) { break; }
-      total += assets.length;
+      const assets = this.filterByResourceType(result.resources || [], opts.resourceTypeFilter)
+        .map((a: any) => this.toClientAsset(a));
       cursor = result.next_cursor ?? null;
+      if (assets.length === 0) { continue; }
+      total += assets.length;
       onBatch(assets, !!cursor && total < cap);
     }
+  }
+
+  private filterByResourceType(resources: any[], filter: FetchChildrenOpts['resourceTypeFilter']): any[] {
+    return resources.filter((asset: any) => {
+      if (filter === 'all') {
+        return true;
+      }
+      return String(asset.resource_type).toLowerCase() === filter;
+    });
   }
 
   private toClientAsset(a: any): ClientAsset {
     // Coerce unexpected resource_type values to 'image'; mirrors prior tree-provider fallback.
     const resourceType = (a.resource_type === 'video' || a.resource_type === 'raw') ? a.resource_type : 'image';
-    const optimized = this.sdk.urlFor(a.public_id, {
+    const deliveryType = typeof a.type === 'string' ? a.type : undefined;
+    const isAuthenticated = deliveryType === 'authenticated';
+    const baseUrlOpts = {
       resource_type: resourceType,
-      type: a.type,
+      type: deliveryType,
+      secure: true,
+    };
+
+    const signedOriginal = isAuthenticated
+      ? this.sdk.urlFor(a.public_id, {
+          ...baseUrlOpts,
+          sign_url: true,
+          ...(resourceType !== 'raw' && a.format ? { format: String(a.format) } : {}),
+        })
+      : undefined;
+
+    const optimized = signedOriginal || this.sdk.urlFor(a.public_id, {
+      ...baseUrlOpts,
       transformation: resourceType === 'raw'
         ? undefined
         : [{ fetch_format: resourceType === 'video' ? 'auto:video' : 'auto' }, { quality: 'auto' }],
     });
-    const thumbnail = resourceType === 'raw'
+    const thumbnail = signedOriginal || (resourceType === 'raw'
       ? optimized
       : this.sdk.urlFor(a.public_id, {
-          resource_type: resourceType,
-          type: a.type,
+          ...baseUrlOpts,
           transformation: [{ width: 160, height: 160, crop: 'fill', fetch_format: 'auto', quality: 'auto' }],
-        });
+        }));
     return {
       public_id: a.public_id,
       display_name: a.display_name,
       resource_type: resourceType,
-      type: a.type,
+      type: deliveryType,
       format: a.format,
       bytes: a.bytes,
       width: a.width,
       height: a.height,
-      secure_url: a.secure_url,
+      secure_url: signedOriginal || a.secure_url,
       optimized_url: optimized,
       thumbnail_url: thumbnail,
       tags: a.tags,
@@ -205,5 +239,52 @@ export class CloudinaryService {
       metadata: a.metadata,
       created_at: a.created_at,
     };
+  }
+
+  async fetchUploadPresets(): Promise<UploadPreset[]> {
+    if (!this.cloudName || !this.apiKey || !this.apiSecret) {
+      throw new Error('Cloudinary credentials not configured');
+    }
+    const result = await this.sdk.uploadPresets();
+    this.uploadPresets = result.presets.map((p) => ({
+      name: p.name,
+      signed: p.unsigned === false,
+      settings: p.settings,
+    }));
+    return this.uploadPresets;
+  }
+
+  async listAllFolders(maxDepth = 4): Promise<Array<{ path: string; name: string }>> {
+    const all: Array<{ path: string; name: string }> = [];
+
+    const visitLevel = async (paths: string[], depth: number): Promise<void> => {
+      if (paths.length === 0 || depth > maxDepth) {
+        return;
+      }
+
+      const results = await Promise.all(
+        paths.map((p) => this.sdk.subFolders(p))
+      );
+
+      const next: string[] = [];
+      for (const result of results) {
+        for (const folder of result.folders || []) {
+          all.push({ path: folder.path, name: folder.name });
+          next.push(folder.path);
+        }
+      }
+
+      await visitLevel(next, depth + 1);
+    };
+
+    await visitLevel([''], 0);
+    return all.sort((a, b) => a.path.localeCompare(b.path));
+  }
+
+  getCurrentUploadPreset(): string | null {
+    if (this.uploadPreset && this.uploadPresets.some((p) => p.name === this.uploadPreset)) {
+      return this.uploadPreset;
+    }
+    return null;
   }
 }

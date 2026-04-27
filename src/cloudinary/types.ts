@@ -13,9 +13,9 @@ export interface ClientAsset {
   width?: number;
   height?: number;
   secure_url: string;
-  /** Pre-computed delivery URL with f_auto,q_auto. */
+  /** Pre-computed delivery URL with f_auto,q_auto. Authenticated assets use the signed original URL. */
   optimized_url: string;
-  /** Pre-computed thumbnail URL: c_fill,w_160,h_160,f_auto,q_auto. */
+  /** Pre-computed thumbnail URL. Authenticated assets use the signed original URL instead of dynamic transforms. */
   thumbnail_url: string;
   tags?: string[];
   context?: Record<string, unknown>;

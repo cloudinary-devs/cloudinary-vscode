@@ -8,10 +8,12 @@ import {
 } from "./config/configUtils";
 import detectFolderMode from "./config/detectFolderMode";
 import { registerAllCommands } from "./commands/registerCommands";
-import { CloudinaryTreeDataProvider } from "./tree/treeDataProvider";
+import { CloudinaryService, Credentials } from "./cloudinary/cloudinaryService";
+import { createCloudinarySdkAdapter } from "./cloudinary/cloudinarySdkAdapter";
 import { v2 as cloudinary } from "cloudinary";
 import { generateUserAgent } from "./utils/userAgent";
 import { HomescreenViewProvider } from "./webview/homescreenView";
+import { LibraryWebviewViewProvider } from "./webview/libraryView";
 import { resetUploadPanel } from "./commands/uploadWidget";
 import { resetAllPreviewPanels } from "./commands/previewAsset";
 
@@ -40,13 +42,29 @@ function getStatusBarTooltip(dynamicFolders: boolean): string {
  * @param context - Extension context provided by VS Code.
  */
 export async function activate(context: vscode.ExtensionContext) {
-  const cloudinaryProvider = new CloudinaryTreeDataProvider();
+  const cloudinaryService = new CloudinaryService(createCloudinarySdkAdapter());
 
   // Set initial view to homescreen
   vscode.commands.executeCommand("setContext", "cloudinary.activeView", "homescreen");
 
+  const libraryWebviewProvider = new LibraryWebviewViewProvider(
+    context.extensionUri,
+    cloudinaryService
+  );
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider(
+      LibraryWebviewViewProvider.viewType,
+      libraryWebviewProvider,
+      { webviewOptions: { retainContextWhenHidden: true } }
+    )
+  );
+
   // Register homescreen sidebar view
-  const homescreenProvider = new HomescreenViewProvider(context.extensionUri, cloudinaryProvider);
+  const homescreenProvider = new HomescreenViewProvider(
+    context.extensionUri,
+    cloudinaryService,
+    libraryWebviewProvider
+  );
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(
       HomescreenViewProvider.viewType,
@@ -55,14 +73,87 @@ export async function activate(context: vscode.ExtensionContext) {
     )
   );
 
-  // Refresh all open webviews when the active environment changes.
-  context.subscriptions.push(
-    cloudinaryProvider.onDidChangeEnvironment(() => {
-      homescreenProvider.refresh();
-      resetUploadPanel();
-      resetAllPreviewPanels();
-    })
-  );
+  const refreshEnvironmentViews = async (): Promise<void> => {
+    homescreenProvider.refresh();
+    resetUploadPanel();
+    resetAllPreviewPanels();
+    await libraryWebviewProvider.envChanged();
+  };
+
+  const updateCloudinaryConfig = (
+    cloudName: string,
+    apiKey: string,
+    apiSecret: string
+  ): void => {
+    (cloudinary.utils as any).userPlatform = generateUserAgent();
+    cloudinary.config({
+      cloud_name: cloudName,
+      api_key: apiKey,
+      api_secret: apiSecret,
+    });
+  };
+
+  const resolveDynamicFolders = async (
+    cloudName: string,
+    apiKey: string,
+    apiSecret: string
+  ): Promise<boolean> => {
+    const cacheKey = `cloudinary.dynamicFolders.${cloudName}`;
+    const cachedFolderMode = context.globalState.get(cacheKey) as boolean | undefined;
+
+    if (typeof cachedFolderMode === "boolean") {
+      return cachedFolderMode;
+    }
+
+    const dynamicFolders = await detectFolderMode(cloudName, apiKey, apiSecret);
+    await context.globalState.update(cacheKey, dynamicFolders);
+    return dynamicFolders;
+  };
+
+  const environmentTarget: Pick<
+    CloudinaryService,
+    "cloudName" | "apiKey" | "apiSecret" | "uploadPreset" | "dynamicFolders"
+  > & {
+    setCredentials: (creds: Credentials) => void;
+  } = {
+    get cloudName() {
+      return cloudinaryService.cloudName;
+    },
+    set cloudName(value: string | null) {
+      cloudinaryService.cloudName = value;
+    },
+    get apiKey() {
+      return cloudinaryService.apiKey;
+    },
+    set apiKey(value: string | null) {
+      cloudinaryService.apiKey = value;
+    },
+    get apiSecret() {
+      return cloudinaryService.apiSecret;
+    },
+    set apiSecret(value: string | null) {
+      cloudinaryService.apiSecret = value;
+    },
+    get uploadPreset() {
+      return cloudinaryService.uploadPreset;
+    },
+    set uploadPreset(value: string | null) {
+      cloudinaryService.uploadPreset = value;
+    },
+    get dynamicFolders() {
+      return cloudinaryService.dynamicFolders;
+    },
+    set dynamicFolders(value: boolean) {
+      cloudinaryService.dynamicFolders = value;
+    },
+    setCredentials(creds: Credentials) {
+      cloudinaryService.setCredentials(creds);
+      if (creds.cloudName && creds.apiKey && creds.apiSecret) {
+        updateCloudinaryConfig(creds.cloudName, creds.apiKey, creds.apiSecret);
+      }
+      void refreshEnvironmentViews();
+    },
+  };
 
   // Check if this is the first run of the extension
   const isFirstRun = context.globalState.get('cloudinary.firstRun', true);
@@ -82,7 +173,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
   if (!selectedEnv) {
     vscode.window.showErrorMessage(
-      "❌ No Cloudinary environment found in config."
+      "No Cloudinary environment found in config."
     );
     return;
   }
@@ -100,35 +191,31 @@ export async function activate(context: vscode.ExtensionContext) {
     statusBar.show();
     context.subscriptions.push(statusBar);
     
-    // Still register the tree view but don't make API calls
-    vscode.window.registerTreeDataProvider(
-      "cloudinaryMediaLibrary",
-      cloudinaryProvider
+    registerAllCommands(
+      context,
+      cloudinaryService,
+      environmentTarget,
+      statusBar,
+      homescreenProvider,
+      libraryWebviewProvider
     );
-    registerAllCommands(context, cloudinaryProvider, statusBar, homescreenProvider);
     return;
   }
 
-  cloudinaryProvider.cloudName = firstCloudName;
-  cloudinaryProvider.apiKey = selectedEnv.apiKey;
-  cloudinaryProvider.apiSecret = selectedEnv.apiSecret;
-  cloudinaryProvider.uploadPreset = selectedEnv.uploadPreset || null;
-
-  // Set user platform for analytics
-  (cloudinary.utils as any).userPlatform = generateUserAgent();
-
-  cloudinary.config({
-    cloud_name: firstCloudName,
-    api_key: selectedEnv.apiKey,
-    api_secret: selectedEnv.apiSecret,
+  cloudinaryService.setCredentials({
+    cloudName: firstCloudName,
+    apiKey: selectedEnv.apiKey,
+    apiSecret: selectedEnv.apiSecret,
+    uploadPreset: selectedEnv.uploadPreset || null,
   });
+  updateCloudinaryConfig(firstCloudName, selectedEnv.apiKey, selectedEnv.apiSecret);
 
   statusBar = vscode.window.createStatusBarItem(
     vscode.StatusBarAlignment.Right,
     500
   );
   // Status bar text will be updated after folder mode detection
-  statusBar.text = `$(cloud) ${cloudinaryProvider.cloudName}`;
+  statusBar.text = `$(cloud) ${cloudinaryService.cloudName}`;
   statusBar.tooltip = "Click to switch Cloudinary environment";
   statusBar.command = "cloudinary.switchEnvironment";
   statusBar.show();
@@ -148,12 +235,12 @@ export async function activate(context: vscode.ExtensionContext) {
     const cloudNames = Object.keys(updatedEnvs);
 
     if (cloudNames.length === 0) {
-      vscode.window.showErrorMessage("❌ No Cloudinary environments found in updated config.");
+      vscode.window.showErrorMessage("No Cloudinary environments found in updated config.");
       return;
     }
 
     // Try to keep the previously active cloud name
-    const preferredCloud = cloudinaryProvider.cloudName;
+    const preferredCloud = cloudinaryService.cloudName;
     const newCloudName = cloudNames.includes(preferredCloud || '')
       ? preferredCloud
       : cloudNames[0];
@@ -169,75 +256,51 @@ export async function activate(context: vscode.ExtensionContext) {
       return;
     }
 
-    cloudinaryProvider.cloudName = newCloudName;
-    cloudinaryProvider.apiKey = env.apiKey;
-    cloudinaryProvider.apiSecret = env.apiSecret;
-    cloudinaryProvider.uploadPreset = env.uploadPreset || null;
-
-    // Update user platform for analytics
-    (cloudinary.utils as any).userPlatform = generateUserAgent();
-
-    cloudinary.config({
-      cloud_name: newCloudName!,
-      api_key: env.apiKey,
-      api_secret: env.apiSecret,
+    const dynamicFolders = await resolveDynamicFolders(
+      newCloudName!,
+      env.apiKey,
+      env.apiSecret
+    );
+    cloudinaryService.setCredentials({
+      cloudName: newCloudName!,
+      apiKey: env.apiKey,
+      apiSecret: env.apiSecret,
+      uploadPreset: env.uploadPreset || null,
+      dynamicFolders,
     });
-
-    const cacheKey = `cloudinary.dynamicFolders.${newCloudName}`;
-    const cachedFolderMode = context.globalState.get(cacheKey) as boolean | undefined;
-
-    if (typeof cachedFolderMode === "boolean") {
-      cloudinaryProvider.dynamicFolders = cachedFolderMode;
-    } else {
-      cloudinaryProvider.dynamicFolders = await detectFolderMode(
-        newCloudName!,
-        env.apiKey,
-        env.apiSecret
-      );
-      context.globalState.update(cacheKey, cloudinaryProvider.dynamicFolders);
-    }
+    updateCloudinaryConfig(newCloudName!, env.apiKey, env.apiSecret);
 
     // Update status bar with folder mode indicator
-    statusBar.text = getStatusBarText(newCloudName!, cloudinaryProvider.dynamicFolders);
-    statusBar.tooltip = getStatusBarTooltip(cloudinaryProvider.dynamicFolders);
+    statusBar.text = getStatusBarText(newCloudName!, dynamicFolders);
+    statusBar.tooltip = getStatusBarTooltip(dynamicFolders);
     statusBar.command = "cloudinary.switchEnvironment";
 
-    cloudinaryProvider.refresh({
-      folderPath: '',
-      nextCursor: null,
-      searchQuery: null,
-      resourceTypeFilter: 'all'
-    });
-
-    cloudinaryProvider.notifyEnvironmentChange();
+    await refreshEnvironmentViews();
   });
 
   context.subscriptions.push(watcher);
 
   // Detect and cache folder mode
-  const cacheKey = `cloudinary.dynamicFolders.${cloudinaryProvider.cloudName}`;
-  const cachedFolderMode = context.globalState.get(cacheKey) as boolean | undefined;
-
-  if (typeof cachedFolderMode === "boolean") {
-    cloudinaryProvider.dynamicFolders = cachedFolderMode;
-  } else {
-    cloudinaryProvider.dynamicFolders = await detectFolderMode(
-      cloudinaryProvider.cloudName,
-      cloudinaryProvider.apiKey,
-      cloudinaryProvider.apiSecret
-    );
-    context.globalState.update(cacheKey, cloudinaryProvider.dynamicFolders);
-  }
+  cloudinaryService.dynamicFolders = await resolveDynamicFolders(
+    cloudinaryService.cloudName!,
+    cloudinaryService.apiKey!,
+    cloudinaryService.apiSecret!
+  );
 
   // Update status bar with folder mode indicator
-  statusBar.text = getStatusBarText(cloudinaryProvider.cloudName, cloudinaryProvider.dynamicFolders);
-  statusBar.tooltip = getStatusBarTooltip(cloudinaryProvider.dynamicFolders);
+  statusBar.text = getStatusBarText(cloudinaryService.cloudName!, cloudinaryService.dynamicFolders);
+  statusBar.tooltip = getStatusBarTooltip(cloudinaryService.dynamicFolders);
 
-  vscode.window.registerTreeDataProvider(
-    "cloudinaryMediaLibrary",
-    cloudinaryProvider
+  await refreshEnvironmentViews();
+
+  registerAllCommands(
+    context,
+    cloudinaryService,
+    environmentTarget,
+    statusBar,
+    homescreenProvider,
+    libraryWebviewProvider
   );
-  registerAllCommands(context, cloudinaryProvider, statusBar, homescreenProvider);
 }
 
 /**
