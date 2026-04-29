@@ -6,6 +6,7 @@ import {
   MCP_SERVERS,
   detectEditor,
   getMcpFilePath,
+  getMcpRootKey,
   fetchSkillList,
   fetchSkillContent,
   installForClaudeCode,
@@ -25,8 +26,7 @@ async function createMcpConfig(
   mcpFilePath: string,
   createdFiles: string[]
 ): Promise<void> {
-  const rootKey = editor === "vscode" ? "servers" : "mcpServers";
-  const configuredKeys = await readConfiguredMcpServerKeys(rootUri, mcpFilePath, rootKey);
+  const configuredKeys = await readConfiguredMcpServerKeys(rootUri, mcpFilePath, getMcpRootKey(editor));
 
   const selected = await vscode.window.showQuickPick(
     MCP_SERVERS.map((s) => ({
@@ -85,13 +85,13 @@ function registerConfigureAiTools(context: vscode.ExtensionContext): void {
         const editor = detectEditor();
         const ideOptions: vscode.QuickPickItem[] = [
           { label: "Claude Code", description: "Install to .claude/skills/" },
-          { label: "Cursor",      description: "Install to .cursor/rules/" },
+          { label: "Cursor", description: "Install to .cursor/rules/" },
           { label: "VS Code (Copilot)", description: "Append to .github/copilot-instructions.md" },
         ];
         const defaultLabel =
           editor === "cursor" ? "Cursor" :
-          editor === "vscode" ? "VS Code (Copilot)" :
-          "Claude Code";
+            editor === "vscode" ? "VS Code (Copilot)" :
+              "Claude Code";
 
         const qp = vscode.window.createQuickPick();
         qp.items = ideOptions;
@@ -171,7 +171,7 @@ function registerConfigureAiTools(context: vscode.ExtensionContext): void {
 
       if (createdFiles.length > 0) {
         const action = await vscode.window.showInformationMessage(
-          `✅ Configured AI tools: ${createdFiles.join(", ")}`,
+          `$(check) Configured AI tools: ${createdFiles.join(", ")}`,
           "Open File"
         );
         if (action === "Open File") {

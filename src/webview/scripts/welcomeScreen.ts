@@ -16,8 +16,8 @@ export function getWelcomeScreenScript(): string {
       vscode.postMessage({ command: 'openExternal', data: url });
     }
 
-    function focusTreeView() {
-      vscode.postMessage({ command: 'focusTreeView' });
+    function focusDashboard() {
+      vscode.postMessage({ command: 'focusDashboard' });
     }
 
     function getConfigExample() {

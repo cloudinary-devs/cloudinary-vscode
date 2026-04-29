@@ -125,6 +125,24 @@ export const actionIcons = {
       `<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>`,
       size
     ),
+
+  lock: (size: IconSize = "md") =>
+    wrapSvg(
+      `<path d="M17 10h-1V7c0-2.21-1.79-4-4-4S8 4.79 8 7v3H7c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2v-8c0-1.1-.9-2-2-2zm-7-3c0-1.1.9-2 2-2s2 .9 2 2v3h-4V7zm7 13H7v-8h10v8z"/>`,
+      size
+    ),
+
+  home: (size: IconSize = "md") =>
+    wrapSvg(
+      `<path d="M12 3L2 12h3v8h6v-6h2v6h6v-8h3L12 3z"/>`,
+      size
+    ),
+
+  tune: (size: IconSize = "md") =>
+    wrapSvg(
+      `<path d="M4 6h8v2H4V6zm10 0h6v2h-6V6zm-4 5h10v2H10v-2zM4 11h4v2H4v-2zm12 5h4v2h-4v-2zM4 16h10v2H4v-2z"/><circle cx="13" cy="7" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="15" cy="17" r="2"/>`,
+      size
+    ),
 };
 
 /**

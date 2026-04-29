@@ -4,16 +4,20 @@
  */
 
 import * as vscode from "vscode";
-import { CloudinaryTreeDataProvider } from "../tree/treeDataProvider";
+import { CloudinaryService } from "../cloudinary/cloudinaryService";
 import { createWebviewDocument, getScriptUri, getStyleUri } from "./webviewUtils";
+import type { LibraryWebviewViewProvider } from "./libraryView";
 import { loadEnvironments } from "../config/configUtils";
 import skillsConfig from "../utils/skills-config.json";
+import { actionIcons } from "./icons";
 import {
   PlatformEntry,
   Scope,
   SkillInfo,
   MCP_SERVERS,
   detectEditor,
+  getMcpRootKey,
+  getEditorDisplayName,
   getMcpFilePath,
   fetchSkillList,
   fetchSkillContent,
@@ -31,8 +35,9 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
-    private readonly _provider: CloudinaryTreeDataProvider
-  ) {}
+    private readonly _service: CloudinaryService,
+    private readonly _libraryWebview?: LibraryWebviewViewProvider
+  ) { }
 
   private _webviewView: vscode.WebviewView | undefined;
   private _cachedSkills: SkillInfo[] | undefined;
@@ -52,7 +57,10 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
 
     webviewView.webview.options = {
       enableScripts: true,
-      localResourceRoots: [vscode.Uri.joinPath(this._extensionUri, "media")],
+      localResourceRoots: [
+        vscode.Uri.joinPath(this._extensionUri, "media"),
+        vscode.Uri.joinPath(this._extensionUri, "resources"),
+      ],
     };
 
     const scriptUri = getScriptUri(
@@ -65,12 +73,15 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
       this._extensionUri,
       "homescreen.css"
     );
+    const logoUri = webviewView.webview.asWebviewUri(
+      vscode.Uri.joinPath(this._extensionUri, "resources", "cloudinary_icon_blue.png")
+    );
 
     webviewView.webview.html = createWebviewDocument({
       title: "Cloudinary",
       webview: webviewView.webview,
       extensionUri: this._extensionUri,
-      bodyContent: this._getBodyContent(),
+      bodyContent: this._getBodyContent(logoUri),
       additionalStyles: [homescreenCssUri],
       additionalScripts: [scriptUri],
     });
@@ -102,12 +113,13 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
             break;
           case "searchAssets":
             if (message.data?.trim()) {
-              this._provider.refresh({ searchQuery: message.data.trim() });
+              const query = message.data.trim();
+              await this._libraryWebview?.setSearch(query);
               vscode.commands.executeCommand("cloudinary.showLibrary");
             }
             break;
           case "clearSearch":
-            this._provider.refresh({ searchQuery: null });
+            await this._libraryWebview?.setSearch(null);
             break;
           case "switchEnvironment":
             vscode.commands.executeCommand("cloudinary.switchEnvironment");
@@ -152,8 +164,20 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
     vscode.commands.executeCommand("workbench.view.extension.cloudinary");
     // Post focusSearch after the view has had time to become visible
     setTimeout(() => {
-      this._webviewView?.webview.postMessage({ command: "focusSearch" });
+      this._safePost({ command: "focusSearch" });
     }, 250);
+  }
+
+  private _safePost(message: unknown): void {
+    const targetView = this._webviewView;
+    if (!targetView) {
+      return;
+    }
+    try {
+      targetView.webview.postMessage(message);
+    } catch {
+      // Webview disposed between checks; safe to drop.
+    }
   }
 
   async refresh(): Promise<void> {
@@ -164,9 +188,9 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
     const view = this._webviewView;
     if (!view) { return; }
 
-    const hasConfig = !!(this._provider.cloudName && this._provider.apiKey);
-    const cloudName = this._provider.cloudName || "";
-    const folderMode = this._provider.dynamicFolders ? "Dynamic folders" : "Fixed folders";
+    const hasConfig = !!(this._service.cloudName && this._service.apiKey);
+    const cloudName = this._service.cloudName || "";
+    const folderMode = this._service.dynamicFolders ? "Dynamic folders" : "Fixed folders";
 
     let envCount = hasConfig ? 1 : 0;
     try {
@@ -174,19 +198,19 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
       envCount = Object.keys(envs).length;
     } catch { /* use default */ }
 
-    view.webview.postMessage({ command: "homescreenData", hasConfig, cloudName, folderMode, envCount });
+    this._safePost({ command: "homescreenData", hasConfig, cloudName, folderMode, envCount });
   }
 
-  private _getBodyContent(): string {
+  private _getBodyContent(logoUri: vscode.Uri): string {
     return `
 
       <div class="hs-root">
         <div class="hs-header">
           <div class="hs-brand">
             <div class="hs-brand-left">
-              <svg class="hs-brand-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                <path d="M19.5 9.5a6.5 6.5 0 0 0-12.47-2A5 5 0 0 0 7 17.5h12a4.5 4.5 0 0 0 .5-8.97z" fill="rgba(255,255,255,0.9)" stroke="rgba(255,255,255,0.2)" stroke-width="0.5"/>
-              </svg>
+              <span class="hs-brand-logo-wrap" aria-hidden="true">
+                <img class="hs-brand-logo" src="${logoUri}" alt="" />
+              </span>
               <span class="hs-brand-name">Cloudinary</span>
             </div>
             <span class="hs-status-pill">
@@ -206,7 +230,7 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
         </div>
 
         <div id="hs-setup-banner" class="hs-setup-banner hidden">
-          <span class="hs-setup-banner-icon">⚠</span>
+          <span class="hs-setup-banner-icon" aria-hidden="true">${actionIcons.warning("sm")}</span>
           <span class="hs-setup-banner-text">Add your API credentials to connect</span>
           <button id="hs-btn-configure" class="hs-setup-banner-btn" data-command="openGlobalConfig">Configure</button>
         </div>
@@ -353,7 +377,7 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
 
     const workspaceFolders = vscode.workspace.workspaceFolders;
     if (!workspaceFolders || workspaceFolders.length === 0) {
-      view.webview.postMessage({ command: "aiToolsData", error: "Please open a workspace folder first." });
+      this._safePost({ command: "aiToolsData", error: "Please open a workspace folder first." });
       return;
     }
     const rootUri = workspaceFolders[0].uri;
@@ -366,27 +390,25 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
 
       const platform = getPlatformEntry(this._currentPlatform);
       if (!platform) {
-        view.webview.postMessage({ command: "aiToolsData", error: `Unknown platform: ${this._currentPlatform}` });
+        this._safePost({ command: "aiToolsData", error: `Unknown platform: ${this._currentPlatform}` });
         return;
       }
-
-      const { project, global: globalSet } = await readInstalledSkillDirNames(rootUri, platform, skills);
-      const inScope = this._currentScope === "project" ? project   : globalSet;
-      const inOther = this._currentScope === "project" ? globalSet : project;
 
       const covers = getPlatformCovers(platform, this._currentScope);
 
       const editor = detectEditor();
       const mcpFilePath = getMcpFilePath(editor);
-      const rootKey = editor === "vscode" ? "servers" : "mcpServers";
-      const configuredMcpSet = await readConfiguredMcpServerKeys(rootUri, mcpFilePath, rootKey);
 
-      const editorLabels: Record<string, string> = {
-        vscode: "VS Code", cursor: "Cursor", windsurf: "Windsurf", antigravity: "Antigravity",
-      };
-      const mcpEditorLabel = editorLabels[editor];
+      const [{ project, global: globalSet }, configuredMcpSet] = await Promise.all([
+        readInstalledSkillDirNames(rootUri, platform, skills),
+        readConfiguredMcpServerKeys(rootUri, mcpFilePath, getMcpRootKey(editor)),
+      ]);
+      const inScope = this._currentScope === "project" ? project : globalSet;
+      const inOther = this._currentScope === "project" ? globalSet : project;
 
-      view.webview.postMessage({
+      const mcpEditorLabel = getEditorDisplayName(editor);
+
+      this._safePost({
         command: "aiToolsData",
         platform: this._currentPlatform,
         scope: this._currentScope,
@@ -409,7 +431,7 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
         mcpEditorLabel,
       });
     } catch (err: any) {
-      view.webview.postMessage({ command: "aiToolsData", error: err.message ?? String(err) });
+      this._safePost({ command: "aiToolsData", error: err.message ?? String(err) });
     }
   }
 
@@ -424,7 +446,7 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
 
     const workspaceFolders = vscode.workspace.workspaceFolders;
     if (!workspaceFolders || workspaceFolders.length === 0) {
-      view.webview.postMessage({ command: "aiToolsResult", errors: ["No workspace folder open."] });
+      this._safePost({ command: "aiToolsResult", errors: ["No workspace folder open."] });
       return;
     }
     const rootUri = workspaceFolders[0].uri;
@@ -433,7 +455,7 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
     const platform = getPlatformEntry(platformId);
 
     if (!platform) {
-      view.webview.postMessage({ command: "aiToolsResult", errors: [`Unknown platform: ${platformId}`] });
+      this._safePost({ command: "aiToolsResult", errors: [`Unknown platform: ${platformId}`] });
       return;
     }
 
@@ -446,7 +468,7 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
         content = await fetchSkillContent(dirName);
       } catch (err: any) {
         errors.push(`${dirName}: ${err.message}`);
-        view.webview.postMessage({ command: "aiToolsProgress", item: dirName, status: "error" });
+        this._safePost({ command: "aiToolsProgress", item: dirName, status: "error" });
         continue;
       }
 
@@ -457,7 +479,7 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
       } catch (err: any) {
         errors.push(`${dirName}: ${err.message}`);
       }
-      view.webview.postMessage({
+      this._safePost({
         command: "aiToolsProgress",
         item: dirName,
         status: errors.length > errsBefore ? "error" : "done",
@@ -470,18 +492,16 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
       try {
         await installMcpServers(rootUri, editor, mcpServers, createdFiles);
         for (const key of mcpServers) {
-          view.webview.postMessage({ command: "aiToolsProgress", item: key, status: "done" });
+          this._safePost({ command: "aiToolsProgress", item: key, status: "done" });
         }
       } catch (err: any) {
         errors.push(`MCP: ${err.message}`);
         for (const key of mcpServers) {
-          view.webview.postMessage({ command: "aiToolsProgress", item: key, status: "error" });
+          this._safePost({ command: "aiToolsProgress", item: key, status: "error" });
         }
       }
     }
 
-    this._cachedSkills = undefined;
-    view.webview.postMessage({ command: "aiToolsResult", errors });
+    this._safePost({ command: "aiToolsResult", errors });
   }
 }
-

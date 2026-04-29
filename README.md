@@ -8,7 +8,7 @@ Easily explore, search, preview, and upload Cloudinary assets directly inside Vi
 
 ## Features
 
-- **Asset Explorer** – View Cloudinary folders and assets in a VS Code Tree View
+- **Asset Explorer** – View Cloudinary folders and assets in the sidebar media library
 - **Search & Filter** – Quickly locate assets by public ID or type
 - **Optimized Preview** – Preview images/videos with Cloudinary transformations applied (`f_auto`, `q_auto`)
 - **Right-click Actions** – Copy Public ID or URL instantly
@@ -75,7 +75,7 @@ Once a valid configuration has been added, the active environment will be shown 
 
 ### Upload
 
-- Click **Upload** from the title bar to open the upload panel, or click **Upload here** on a folder entry to open with that folder pre-selected.
+- Click **Upload** from the library toolbar to open the upload panel, or click **Upload here** on a folder entry to open with that folder pre-selected.
 - Alternatively, run `Cloudinary: Upload` from the command palette.
 
 **Upload Panel Features:**
@@ -94,8 +94,8 @@ Once a valid configuration has been added, the active environment will be shown 
 ![Uploading assets](https://res.cloudinary.com/demo/video/upload/w_1200/f_auto:animated/q_auto/e_accelerate:100/e_loop/docs/vscode-extension-vid3)
 
 ### Filter or Search
-- Click "Filter" in the title bar or run `Cloudinary: Filter` to narrow assets by type
-- Click "Search" in the title bar or run `Cloudinary: Search` to search by public ID
+- Use the always-visible filter controls in the media library to narrow assets by type or change sort order.
+- Use the always-visible search field in the media library to search by public ID.
 
 ![Filtering and searching](https://res.cloudinary.com/demo/video/upload/w_1200/f_auto:animated/q_auto/e_accelerate:50/e_loop/docs/vscode-extension-vid2)
 
@@ -113,16 +113,17 @@ Once a valid configuration has been added, the active environment will be shown 
 - **Metadata** – View tags, context metadata, and structured metadata
 - **URLs** – Copy original or optimized URLs with one click
 - **Type Icons** – Tab icons indicate asset type (image, video, or file)
+- **Authenticated Assets** – Authenticated delivery assets are marked with a lock and use a signed original URL for preview/copy actions
 
-### Refresh Tree
-- Click "Refresh" to reload the tree
+### Refresh Library
+- Click **Refresh** to reload the media library
 
 ---
 
 ## Known Limitations
 - Asset filtering is limited to basic types (image, video, raw)
-- No options to control number of items returned in tree or root folder
-- Folder dropdown in upload panel only shows folders that have been browsed in the tree view
+- No user-facing option to control library page size or prefetch cap
+- Folder dropdown discovery is capped to a bounded folder depth for responsiveness
 
 ---
 

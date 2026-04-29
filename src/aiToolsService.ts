@@ -58,22 +58,37 @@ export function detectEditor(): EditorType {
 
 export function getMcpFilePath(editor: EditorType): string {
   switch (editor) {
-    case "cursor":      return ".cursor/mcp.json";
-    case "windsurf":    return ".windsurf/mcp.json";
+    case "cursor": return ".cursor/mcp.json";
+    case "windsurf": return ".windsurf/mcp.json";
     case "antigravity": return ".agent/mcp_config.json";
     case "vscode":
-    default:            return ".vscode/mcp.json";
+    default: return ".vscode/mcp.json";
   }
+}
+
+export function getMcpRootKey(editor: EditorType): "servers" | "mcpServers" {
+  return editor === "vscode" ? "servers" : "mcpServers";
+}
+
+export function getEditorDisplayName(editor: EditorType): string | undefined {
+  const names: Partial<Record<EditorType, string>> = {
+    vscode: "VS Code", cursor: "Cursor", windsurf: "Windsurf", antigravity: "Antigravity",
+  };
+  return names[editor];
+}
+
+function stripTilde(dir: string): string {
+  return dir.replace(/^~\/?/, "");
 }
 
 export function detectEditorPlatform(): string {
   const editor = detectEditor();
   switch (editor) {
-    case "cursor":      return "cursor";
-    case "windsurf":    return "windsurf";
+    case "cursor": return "cursor";
+    case "windsurf": return "windsurf";
     case "antigravity": return "antigravity";
     case "vscode":
-    default:            return "github-copilot";
+    default: return "github-copilot";
   }
 }
 
@@ -408,7 +423,7 @@ export async function installSkill(
 ): Promise<void> {
   const base = scope === "global" ? os.homedir() : rootUri.fsPath;
   const rawDir = scope === "global" ? platform.globalSkillsDir : platform.skillsDir;
-  const dir = scope === "global" ? rawDir.replace(/^~\/?/, "") : rawDir;
+  const dir = scope === "global" ? stripTilde(rawDir) : rawDir;
 
   // Write SKILL.md (silent overwrite — matches `npx skills add -y` behaviour)
   const skillPath = path.join(dir, dirName, "SKILL.md");
@@ -466,7 +481,7 @@ export async function readInstalledSkillDirNames(
   }
 
   const projectDir = platform.skillsDir;
-  const globalDir = platform.globalSkillsDir.replace(/^~\/?/, "");
+  const globalDir = stripTilde(platform.globalSkillsDir);
 
   const [project, global] = await Promise.all([
     checkScope(projectBase, projectDir),
@@ -546,8 +561,7 @@ export async function installMcpServers(
   createdFiles: string[]
 ): Promise<void> {
   const mcpFilePath = getMcpFilePath(editor);
-  const isVscode = editor === "vscode";
-  const rootKey = isVscode ? "servers" : "mcpServers";
+  const rootKey = getMcpRootKey(editor);
   const mcpUri = vscode.Uri.joinPath(rootUri, mcpFilePath);
   let config: Record<string, unknown> = {};
   try {

@@ -12,6 +12,7 @@ import {
 
 interface UploadPreset {
   name: string;
+  signed?: boolean;
   settings?: Record<string, unknown>;
 }
 
@@ -24,6 +25,7 @@ interface AssetData {
   public_id: string;
   secure_url: string;
   resource_type: string;
+  type?: string;
   _uploadedToFolder?: string;
 }
 
@@ -35,6 +37,7 @@ interface UploadMessage {
   error?: string;
   folderPath?: string;
   folders?: Array<{ path: string; label: string }>;
+  presets?: UploadPreset[];
 }
 
 // Configuration
@@ -365,6 +368,10 @@ function getThumbnailUrl(asset: AssetData): string | null {
   const publicId = asset.public_id;
   const resourceType = asset.resource_type;
 
+  if (asset.type === "authenticated") {
+    return resourceType === "image" ? asset.secure_url : null;
+  }
+
   if (resourceType === "image") {
     return `https://res.cloudinary.com/${cloudName}/image/upload/w_130,h_100,c_fill,g_auto,f_auto,q_auto/${publicId}`;
   } else if (resourceType === "video") {
@@ -521,6 +528,23 @@ function handleUploadMessage(message: UploadMessage): void {
                 `<option value="${f.path}" ${f.path === currentValue ? "selected" : ""}>${f.label}</option>`
             )
             .join("");
+        }
+      }
+      break;
+
+    case "updatePresets":
+      if (Array.isArray(message.presets)) {
+        presets = message.presets;
+        const presetSelect = document.getElementById("presetSelect") as HTMLSelectElement | null;
+        if (presetSelect) {
+          const currentValue = presetSelect.value;
+          presetSelect.innerHTML = presets
+            .map(
+              (p) =>
+                `<option value="${p.name}" ${p.name === currentValue ? "selected" : ""}>${p.name} (${p.signed ? "Signed" : "Unsigned"})</option>`
+            )
+            .join("");
+          presetSelect.dispatchEvent(new Event("change"));
         }
       }
       break;

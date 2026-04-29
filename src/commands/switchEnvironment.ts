@@ -1,8 +1,8 @@
 import * as vscode from "vscode";
 import { v2 as cloudinary } from "cloudinary";
+import { CloudinaryService, Credentials } from "../cloudinary/cloudinaryService";
 import { loadEnvironments, getGlobalConfigPath } from "../config/configUtils";
 import detectFolderMode from "../config/detectFolderMode";
-import { CloudinaryTreeDataProvider } from "../tree/treeDataProvider";
 import { generateUserAgent } from "../utils/userAgent";
 
 interface CloudinaryEnvironment {
@@ -11,15 +11,49 @@ interface CloudinaryEnvironment {
   uploadPreset?: string;  // Optional: Default upload preset
 }
 
+type EnvironmentTarget = Pick<
+  CloudinaryService,
+  "cloudName" | "apiKey" | "apiSecret" | "uploadPreset" | "dynamicFolders"
+> & {
+  setCredentials?: (creds: Credentials) => void;
+};
+
+function updateEnvironmentTarget(
+  target: EnvironmentTarget,
+  credentials: Credentials
+) {
+  if (typeof target.setCredentials === "function") {
+    target.setCredentials(credentials);
+    return;
+  }
+
+  target.cloudName = credentials.cloudName;
+  target.apiKey = credentials.apiKey;
+  target.apiSecret = credentials.apiSecret;
+  target.uploadPreset = credentials.uploadPreset ?? null;
+  target.dynamicFolders = credentials.dynamicFolders ?? false;
+}
+
+function getStatusBarText(cloudName: string, dynamicFolders: boolean): string {
+  const folderMode = dynamicFolders ? "Dynamic" : "Fixed";
+  return `$(cloud) ${cloudName} $(folder) ${folderMode}`;
+}
+
+function getStatusBarTooltip(dynamicFolders: boolean): string {
+  return dynamicFolders
+    ? "Click to switch Cloudinary environment\n\nDynamic Folders: Assets can be organized independently of their public ID"
+    : "Click to switch Cloudinary environment\n\nFixed Folders: Asset folder is determined by public ID path";
+}
+
 /**
  * Registers commands for switching Cloudinary environments and editing global config.
  * @param context - Extension context (includes global state).
- * @param provider - Cloudinary data provider to update credentials.
+ * @param target - Cloudinary environment target to update credentials on.
  * @param statusBar - VS Code status bar item to reflect environment change.
  */
 function registerSwitchEnv(
   context: vscode.ExtensionContext,
-  provider: CloudinaryTreeDataProvider,
+  target: EnvironmentTarget,
   statusBar: vscode.StatusBarItem
 ) {
   context.subscriptions.push(
@@ -30,7 +64,7 @@ function registerSwitchEnv(
         const cloudNames = Object.keys(environments);
 
         if (cloudNames.length === 0) {
-          vscode.window.showErrorMessage("❌ No Cloudinary environments found in config.");
+          vscode.window.showErrorMessage("No Cloudinary environments found in config.");
           return;
         }
 
@@ -40,25 +74,28 @@ function registerSwitchEnv(
 
         if (selected) {
           const env = environments[selected];
-
-          provider.cloudName = selected;
-          provider.apiKey = env.apiKey;
-          provider.apiSecret = env.apiSecret;
-          provider.uploadPreset = env.uploadPreset || null;
-
           const cacheKey = `cloudinary.dynamicFolders.${selected}`;
           const cachedFolderMode = context.globalState.get(cacheKey) as boolean | undefined;
+          let dynamicFolders: boolean;
 
           if (typeof cachedFolderMode === "boolean") {
-            provider.dynamicFolders = cachedFolderMode;
+            dynamicFolders = cachedFolderMode;
           } else {
-            provider.dynamicFolders = await detectFolderMode(
+            dynamicFolders = await detectFolderMode(
               selected,
               env.apiKey,
               env.apiSecret
             );
-            context.globalState.update(cacheKey, provider.dynamicFolders);
+            await context.globalState.update(cacheKey, dynamicFolders);
           }
+
+          updateEnvironmentTarget(target, {
+            cloudName: selected,
+            apiKey: env.apiKey,
+            apiSecret: env.apiSecret,
+            uploadPreset: env.uploadPreset || null,
+            dynamicFolders,
+          });
 
           (cloudinary.utils as any).userPlatform = generateUserAgent();
 
@@ -68,24 +105,11 @@ function registerSwitchEnv(
             api_secret: env.apiSecret,
           });
 
-          // Update status bar with folder mode indicator
-          const folderMode = provider.dynamicFolders ? "Dynamic" : "Fixed";
-          statusBar.text = `$(cloud) ${selected} $(folder) ${folderMode}`;
-          statusBar.tooltip = provider.dynamicFolders
-            ? "Click to switch Cloudinary environment\n\nDynamic Folders: Assets can be organized independently of their public ID"
-            : "Click to switch Cloudinary environment\n\nFixed Folders: Asset folder is determined by public ID path";
-
-          provider.refresh({
-            folderPath: '',
-            nextCursor: null,
-            searchQuery: null,
-            resourceTypeFilter: 'all'
-          });
-
-          provider.notifyEnvironmentChange();
+          statusBar.text = getStatusBarText(selected, dynamicFolders);
+          statusBar.tooltip = getStatusBarTooltip(dynamicFolders);
 
           vscode.window.showInformationMessage(
-            `🔄 Switched to ${selected} environment.`
+            `$(cloud) Switched to ${selected} environment.`
           );
         }
       }

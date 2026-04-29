@@ -1,23 +1,34 @@
 # Webview System
 
-The extension uses a modular design system for building webview UIs. CSS and JavaScript are loaded from external files, providing better maintainability and debugging.
+The extension uses a modular design system for building webview UIs. CSS is loaded from `media/styles/`, and browser-side TypeScript entry points are bundled into `media/scripts/` by `esbuild.js`.
 
 ## Architecture
 
 ```
 src/webview/
-├── media/                      # External files loaded at runtime
-│   ├── styles/
-│   │   ├── tokens.css          # Design tokens (CSS custom properties)
-│   │   ├── base.css            # Reset, typography, utilities
-│   │   └── components.css      # Component styles
-│   └── scripts/
-│       ├── common.js           # Shared utilities (tabs, copy, collapsibles)
-│       ├── upload-widget.js    # Upload-specific functionality
-│       └── welcome.js          # Welcome screen functionality
+├── client/                     # Browser-side TypeScript entry points
+│   ├── common.ts               # Shared webview utilities
+│   ├── homescreen.ts           # Homescreen sidebar client
+│   ├── library.ts              # Media library sidebar client
+│   ├── preview.ts              # Asset preview client
+│   ├── upload-widget.ts        # Upload panel client
+│   └── welcome.ts              # Welcome panel client
 ├── webviewUtils.ts             # HTML generation and CSP helpers
-├── icons.ts                    # Centralized SVG icons
+├── icons.ts                    # Centralized host-side SVG icons
 └── utils/helpers.ts            # Shared utilities (escapeHtml, etc.)
+
+media/
+├── styles/                     # CSS loaded by webviews
+│   ├── tokens.css              # Design tokens (CSS custom properties)
+│   ├── base.css                # Reset, typography, utilities
+│   ├── components.css          # Component styles
+│   └── library.css             # Library-specific styling
+└── scripts/                    # Built browser bundles from src/webview/client/
+    ├── homescreen.js
+    ├── library.js
+    ├── preview.js
+    ├── upload-widget.js
+    └── welcome.js
 ```
 
 ## Creating a Webview
@@ -37,12 +48,12 @@ function openMyPanel(context: vscode.ExtensionContext) {
     {
       enableScripts: true,
       localResourceRoots: [
-        vscode.Uri.joinPath(context.extensionUri, "src", "webview", "media"),
+        vscode.Uri.joinPath(context.extensionUri, "media"),
       ],
     }
   );
 
-  // Optional: Add custom script
+  // Optional: add a bundled client entry from media/scripts/.
   const myScriptUri = getScriptUri(panel.webview, context.extensionUri, "my-script.js");
 
   panel.webview.html = createWebviewDocument({
@@ -52,7 +63,6 @@ function openMyPanel(context: vscode.ExtensionContext) {
     bodyContent: getMyContent(),
     bodyClass: "layout-centered",  // Optional
     additionalScripts: [myScriptUri],  // Optional
-    inlineScript: "initCommon(); initMyPanel();",  // Required
   });
 
   // Handle messages from webview
@@ -64,10 +74,11 @@ function openMyPanel(context: vscode.ExtensionContext) {
 
 ### Key Points
 
-1. **Always call `initCommon()`** in the inline script - this initializes tabs, copy buttons, and collapsibles
-2. **Use `escapeHtml()`** for any dynamic content
-3. **Import icons** from the centralized module
-4. **Specify `localResourceRoots`** to allow loading external files
+1. **Bundle client behavior from `src/webview/client/`** and add the entry point to `esbuild.js`
+2. **Call `initCommon()` from the client entry** when you need tabs, copy buttons, collapsibles, or lightbox behavior
+3. **Use `escapeHtml()`** for any dynamic content
+4. **Import icons** from the centralized module
+5. **Specify `localResourceRoots`** to allow loading external files
 
 ## CSS Architecture
 
@@ -122,27 +133,20 @@ Styles for all UI components:
 | Drop Zone | `.drop-zone`, `.drop-zone--active` |
 | Lightbox | `.lightbox`, `.lightbox__content` |
 
-## JavaScript Architecture
+## Client Script Architecture
 
-### Common Script (`common.js`)
+### Common Client Module (`src/webview/client/common.ts`)
 
-Shared functionality loaded by all webviews:
+Shared functionality imported by webview client entries:
 
-```javascript
-// Initialize all common functionality
-function initCommon() {
-  initVSCode();      // acquireVsCodeApi()
-  initTabs();        // Tab switching
-  initCopyButtons(); // Copy to clipboard
-  initCollapsibles();// Expandable sections
-  initLightbox();    // Image lightbox
-}
+```typescript
+import { initCommon, getVSCode } from "./common";
 
-// Utility functions
-function copyToClipboard(text) { ... }
-function formatFileSize(bytes) { ... }
-function truncateString(str, maxLength) { ... }
+initCommon();
+const vscode = getVSCode();
 ```
+
+`initCommon()` initializes the VS Code API bridge plus shared tabs, copy buttons, collapsibles, and lightbox behavior. The module also exports helpers such as `copyToClipboard(...)`, `formatFileSize(...)`, and `truncateString(...)`.
 
 ### View-Specific Scripts
 
@@ -150,19 +154,26 @@ Each webview can have its own script:
 
 | Script | Purpose | Init Function |
 |--------|---------|---------------|
-| `upload-widget.js` | File uploads, progress, presets | `initUploadWidget(config)` |
+| `homescreen.js` | Sidebar homescreen and AI tools setup | (auto-init) |
+| `library.js` | Sidebar media library browsing UI | (auto-init) |
+| `preview.js` | Asset preview panel behavior | (auto-init) |
+| `upload-widget.js` | File uploads, progress, presets | `initUploadWidget(config)` for server-provided config |
 | `welcome.js` | Welcome screen interactions | (auto-init) |
 
 ### Initialization Pattern
 
-```javascript
-// In inline script
-initCommon();  // Always first
-initUploadWidget({
-  cloudName: "my-cloud",
-  presets: [...]
+```typescript
+// src/webview/client/my-panel.ts
+import { initCommon, getVSCode } from "./common";
+
+initCommon();
+
+document.getElementById("myButton")?.addEventListener("click", () => {
+  getVSCode()?.postMessage({ command: "doSomething" });
 });
 ```
+
+Use `inlineScript` only when the extension host must pass runtime data into the already-loaded client bundle, as the upload panel does with `initUploadWidget({ ... })`.
 
 ## Content Security Policy
 
@@ -317,8 +328,8 @@ panel.webview.onDidReceiveMessage((message) => {
 
 ## Adding a New Component
 
-1. **Add styles** to `src/webview/media/styles/components.css`
-2. **Add JavaScript** (if needed) to `src/webview/media/scripts/common.js`
+1. **Add styles** to the relevant file in `media/styles/`
+2. **Add TypeScript** (if needed) to `src/webview/client/`
 3. **Add TypeScript generator** (if complex) to `src/webview/components/`
 4. **Export** from `src/webview/components/index.ts`
 

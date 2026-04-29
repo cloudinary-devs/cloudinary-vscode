@@ -15,7 +15,7 @@ export default async function detectFolderMode(
   apiSecret: string
 ): Promise<boolean> {
   if (!cloudName || !apiKey || !apiSecret) {
-    vscode.window.showErrorMessage("❌ Cloud name, API key, and API secret are required.");
+    vscode.window.showErrorMessage("Cloud name, API key, and API secret are required.");
     return false;
   }
 
