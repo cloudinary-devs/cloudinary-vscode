@@ -54,3 +54,41 @@ jobs:
           name: allure-report-${{ github.run_number }}
           path: test/e2e/allure-report
           retention-days: 30
+
+      - name: Set timestamp.
+        id: timestamp
+        run: echo "TIMESTAMP=$(date +%Y%m%d_%H%M%S_%3N)" >> $GITHUB_ENV
+
+      - name: Generate GitHub App token.
+        if: always()
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          owner: cloudinary-devs
+          repositories: cld-vscode-test-allure-reports
+
+        # How to update the GitHub App token (need to be updated every year):
+        # 1. Create a GitHub App at https://github.com/organizations/cloudinary-devs/settings/apps
+        #    - Name: cloudinary-devs-bot, Webhook: unchecked, Permissions: Contents (Read & write), Install: Only this account
+        # 2. Note the App ID, then generate a private key (Settings → Private keys → Generate). Save the .pem file.
+        # 3. Install the app: App settings → Install App → cloudinary-devs org → Only select repositories → cld-vscode-test-allure-reports
+        # 4. Add secrets to this repo (Settings → Secrets → Actions): APP_ID and APP_PRIVATE_KEY (.pem contents)
+        # 5. The token is generated above via actions/create-github-app-token using those secrets.
+      - name: Pushes to reports repository.
+        if: always()
+        uses: cpina/github-action-push-to-another-repository@main
+        env:
+          API_TOKEN_GITHUB: ${{ steps.app-token.outputs.token }}
+        with:
+          source-directory: 'test/e2e/allure-report'
+          destination-github-username: 'cloudinary-devs'
+          destination-repository-name: 'cld-vscode-test-allure-reports'
+          user-email: ''
+          target-branch: main
+          target-directory: 'allure-report_ts_${{ env.TIMESTAMP }}'
+
+      - name: Write URL in summary.
+        if: always()
+        run: echo "### Test results https://jubilant-broccoli-www5lem.pages.github.io/allure-report_ts_${{ env.TIMESTAMP }}" >> $GITHUB_STEP_SUMMARY
