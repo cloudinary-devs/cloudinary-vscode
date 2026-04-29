@@ -349,9 +349,9 @@ function getWelcomeContent(cloudinaryState: WelcomeScreenCloudinaryState): strin
           <div class="wg-status-detail">${hasConfig ? "Your environment is ready. Open the dashboard to explore your media." : "Add your Cloudinary API credentials to get started."}</div>
         </div>
         ${hasConfig
-          ? `<button class="wg-btn wg-btn--ghost" onclick="focusDashboard()">Open Dashboard →</button>`
-          : `<button class="wg-btn wg-btn--primary" onclick="openGlobalConfig()">Configure →</button>`
-        }
+      ? `<button class="wg-btn wg-btn--ghost" onclick="focusDashboard()">Open Dashboard →</button>`
+      : `<button class="wg-btn wg-btn--primary" onclick="openGlobalConfig()">Configure →</button>`
+    }
       </div>
 
       <!-- ── Setup steps ── -->

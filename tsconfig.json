@@ -12,6 +12,7 @@
     "resolveJsonModule": true
   },
   "exclude": [
-    "src/webview/client/**/*"
+    "src/webview/client/**/*",
+    "test/e2e/**/*"
   ]
 }

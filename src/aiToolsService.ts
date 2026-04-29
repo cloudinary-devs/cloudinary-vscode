@@ -58,11 +58,11 @@ export function detectEditor(): EditorType {
 
 export function getMcpFilePath(editor: EditorType): string {
   switch (editor) {
-    case "cursor":      return ".cursor/mcp.json";
-    case "windsurf":    return ".windsurf/mcp.json";
+    case "cursor": return ".cursor/mcp.json";
+    case "windsurf": return ".windsurf/mcp.json";
     case "antigravity": return ".agent/mcp_config.json";
     case "vscode":
-    default:            return ".vscode/mcp.json";
+    default: return ".vscode/mcp.json";
   }
 }
 
@@ -84,11 +84,11 @@ function stripTilde(dir: string): string {
 export function detectEditorPlatform(): string {
   const editor = detectEditor();
   switch (editor) {
-    case "cursor":      return "cursor";
-    case "windsurf":    return "windsurf";
+    case "cursor": return "cursor";
+    case "windsurf": return "windsurf";
     case "antigravity": return "antigravity";
     case "vscode":
-    default:            return "github-copilot";
+    default: return "github-copilot";
   }
 }
 

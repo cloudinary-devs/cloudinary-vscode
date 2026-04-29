@@ -37,7 +37,7 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
     private readonly _extensionUri: vscode.Uri,
     private readonly _service: CloudinaryService,
     private readonly _libraryWebview?: LibraryWebviewViewProvider
-  ) {}
+  ) { }
 
   private _webviewView: vscode.WebviewView | undefined;
   private _cachedSkills: SkillInfo[] | undefined;
@@ -403,7 +403,7 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
         readInstalledSkillDirNames(rootUri, platform, skills),
         readConfiguredMcpServerKeys(rootUri, mcpFilePath, getMcpRootKey(editor)),
       ]);
-      const inScope = this._currentScope === "project" ? project   : globalSet;
+      const inScope = this._currentScope === "project" ? project : globalSet;
       const inOther = this._currentScope === "project" ? globalSet : project;
 
       const mcpEditorLabel = getEditorDisplayName(editor);

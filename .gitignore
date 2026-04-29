@@ -51,9 +51,18 @@ Thumbs.db
 .cursor/
 .claude/
 CLAUDE.md
+docs/superpowers
 
 # Temporary files
 *.tmp
 *.temp
 temp/
 
+
+# Test reports
+test/e2e/allure-results/
+test/e2e/allure-report/
+test/e2e/.wdio-vscode-service/
+test/e2e/.env
+test/e2e/videos/
+test/e2e/_results_/

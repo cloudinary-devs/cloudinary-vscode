@@ -29,8 +29,8 @@ type UploadWidgetCloudinaryState = Pick<
 type UploadWidgetCloudinaryStateTarget =
   | UploadWidgetCloudinaryState
   | {
-      service?: UploadWidgetCloudinaryState;
-    };
+    service?: UploadWidgetCloudinaryState;
+  };
 
 function hasUploadWidgetCloudinaryState(
   value: UploadWidgetCloudinaryStateTarget
@@ -88,14 +88,14 @@ function getOptimizedUrl(asset: any, resourceType: string): string {
   return resourceType === "raw"
     ? cloudinary.url(asset.public_id, { resource_type: "raw", type: asset.type, secure: true })
     : cloudinary.url(asset.public_id, {
-        resource_type: resourceType,
-        type: asset.type,
-        secure: true,
-        transformation: [
-          { fetch_format: resourceType === "video" ? "auto:video" : "auto" },
-          { quality: "auto" },
-        ],
-      });
+      resource_type: resourceType,
+      type: asset.type,
+      secure: true,
+      transformation: [
+        { fetch_format: resourceType === "video" ? "auto:video" : "auto" },
+        { quality: "auto" },
+      ],
+    });
 }
 
 function withSignedAuthenticatedUrl(asset: any): any {
@@ -229,12 +229,12 @@ async function uploadWithProgress(
   return new Promise((resolve, reject) => {
     const uploadStream = useChunkedUpload
       ? cloudinary.uploader.upload_chunked_stream(
-          { ...options, chunk_size: UPLOAD_CHUNK_SIZE },
-          (error, result) => (error ? reject(error) : resolve(result))
-        )
+        { ...options, chunk_size: UPLOAD_CHUNK_SIZE },
+        (error, result) => (error ? reject(error) : resolve(result))
+      )
       : cloudinary.uploader.upload_stream(options, (error, result) =>
-          error ? reject(error) : resolve(result)
-        );
+        error ? reject(error) : resolve(result)
+      );
 
     let uploaded = 0;
     const total = buffer.length;

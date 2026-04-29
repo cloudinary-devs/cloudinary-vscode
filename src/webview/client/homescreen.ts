@@ -176,9 +176,9 @@ function handleApply(): void {
   if (!_cachedData) { return; }
 
   const skillCheckboxes = document.querySelectorAll<HTMLInputElement>(".hs-ai-cb[data-skill]");
-  const mcpCheckboxes   = document.querySelectorAll<HTMLInputElement>(".hs-ai-cb[data-mcp]");
+  const mcpCheckboxes = document.querySelectorAll<HTMLInputElement>(".hs-ai-cb[data-mcp]");
 
-  const selectedSkills  = [...skillCheckboxes].filter((c) => c.checked && !c.disabled).map((c) => c.dataset.skill!);
+  const selectedSkills = [...skillCheckboxes].filter((c) => c.checked && !c.disabled).map((c) => c.dataset.skill!);
   const selectedMcpKeys = [...mcpCheckboxes].filter((c) => c.checked && !c.disabled).map((c) => c.dataset.mcp!);
 
   document.querySelectorAll<HTMLInputElement>(".hs-ai-cb").forEach((c) => { c.disabled = true; });
@@ -191,8 +191,8 @@ function handleApply(): void {
   getVSCode()?.postMessage({
     command: "installAiTools",
     platform: _cachedData.platform,
-    scope:    _cachedData.scope,
-    skills:   selectedSkills,
+    scope: _cachedData.scope,
+    skills: selectedSkills,
     mcpServers: selectedMcpKeys,
   });
 }
