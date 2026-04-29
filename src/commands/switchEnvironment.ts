@@ -108,8 +108,6 @@ function registerSwitchEnv(
           statusBar.text = getStatusBarText(selected, dynamicFolders);
           statusBar.tooltip = getStatusBarTooltip(dynamicFolders);
 
-          provider.notifyEnvironmentChange();
-
           vscode.window.showInformationMessage(
             `$(cloud) Switched to ${selected} environment.`
           );

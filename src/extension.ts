@@ -155,28 +155,6 @@ export async function activate(context: vscode.ExtensionContext) {
     },
   };
 
-  // Set initial view to homescreen
-  vscode.commands.executeCommand("setContext", "cloudinary.activeView", "homescreen");
-
-  // Register homescreen sidebar view
-  const homescreenProvider = new HomescreenViewProvider(context.extensionUri, cloudinaryProvider);
-  context.subscriptions.push(
-    vscode.window.registerWebviewViewProvider(
-      HomescreenViewProvider.viewType,
-      homescreenProvider,
-      { webviewOptions: { retainContextWhenHidden: true } }
-    )
-  );
-
-  // Refresh all open webviews when the active environment changes.
-  context.subscriptions.push(
-    cloudinaryProvider.onDidChangeEnvironment(() => {
-      homescreenProvider.refresh();
-      resetUploadPanel();
-      resetAllPreviewPanels();
-    })
-  );
-
   // Check if this is the first run of the extension
   const isFirstRun = context.globalState.get('cloudinary.firstRun', true);
 
