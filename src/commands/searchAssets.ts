@@ -1,26 +1,18 @@
 import * as vscode from "vscode";
 import { CloudinaryTreeDataProvider } from "../tree/treeDataProvider";
+import { HomescreenViewProvider } from "../webview/homescreenView";
 
 /**
- * Registers a command that allows users to search for Cloudinary assets by public ID.
- * @param context - The VS Code extension context.
- * @param provider - Cloudinary tree data provider used to refresh view based on search.
+ * Registers the search command. Opens the dashboard and focuses its search input.
  */
 function registerSearch(
   context: vscode.ExtensionContext,
-  provider: CloudinaryTreeDataProvider
+  _provider: CloudinaryTreeDataProvider,
+  homescreenProvider: HomescreenViewProvider
 ) {
   context.subscriptions.push(
-    vscode.commands.registerCommand("cloudinary.searchAssets", async () => {
-      const query = await vscode.window.showInputBox({
-        placeHolder: "Search for a public id",
-      });
-
-      if (query !== undefined && query.trim() !== "") {
-        provider.refresh({ searchQuery: query.trim() });
-      } else {
-        vscode.window.showErrorMessage("Search query cannot be empty.");
-      }
+    vscode.commands.registerCommand("cloudinary.searchAssets", () => {
+      homescreenProvider.focusSearch();
     })
   );
 }

@@ -82,6 +82,8 @@ function registerSwitchEnv(
             resourceTypeFilter: 'all'
           });
 
+          provider.notifyEnvironmentChange();
+
           vscode.window.showInformationMessage(
             `🔄 Switched to ${selected} environment.`
           );
