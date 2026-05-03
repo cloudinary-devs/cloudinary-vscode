@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import * as fs from 'node:fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -21,6 +22,17 @@ class PathUtils {
    */
   public getTestAssetsPath() {
     return path.join(__dirname, '..', '..', 'assets');
+  }
+
+  /**
+   * Gets the path to the temp folder.
+   */
+  public getTempFolderPath() {
+    const tempFolderPath = path.join(__dirname, '..', '..', 'temp');
+    if (!fs.existsSync(tempFolderPath)) {
+      fs.mkdirSync(tempFolderPath, { recursive: true });
+    }
+    return tempFolderPath;
   }
 }
 
