@@ -27,6 +27,12 @@ End-to-end runs require Cloudinary credentials in `process.env`. The `onPrepare`
 pnpm test:e2e
 ```
 
+To run a specific test file:
+
+```bash
+pnpm test:e2e --spec [FILE_PATH]
+```
+
 This will:
 1. Download a VS Code binary (if not already cached in `.wdio-vscode-service/`)
 2. Launch VS Code with the extension loaded
@@ -65,9 +71,6 @@ Tests use [Mocha](https://mochajs.org/) as the test framework and the `wdio-vsco
 
 VS Code page object references:
 - [wdio-vscode-service API](https://jubilant-broccoli-www5lem.pages.github.io/vscode-po/index.html) — full API reference for the WebdriverIO VS Code service.
-
-VS Code page object references:
-- [wdio-vscode-service API](https://webdriverio-community.github.io/wdio-vscode-service/modules.html)
 
 ### Manual approach
 
@@ -152,6 +155,7 @@ describe('Search asset from side bar', () => {
 - Allure step logging in every utility method
 - Self-contained tests with seed/cleanup in `beforeEach`/`afterEach`
 - `waitUntil` with `timeoutMsg` — never `browser.pause()`
+
 
 ### Allure Reporting
 
