@@ -27,12 +27,6 @@ End-to-end runs require Cloudinary credentials in `process.env`. The `onPrepare`
 pnpm test:e2e
 ```
 
-To run a specific test file:
-
-```bash
-pnpm test:e2e --spec specs/<file>.spec.ts
-```
-
 This will:
 1. Download a VS Code binary (if not already cached in `.wdio-vscode-service/`)
 2. Launch VS Code with the extension loaded
@@ -68,6 +62,9 @@ test/e2e/
 ## Writing Tests
 
 Tests use [Mocha](https://mochajs.org/) as the test framework and the `wdio-vscode-service` page objects to interact with VS Code.
+
+VS Code page object references:
+- [wdio-vscode-service API](https://jubilant-broccoli-www5lem.pages.github.io/vscode-po/index.html) — full API reference for the WebdriverIO VS Code service.
 
 VS Code page object references:
 - [wdio-vscode-service API](https://webdriverio-community.github.io/wdio-vscode-service/modules.html)

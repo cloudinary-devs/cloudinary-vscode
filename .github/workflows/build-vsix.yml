@@ -1,0 +1,92 @@
+name: Build VSIX
+
+on:
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened]
+
+jobs:
+  build-vsix:
+    name: Build installable VSIX
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run linting
+        run: npm run lint
+
+      - name: Sanitize branch name
+        id: branch
+        run: echo "name=$(echo '${{ github.head_ref }}' | tr '/' '-')" >> "$GITHUB_OUTPUT"
+
+      - name: Stamp pre-release version
+        run: |
+          BASE=$(node -p "require('./package.json').version")
+          jq ".version = \"${BASE}-pr.${{ github.event.pull_request.number }}\"" package.json > package.tmp.json
+          mv package.tmp.json package.json
+
+      - name: Package extension
+        run: npx @vscode/vsce package --no-dependencies -o cloudinary-${{ steps.branch.outputs.name }}.vsix
+
+      - name: Upload VSIX artifact
+        id: upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: cloudinary-${{ steps.branch.outputs.name }}
+          path: cloudinary-${{ steps.branch.outputs.name }}.vsix
+          retention-days: 14
+
+      - name: Update PR description with VSIX link
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const markerStart = '<!-- vsix-build -->';
+            const markerEnd = '<!-- /vsix-build -->';
+            const version = require('./package.json').version;
+            const artifactUrl = '${{ steps.upload.outputs.artifact-url }}';
+            const artifactName = 'cloudinary-${{ steps.branch.outputs.name }}.vsix';
+
+            const section = [
+              markerStart,
+              `> **📦 Test build · v${version}** — [Download VSIX](${artifactUrl}) _(expires in 14 days, requires GitHub login)_`,
+              `> To install: **Extensions → ··· → Install from VSIX…** or \`code --install-extension ${artifactName}\``,
+              markerEnd,
+            ].join('\n');
+
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+            });
+
+            const currentBody = pr.body || '';
+            let newBody;
+
+            if (currentBody.includes(markerStart)) {
+              const startIdx = currentBody.indexOf(markerStart);
+              const endIdx = currentBody.indexOf(markerEnd) + markerEnd.length;
+              newBody = currentBody.slice(0, startIdx) + section + currentBody.slice(endIdx);
+            } else {
+              newBody = currentBody ? currentBody + '\n\n' + section : section;
+            }
+
+            await github.rest.pulls.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+              body: newBody,
+            });

@@ -38,6 +38,17 @@ export class CloudinaryTreeDataProvider implements vscode.TreeDataProvider<Cloud
   private _onDidChangeTreeData = new vscode.EventEmitter<CloudinaryItem | undefined | void>();
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
 
+  private _onDidChangeEnvironment = new vscode.EventEmitter<void>();
+  readonly onDidChangeEnvironment = this._onDidChangeEnvironment.event;
+
+  /**
+   * Fires the onDidChangeEnvironment event to notify subscribers that
+   * credentials have changed to a new environment.
+   */
+  notifyEnvironmentChange(): void {
+    this._onDidChangeEnvironment.fire();
+  }
+
   /**
    * Refreshes the tree data view.
    */

@@ -50,8 +50,15 @@
     "views": {
       "cloudinary": [
         {
+          "id": "cloudinaryHomescreen",
+          "name": "Cloudinary",
+          "type": "webview",
+          "when": "cloudinary.activeView != 'library'"
+        },
+        {
           "id": "cloudinaryMediaLibrary",
-          "name": ""
+          "name": "",
+          "when": "cloudinary.activeView == 'library'"
         }
       ]
     },
@@ -112,10 +119,31 @@
         "command": "cloudinary.openWelcomeScreen",
         "title": "Open Welcome Guide",
         "category": "Cloudinary"
+      },
+      {
+        "command": "cloudinary.showHomescreen",
+        "title": "Go to Home",
+        "icon": "$(home)",
+        "category": "Cloudinary"
+      },
+      {
+        "command": "cloudinary.showLibrary",
+        "title": "Browse Media Library",
+        "category": "Cloudinary"
+      },
+      {
+        "command": "cloudinary.configureAiTools",
+        "title": "Configure AI Tools",
+        "category": "Cloudinary"
       }
     ],
     "menus": {
       "view/title": [
+        {
+          "command": "cloudinary.showHomescreen",
+          "when": "view == cloudinaryMediaLibrary",
+          "group": "navigation@0"
+        },
         {
           "command": "cloudinary.refresh",
           "when": "view == cloudinaryMediaLibrary",

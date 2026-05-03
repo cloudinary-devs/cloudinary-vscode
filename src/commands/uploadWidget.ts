@@ -75,6 +75,19 @@ function registerUpload(
 }
 
 /**
+ * Resets the upload panel for a new environment.
+ * If the panel is currently open, disposes it and reopens it with the new
+ * credentials already loaded in `provider`. No-ops if the panel is closed.
+ */
+export function resetUploadPanel(): void {
+  if (!uploadPanel) {
+    return;
+  }
+  uploadPanel.dispose();
+  uploadPanel = undefined;
+}
+
+/**
  * Opens the upload panel or reveals it if already open.
  */
 function openOrRevealUploadPanel(
@@ -213,9 +226,10 @@ function createUploadPanel(
   provider: CloudinaryTreeDataProvider,
   context: vscode.ExtensionContext
 ): vscode.WebviewPanel {
+  const cloudName = provider.cloudName!;
   const panel = vscode.window.createWebviewPanel(
     "cloudinaryUploadWidget",
-    "Upload to Cloudinary",
+    `Upload — ${cloudName}`,
     vscode.ViewColumn.One,
     {
       enableScripts: true,
@@ -233,7 +247,6 @@ function createUploadPanel(
   );
 
   const currentPreset = provider.getCurrentUploadPreset() || "";
-  const cloudName = provider.cloudName!;
   const folders = collectFolderOptions(provider);
 
   const uploadScriptUri = getScriptUri(

@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { CloudinarySDK } from '../src/sdks/cloudinarySDK.js';
-import { activityBarUtils } from '../src/utils/ActivityBarUtils.js'
-import { sideBarViewUtils } from '../src/utils/SideBarViewUtils.js'
+import { activityBarUtils } from '../src/vscodeComponentsUtils/ActivityBarUtils.js'
+import { sideBarViewUtils } from '../src/vscodeComponentsUtils/SideBarViewUtils.js'
 import crypto from 'node:crypto';
 import { pathUtils } from '../src/utils/pathUtils.js';
 
@@ -15,12 +15,20 @@ describe('Asset Explorer Tetsts', () => {
     let secondAssetPublicID = `e2e-test-ae-${crypto.randomUUID().substring(0, 8)}`;
 
     beforeEach(async () => {
-        await cloudinarySDK.V2.uploader.upload(path.join(pathUtils.getTestAssetsPath(), 'sample_png.png'), { public_id: firstAssetPublicID });
-        await cloudinarySDK.V2.uploader.upload(path.join(pathUtils.getTestAssetsPath(), 'sample_png.png'), { public_id: secondAssetPublicID });
+        try {
+            await cloudinarySDK.V2.uploader.upload(path.join(pathUtils.getTestAssetsPath(), 'sample_png.png'), { public_id: firstAssetPublicID });
+            await cloudinarySDK.V2.uploader.upload(path.join(pathUtils.getTestAssetsPath(), 'sample_png.png'), { public_id: secondAssetPublicID });
+        } catch (error) {
+            throw new Error('Error uploading assets:', error);
+        }
     });
 
     afterEach(async () => {
-        await cloudinarySDK.V2.api.delete_resources([firstAssetPublicID, secondAssetPublicID]);
+        try {
+            await cloudinarySDK.V2.api.delete_resources([firstAssetPublicID, secondAssetPublicID]);
+        } catch (error) {
+            throw new Error('Error deleting assets:', error);
+        }
     });
 
     /**

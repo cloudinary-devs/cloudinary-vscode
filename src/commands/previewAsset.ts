@@ -120,6 +120,15 @@ function registerPreview(context: vscode.ExtensionContext) {
 }
 
 /**
+ * Closes all open preview panels when the active environment switches.
+ */
+export function resetAllPreviewPanels(): void {
+  for (const panel of openPanels.values()) {
+    panel.dispose();
+  }
+}
+
+/**
  * Get asset type icon.
  */
 function getAssetTypeIcon(type: string): string {
