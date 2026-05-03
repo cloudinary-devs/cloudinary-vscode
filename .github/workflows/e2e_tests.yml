@@ -27,6 +27,12 @@ jobs:
         with:
           version: 10.24.0
 
+      - name: Setup Chrome
+        uses: browser-actions/setup-chrome@v1
+        with:
+          chrome-version: stable
+          install-chromedriver: true
+
       - name: Install E2E dependencies
         run: pnpm install
         working-directory: test/e2e
@@ -56,6 +62,7 @@ jobs:
           retention-days: 30
 
       - name: Set timestamp.
+        if: always()
         id: timestamp
         run: echo "TIMESTAMP=$(date +%Y%m%d_%H%M%S_%3N)" >> $GITHUB_ENV
 
