@@ -27,6 +27,9 @@ jobs:
         with:
           version: 10.24.0
 
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
       - name: Install E2E dependencies
         run: pnpm install
         working-directory: test/e2e
