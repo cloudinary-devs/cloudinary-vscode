@@ -27,12 +27,6 @@ jobs:
         with:
           version: 10.24.0
 
-      - name: Setup Chrome
-        uses: browser-actions/setup-chrome@v1
-        with:
-          chrome-version: stable
-          install-chromedriver: true
-
       - name: Install E2E dependencies
         run: pnpm install
         working-directory: test/e2e
