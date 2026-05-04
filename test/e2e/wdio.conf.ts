@@ -156,10 +156,6 @@ export const config: WebdriverIO.Config = {
             disableWebdriverScreenshotsReporting: true,
             addConsoleLogs: true,
         }],
-        ['video', {
-            saveAllVideos: false,
-            videoSlowdownMultiplier: 3,
-        }],
     ],
 
     // Options to be passed to Mocha.
