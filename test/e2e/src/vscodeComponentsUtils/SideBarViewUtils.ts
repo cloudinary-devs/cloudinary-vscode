@@ -1,6 +1,7 @@
 import { browser, expect } from "@wdio/globals"
 import { TreeItem } from "wdio-vscode-service"
 import allureReporter from '@wdio/allure-reporter'
+import { HomeScreenViewPage } from "../webViewTabs/HomeScreenViewPage.js";
 
 /**
  * Actions available in the Side Bar View.
@@ -15,6 +16,8 @@ export enum SideBarViewActions {
  * Utility class for interacting with the Side Bar View in VS Code.
  */
 class SideBarViewUtils {
+    public readonly homeScreenViewPage = new HomeScreenViewPage();
+    
     /**
      * Gets the Side Bar View instance.
      */
