@@ -46,7 +46,6 @@ Thumbs.db
 *.swp
 *.swo
 *~
-.cursor/
 .claude/
 CLAUDE.md
 docs/superpowers
