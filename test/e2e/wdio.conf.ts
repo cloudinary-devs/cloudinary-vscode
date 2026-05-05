@@ -36,9 +36,7 @@ export const config: WebdriverIO.Config = {
         './specs/**/*.spec.ts'
     ],
     // Patterns to exclude.
-    exclude: [
-        './specs/searchAssetFromSideBar.spec.ts'
-    ],
+    exclude: [],
     //
     // ============
     // Capabilities
