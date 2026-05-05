@@ -59,12 +59,20 @@ class SideBarViewUtils {
     public async validateContentItemsExist(expectedItems: string[]) {
         await allureReporter.addStep(`Validate content items exist: [${expectedItems.join(', ')}]`);
         await this.waitContentToLoad();
-        const content = await this.getSideBarViewContent();
-        const sections = await content.getSections();
-        const visibleItems = await sections[0].getVisibleItems() as TreeItem[];
-        const itemLabels = await Promise.all(
-            visibleItems.map(item => item.getLabel())
-        );
+        let itemLabels: string[] = [];
+        await browser.waitUntil(async () => {
+            try {
+                const content = await this.getSideBarViewContent();
+                const sections = await content.getSections();
+                const visibleItems = await sections[0].getVisibleItems() as TreeItem[];
+                itemLabels = await Promise.all(
+                    visibleItems.map(item => item.getLabel())
+                );
+                return itemLabels.includes(expectedItems[0]);
+            } catch {
+                return false;
+            }
+        }, { timeout: 15000, timeoutMsg: 'Timed out waiting for content items to be available' });
 
         for (const expected of expectedItems) {
             expect(itemLabels).toContain(expected);

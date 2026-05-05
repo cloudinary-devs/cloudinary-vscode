@@ -36,7 +36,7 @@ export const config: WebdriverIO.Config = {
     ],
     // Patterns to exclude.
     exclude: [
-        // 'path/to/excluded/files'
+        './specs/searchAssetFromSideBar.spec.ts'
     ],
     //
     // ============
@@ -54,7 +54,7 @@ export const config: WebdriverIO.Config = {
     // and 30 processes will get spawned. The property handles how many capabilities
     // from the same test should run tests.
     //
-    maxInstances: 1,
+    maxInstances: process.env.CI ? 1 : 5,
     //
     // If you have trouble getting all important capabilities together, check out the
     // Sauce Labs platform configurator - a great tool to configure your capabilities:

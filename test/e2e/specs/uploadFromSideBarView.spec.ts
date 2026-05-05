@@ -50,7 +50,9 @@ describe('Upload asset from side bar Upload button', () => {
         await uploadToCloudinaryTab.switchBack();
 
         await activityBarUtils.openView('Cloudinary');
-        
+
+        await cloudinarySDK.waitUntilAssetIsUploaded(firstAssetPublicID);
+
         await sideBarViewUtils.clickAction(SideBarViewActions.REFRESH);
 
         await sideBarViewUtils.validateContentItemsExist([newFileName.replace('.png', '')]);
