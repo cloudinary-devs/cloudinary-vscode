@@ -17,7 +17,17 @@ class WdioUtils {
         await element.waitForClickable();
         return element.click(options);
     }
-        
+
+    /**
+     * Adds value to input an element.
+     */
+    public async addValue(selector: string, value: string): Promise<void> {
+        await allureReporter.addStep(`Add value to an element '${selector}'`);
+        const element = $(selector);
+        await element.waitForExist();
+        await element.waitForEnabled();
+        return element.addValue(value);
+    }
 }
 
 export default new WdioUtils();
