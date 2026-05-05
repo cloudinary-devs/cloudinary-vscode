@@ -3,6 +3,7 @@ import * as os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import * as path from 'node:path';
 import allureReporter from '@wdio/allure-reporter'
+import video from 'wdio-video-reporter'
 
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -35,9 +36,7 @@ export const config: WebdriverIO.Config = {
         './specs/**/*.spec.ts'
     ],
     // Patterns to exclude.
-    exclude: [
-        // 'path/to/excluded/files'
-    ],
+    exclude: [],
     //
     // ============
     // Capabilities
@@ -54,7 +53,7 @@ export const config: WebdriverIO.Config = {
     // and 30 processes will get spawned. The property handles how many capabilities
     // from the same test should run tests.
     //
-    maxInstances: 5,
+    maxInstances: process.env.CI ? 1 : 3,
     //
     // If you have trouble getting all important capabilities together, check out the
     // Sauce Labs platform configurator - a great tool to configure your capabilities:
@@ -150,6 +149,11 @@ export const config: WebdriverIO.Config = {
     // see also: https://webdriver.io/docs/dot-reporter
     reporters: [
         'spec',
+        [video, {
+            saveAllVideos: false,
+            videoSlowdownMultiplier: 3,
+            outputDir: 'allure-results',
+        }],
         ['allure', {
             outputDir: 'allure-results',
             disableWebdriverStepsReporting: true,

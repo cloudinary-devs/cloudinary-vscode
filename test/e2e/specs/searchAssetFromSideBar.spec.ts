@@ -34,6 +34,7 @@ describe('Search asset from side bar', () => {
     it('should find the uploaded asset via sidebar search', async () => {
         await activityBarUtils.openView('Cloudinary');
         await sideBarViewUtils.homeScreenViewPage.clickBrowseLibraryButton();
+        await sideBarViewUtils.waitContentToLoad();
 
         await sideBarViewUtils.clickAction(SideBarViewActions.SEARCH);
 
