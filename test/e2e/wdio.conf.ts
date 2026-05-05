@@ -3,6 +3,7 @@ import * as os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import * as path from 'node:path';
 import allureReporter from '@wdio/allure-reporter'
+import video from 'wdio-video-reporter'
 
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -150,6 +151,11 @@ export const config: WebdriverIO.Config = {
     // see also: https://webdriver.io/docs/dot-reporter
     reporters: [
         'spec',
+        [video, {
+            saveAllVideos: false,
+            videoSlowdownMultiplier: 3,
+            outputDir: 'allure-results',
+        }],
         ['allure', {
             outputDir: 'allure-results',
             disableWebdriverStepsReporting: true,
