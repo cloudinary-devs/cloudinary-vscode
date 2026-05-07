@@ -6,7 +6,7 @@ import {
   API_BASE, API_URL, vscode, state, tabMessagesCache, tabStreamState,
   $, conversationEl, inputEl, scrollToBottom, normalizeSources,
   getSourceUrl, getSourceLabel, escapeHtml, pickStarters,
-  uid, convId, timeAgo, callbacks, IDE_PLATFORM,
+  uid, convId, timeAgo, callbacks, IDE_PLATFORM, INITIAL_PROMPT,
 } from "./state"
 import {
   persistMessage, updateConversationTimestamp, persistTabState, loadConversations,
@@ -794,13 +794,19 @@ async function migrateFromVSCodeState() {
 // --- Init ---
 
 async function init() {
+  const initialPrompt = INITIAL_PROMPT
   const migratedId = await migrateFromVSCodeState()
   await loadConversations()
 
   let restoredTabState = null
-  try { restoredTabState = await dbLoadTabState() } catch (_) {}
+  if (!initialPrompt) {
+    try { restoredTabState = await dbLoadTabState() } catch (_) {}
+  }
 
-  if (restoredTabState && restoredTabState.openTabs && restoredTabState.openTabs.length > 0) {
+  if (initialPrompt) {
+    createTab(null, 'New Chat')
+    persistTabState()
+  } else if (restoredTabState && restoredTabState.openTabs && restoredTabState.openTabs.length > 0) {
     state.openTabs = restoredTabState.openTabs
     state.activeTabId = restoredTabState.activeTabId
 
@@ -900,6 +906,10 @@ async function init() {
       }
     }
   })
+
+  if (initialPrompt) {
+    askFromHomePrompt(initialPrompt)
+  }
 }
 
 document.addEventListener('DOMContentLoaded', init)

@@ -22,8 +22,8 @@ export class DocsAiViewProvider implements vscode.WebviewViewProvider {
       localResourceRoots: [vscode.Uri.joinPath(this._extensionUri, "media")],
     };
 
-    view.webview.html = this.getHtml(view.webview);
-    this.flushPendingPrompt(300);
+    const initialPrompt = this.consumePendingPrompt();
+    view.webview.html = this.getHtml(view.webview, initialPrompt);
   }
 
   refresh(): void {
@@ -31,8 +31,8 @@ export class DocsAiViewProvider implements vscode.WebviewViewProvider {
     if (!view) {
       return;
     }
-    view.webview.html = this.getHtml(view.webview);
-    this.flushPendingPrompt(300);
+    const initialPrompt = this.consumePendingPrompt();
+    view.webview.html = this.getHtml(view.webview, initialPrompt);
   }
 
   queuePrompt(prompt: unknown): void {
@@ -41,7 +41,7 @@ export class DocsAiViewProvider implements vscode.WebviewViewProvider {
       return;
     }
     this._pendingPrompt = value;
-    this.flushPendingPrompt(300);
+    this.flushPendingPrompt();
   }
 
   flushPendingPrompt(delay = 0): void {
@@ -67,11 +67,18 @@ export class DocsAiViewProvider implements vscode.WebviewViewProvider {
     postPrompt();
   }
 
-  private getHtml(webview: vscode.Webview): string {
+  private consumePendingPrompt(): string | undefined {
+    const prompt = this._pendingPrompt;
+    this._pendingPrompt = undefined;
+    return prompt;
+  }
+
+  private getHtml(webview: vscode.Webview, initialPrompt?: string): string {
     const cssUri = getStyleUri(webview, this._extensionUri, "docs-ai.css");
     const scriptUri = getScriptUri(webview, this._extensionUri, "docs-ai.js");
     const nonce = getNonce();
     const appName = JSON.stringify(vscode.env.appName);
+    const initialPromptJson = JSON.stringify(initialPrompt ?? "");
 
     const csp = [
       "default-src 'none'",
@@ -130,6 +137,7 @@ export class DocsAiViewProvider implements vscode.WebviewViewProvider {
 
   <script nonce="${nonce}">
     window.__IDE_NAME__ = ${appName};
+    window.__INITIAL_PROMPT__ = ${initialPromptJson};
   </script>
   <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>

@@ -7,6 +7,10 @@ export const vscode = acquireVsCodeApi()
 
 const rawIdeName = (typeof window !== 'undefined' && window.__IDE_NAME__) || 'vscode'
 export const IDE_PLATFORM = rawIdeName.toLowerCase().replace(/\s+/g, '-')
+export const INITIAL_PROMPT =
+  typeof window !== 'undefined' && typeof window.__INITIAL_PROMPT__ === 'string'
+    ? window.__INITIAL_PROMPT__.trim()
+    : ''
 
 export const state = {
   messages: [],
