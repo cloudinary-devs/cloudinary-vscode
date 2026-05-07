@@ -53,12 +53,19 @@
           "id": "cloudinaryHomescreen",
           "name": "Cloudinary",
           "type": "webview",
-          "when": "cloudinary.activeView != 'library'"
+          "when": "cloudinary.activeView != 'library' && cloudinary.activeView != 'docsAi'"
         },
         {
           "id": "cloudinaryMediaLibrary",
           "name": "",
           "when": "cloudinary.activeView == 'library'"
+        },
+        {
+          "id": "cloudinaryDocsAI",
+          "name": "Docs AI",
+          "type": "webview",
+          "contextualTitle": "Cloudinary Docs AI",
+          "when": "cloudinary.activeView == 'docsAi'"
         }
       ]
     },
@@ -132,8 +139,19 @@
         "category": "Cloudinary"
       },
       {
+        "command": "cloudinary.showDocsAI",
+        "title": "Open Docs AI",
+        "category": "Cloudinary"
+      },
+      {
         "command": "cloudinary.configureAiTools",
         "title": "Configure AI Tools",
+        "category": "Cloudinary"
+      },
+      {
+        "command": "cloudinary.docsAi.refresh",
+        "title": "Refresh Docs AI",
+        "icon": "$(refresh)",
         "category": "Cloudinary"
       }
     ],
@@ -168,6 +186,16 @@
           "command": "cloudinary.openGlobalConfig",
           "when": "view == cloudinaryMediaLibrary",
           "group": "navigation@5"
+        },
+        {
+          "command": "cloudinary.docsAi.refresh",
+          "when": "view == cloudinaryDocsAI",
+          "group": "navigation@1"
+        },
+        {
+          "command": "cloudinary.showHomescreen",
+          "when": "view == cloudinaryDocsAI",
+          "group": "navigation@0"
         }
       ],
       "view/item/context": [
@@ -215,6 +243,8 @@
     "esbuild": "^0.25.9",
     "eslint": "^8.52.0",
     "glob": "^10.3.10",
+    "highlight.js": "^11.11.1",
+    "marked": "^17.0.3",
     "mocha": "^10.2.0",
     "npm-run-all": "^4.1.5",
     "typescript": "^5.2.2"

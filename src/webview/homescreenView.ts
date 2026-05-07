@@ -94,6 +94,9 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
           case "showLibrary":
             vscode.commands.executeCommand("cloudinary.showLibrary");
             break;
+          case "showDocsAI":
+            vscode.commands.executeCommand("cloudinary.showDocsAI", message.data);
+            break;
           case "openUploadWidget":
             vscode.commands.executeCommand("cloudinary.openUploadWidget");
             break;
@@ -335,6 +338,33 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
             </div>
 
           </div><!-- /hs-ai-panel -->
+
+          <section class="hs-docs-ai-home" aria-labelledby="hs-docs-ai-heading">
+            <div class="hs-docs-ai-empty">
+              <h2 id="hs-docs-ai-heading" class="hs-docs-ai-empty-heading">Ask Cloudinary</h2>
+              <p class="hs-docs-ai-empty-sub">Ask me anything about our products and documentation.</p>
+              <div class="hs-docs-ai-empty-input-row">
+                <textarea
+                  id="hs-docs-ai-input"
+                  class="hs-docs-ai-empty-input"
+                  rows="1"
+                  placeholder="Send a message..."
+                  autocomplete="off"
+                  dir="auto"
+                  spellcheck="true"
+                  aria-label="Ask Cloudinary documentation"
+                ></textarea>
+                <button id="hs-docs-ai-submit" class="hs-docs-ai-empty-send-btn" type="button" title="Send message" aria-label="Send message" disabled>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                </button>
+              </div>
+              <div class="hs-docs-ai-chips" aria-label="Suggested documentation questions">
+                <button class="hs-docs-ai-chip" type="button" data-question="How do I upload images?">How do I upload images?</button>
+                <button class="hs-docs-ai-chip" type="button" data-question="Explain image transformations">Explain image transformations</button>
+                <button class="hs-docs-ai-chip" type="button" data-question="What SDKs does Cloudinary support?">What SDKs does Cloudinary support?</button>
+              </div>
+            </div>
+          </section>
         </div>
 
         <div class="hs-footer">
@@ -484,4 +514,3 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
     view.webview.postMessage({ command: "aiToolsResult", errors });
   }
 }
-

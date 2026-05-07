@@ -10,6 +10,7 @@ import registerWelcomeScreen from "./welcomeScreen";
 import registerConfigureAiTools from "./configureAiTools";
 import { CloudinaryTreeDataProvider } from "../tree/treeDataProvider";
 import { HomescreenViewProvider } from "../webview/homescreenView";
+import { DocsAiViewProvider } from "../webview/docsAiView";
 
 /**
  * Registers all Cloudinary-related commands with the VS Code command registry.
@@ -22,7 +23,8 @@ function registerAllCommands(
   context: vscode.ExtensionContext,
   provider: CloudinaryTreeDataProvider,
   statusBar: vscode.StatusBarItem,
-  homescreenProvider: HomescreenViewProvider
+  homescreenProvider: HomescreenViewProvider,
+  docsAiProvider: DocsAiViewProvider
 ) {
   context.subscriptions.push(
     vscode.commands.registerCommand("cloudinary.showHomescreen", () => {
@@ -34,6 +36,18 @@ function registerAllCommands(
     vscode.commands.registerCommand("cloudinary.showLibrary", () => {
       vscode.commands.executeCommand("setContext", "cloudinary.activeView", "library");
       vscode.commands.executeCommand("workbench.view.extension.cloudinary");
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand("cloudinary.showDocsAI", (initialPrompt?: string) => {
+      docsAiProvider.queuePrompt(initialPrompt);
+      vscode.commands.executeCommand("setContext", "cloudinary.activeView", "docsAi");
+      vscode.commands.executeCommand("workbench.view.extension.cloudinary");
+      setTimeout(() => {
+        vscode.commands.executeCommand("cloudinaryDocsAI.focus");
+        docsAiProvider.flushPendingPrompt(250);
+      }, 150);
     })
   );
 

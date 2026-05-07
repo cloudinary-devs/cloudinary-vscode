@@ -12,6 +12,7 @@ import { CloudinaryTreeDataProvider } from "./tree/treeDataProvider";
 import { v2 as cloudinary } from "cloudinary";
 import { generateUserAgent } from "./utils/userAgent";
 import { HomescreenViewProvider } from "./webview/homescreenView";
+import { DocsAiViewProvider } from "./webview/docsAiView";
 import { resetUploadPanel } from "./commands/uploadWidget";
 import { resetAllPreviewPanels } from "./commands/previewAsset";
 
@@ -53,6 +54,18 @@ export async function activate(context: vscode.ExtensionContext) {
       homescreenProvider,
       { webviewOptions: { retainContextWhenHidden: true } }
     )
+  );
+
+  const docsAiProvider = new DocsAiViewProvider(context.extensionUri);
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider(
+      DocsAiViewProvider.viewType,
+      docsAiProvider,
+      { webviewOptions: { retainContextWhenHidden: true } }
+    ),
+    vscode.commands.registerCommand("cloudinary.docsAi.refresh", () => {
+      docsAiProvider.refresh();
+    })
   );
 
   // Refresh all open webviews when the active environment changes.
@@ -105,7 +118,7 @@ export async function activate(context: vscode.ExtensionContext) {
       "cloudinaryMediaLibrary",
       cloudinaryProvider
     );
-    registerAllCommands(context, cloudinaryProvider, statusBar, homescreenProvider);
+    registerAllCommands(context, cloudinaryProvider, statusBar, homescreenProvider, docsAiProvider);
     return;
   }
 
@@ -237,7 +250,7 @@ export async function activate(context: vscode.ExtensionContext) {
     "cloudinaryMediaLibrary",
     cloudinaryProvider
   );
-  registerAllCommands(context, cloudinaryProvider, statusBar, homescreenProvider);
+  registerAllCommands(context, cloudinaryProvider, statusBar, homescreenProvider, docsAiProvider);
 }
 
 /**
