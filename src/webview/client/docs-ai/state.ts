@@ -1,7 +1,25 @@
 // @ts-nocheck
 
-export const API_BASE =
-  'https://cld-docs-ai-delta.vercel.app'
+const DEFAULT_API_BASE = 'https://cld-docs-ai-delta.vercel.app'
+
+function normalizeApiBase(value) {
+  const rawValue = typeof value === 'string' ? value.trim() : ''
+  if (!rawValue) {return DEFAULT_API_BASE}
+
+  try {
+    const url = new URL(rawValue)
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') {return DEFAULT_API_BASE}
+    url.hash = ''
+    url.search = ''
+    return url.href.replace(/\/+$/, '')
+  } catch (_) {
+    return DEFAULT_API_BASE
+  }
+}
+
+export const API_BASE = normalizeApiBase(
+  typeof window !== 'undefined' ? window.__DOCS_AI_API_BASE__ : DEFAULT_API_BASE
+)
 export const API_URL = `${API_BASE}/api/rag/chat-ai`
 export const vscode = acquireVsCodeApi()
 
@@ -20,6 +38,7 @@ export const state = {
   loading: false,
   abortController: null,
   shouldAutoScroll: true,
+  isAutoScrolling: false,
   historyOpen: false,
   moreMenuOpen: false,
   openTabs: [],
@@ -61,10 +80,26 @@ export const $ = (sel) => document.querySelector(sel)
 export const conversationEl = () => $('#conversation')
 export const inputEl = () => $('#chat-input')
 
+let autoScrollToken = 0
+
 export function scrollToBottom() {
   if (!state.shouldAutoScroll) {return}
   const conv = conversationEl()
-  if (conv) {conv.scrollTo({ top: conv.scrollHeight, behavior: 'smooth' })}
+  if (!conv) {return}
+
+  const token = ++autoScrollToken
+  state.isAutoScrolling = true
+
+  const pinToBottom = () => {
+    conv.scrollTop = conv.scrollHeight
+  }
+
+  pinToBottom()
+  requestAnimationFrame(pinToBottom)
+
+  setTimeout(() => {
+    if (token === autoScrollToken) {state.isAutoScrolling = false}
+  }, 120)
 }
 
 export function normalizeSources(payload) {

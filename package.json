@@ -69,6 +69,17 @@
         }
       ]
     },
+    "configuration": {
+      "title": "Cloudinary",
+      "properties": {
+        "cloudinary.docsAi.apiBase": {
+          "type": "string",
+          "default": "https://cld-docs-ai-delta.vercel.app",
+          "scope": "machine-overridable",
+          "markdownDescription": "Base URL for the Cloudinary Docs AI backend. Override this for local development, for example `http://127.0.0.1:5173`."
+        }
+      }
+    },
     "commands": [
       {
         "command": "cloudinary.openAsset",

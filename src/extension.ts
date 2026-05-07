@@ -68,6 +68,14 @@ export async function activate(context: vscode.ExtensionContext) {
     })
   );
 
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeConfiguration((event) => {
+      if (event.affectsConfiguration("cloudinary.docsAi.apiBase")) {
+        docsAiProvider.refresh();
+      }
+    })
+  );
+
   // Refresh all open webviews when the active environment changes.
   context.subscriptions.push(
     cloudinaryProvider.onDidChangeEnvironment(() => {

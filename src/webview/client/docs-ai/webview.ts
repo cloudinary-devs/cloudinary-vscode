@@ -226,8 +226,8 @@ function render() {
             <span class="chevron ${m.sourcesOpen ? 'chevron-open' : ''}"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></span>
           </button>
           ${m.sourcesOpen ? `<div class="sources-list">${m.sources.map(s =>
-            `<a href="${getSourceUrl(s)}" target="_blank" rel="noopener noreferrer" class="source-item">
-              <span>${getSourceLabel(s)}</span>
+            `<a href="${escapeHtml(getSourceUrl(s))}" target="_blank" rel="noopener noreferrer" class="source-item">
+              <span>${escapeHtml(getSourceLabel(s))}</span>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
             </a>`).join('')}</div>` : ''}
         </div>`
@@ -237,8 +237,10 @@ function render() {
     if (m.role === 'assistant' && m.followUpQuestions && m.followUpQuestions.length && !m.streaming && m.id === lastAssistantId) {
       followUpsHtml = `
         <div class="follow-ups">
-          ${m.followUpQuestions.map(q =>
-            `<button class="follow-up-btn" dir="auto" data-question="${q.replace(/"/g, '&quot;')}">${q}</button>`
+          ${m.followUpQuestions.map(q => {
+            const question = escapeHtml(q)
+            return `<button class="follow-up-btn" dir="auto" data-question="${question}">${question}</button>`
+          }
           ).join('')}
         </div>`
     }
@@ -273,8 +275,7 @@ function render() {
 
   conv.querySelectorAll('.code-copy').forEach(btn => {
     btn.addEventListener('click', () => {
-      const code = btn.dataset.code
-        .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"')
+      const code = btn.dataset.code || ''
       try {
         navigator.clipboard.writeText(code)
       } catch (_) {
@@ -436,6 +437,53 @@ function updateComposer() {
   if (input) {input.placeholder = state.streaming ? 'Type your next message...' : 'Send a message...'}
 }
 
+function handleStreamEvent(data, askMessages, assistantId, askTabId) {
+  const msg = askMessages.find(m => m.id === assistantId)
+  if (!msg) {return false}
+
+  if (data.type === 'sources') {
+    msg.sources = normalizeSources(data.sources)
+  } else if (data.type === 'chunk') {
+    msg.content = data.fullContent ?? data.content ?? ''
+    msg.streaming = true
+  } else if (data.type === 'done') {
+    msg.content = data.answer ?? msg.content
+    msg.streaming = false
+    if (state.activeTabId === askTabId) {state.streaming = false}
+  } else if (data.type === 'followup') {
+    msg.followUpQuestions = Array.isArray(data.questions) ? data.questions : []
+  } else if (data.type === 'error') {
+    msg.content = data.error ?? 'Error from server'
+    msg.streaming = false
+    msg.error = true
+    if (state.activeTabId === askTabId) {state.streaming = false}
+  } else {
+    return false
+  }
+
+  return true
+}
+
+function processStreamLine(line, askMessages, assistantId, askTabId) {
+  const eventLine = line.trim()
+  if (!eventLine.startsWith('data:')) {return}
+  const json = eventLine.slice(5).trim()
+  if (!json) {return}
+
+  try {
+    const data = JSON.parse(json)
+    if (handleStreamEvent(data, askMessages, assistantId, askTabId) && state.activeTabId === askTabId) {
+      render()
+    }
+  } catch (_) {}
+}
+
+function flushStreamBuffer(buffer, askMessages, assistantId, askTabId) {
+  const pending = buffer.trim()
+  if (!pending) {return}
+  processStreamLine(pending, askMessages, assistantId, askTabId)
+}
+
 // --- Actions ---
 
 async function ask(text) {
@@ -516,35 +564,10 @@ async function ask(text) {
       buffer = lines.pop() || ''
 
       for (const line of lines) {
-        if (!line.startsWith('data:')) {continue}
-        const json = line.slice(5).trim()
-        if (!json) {continue}
-        try {
-          const data = JSON.parse(json)
-          const msg = askMessages.find(m => m.id === assistantId)
-          if (!msg) {continue}
-
-          if (data.type === 'sources') {
-            msg.sources = normalizeSources(data.sources)
-          } else if (data.type === 'chunk') {
-            msg.content = data.fullContent ?? data.content ?? ''
-            msg.streaming = true
-          } else if (data.type === 'done') {
-            msg.content = data.answer ?? msg.content
-            msg.streaming = false
-            if (state.activeTabId === askTabId) {state.streaming = false}
-          } else if (data.type === 'followup') {
-            msg.followUpQuestions = Array.isArray(data.questions) ? data.questions : []
-          } else if (data.type === 'error') {
-            msg.content = data.error ?? 'Error from server'
-            msg.streaming = false
-            msg.error = true
-            if (state.activeTabId === askTabId) {state.streaming = false}
-          }
-          if (state.activeTabId === askTabId) {render()}
-        } catch (_) {}
+        processStreamLine(line, askMessages, assistantId, askTabId)
       }
     }
+    flushStreamBuffer(buffer, askMessages, assistantId, askTabId)
   } catch (e) {
     if (e.name !== 'AbortError') {
       const msg = askMessages.find(m => m.id === assistantId)
@@ -647,34 +670,10 @@ async function askFromEdit(text) {
       buffer = lines.pop() || ''
 
       for (const line of lines) {
-        if (!line.startsWith('data:')) {continue}
-        const json = line.slice(5).trim()
-        if (!json) {continue}
-        try {
-          const data = JSON.parse(json)
-          const msg = askMessages.find(m => m.id === assistantId)
-          if (!msg) {continue}
-          if (data.type === 'sources') {
-            msg.sources = normalizeSources(data.sources)
-          } else if (data.type === 'chunk') {
-            msg.content = data.fullContent ?? data.content ?? ''
-            msg.streaming = true
-          } else if (data.type === 'done') {
-            msg.content = data.answer ?? msg.content
-            msg.streaming = false
-            if (state.activeTabId === askTabId) {state.streaming = false}
-          } else if (data.type === 'followup') {
-            msg.followUpQuestions = Array.isArray(data.questions) ? data.questions : []
-          } else if (data.type === 'error') {
-            msg.content = data.error ?? 'Error from server'
-            msg.streaming = false
-            msg.error = true
-            if (state.activeTabId === askTabId) {state.streaming = false}
-          }
-          if (state.activeTabId === askTabId) {render()}
-        } catch (_) {}
+        processStreamLine(line, askMessages, assistantId, askTabId)
       }
     }
+    flushStreamBuffer(buffer, askMessages, assistantId, askTabId)
   } catch (e) {
     if (e.name !== 'AbortError') {
       const msg = askMessages.find(m => m.id === assistantId)
@@ -854,8 +853,9 @@ async function init() {
   if (conv) {
     conv.addEventListener('scroll', () => {
       if (!state.streaming) {return}
-      const isNearBottom = conv.scrollHeight - conv.scrollTop - conv.clientHeight < 100
-      if (!isNearBottom) {state.shouldAutoScroll = false}
+      if (state.isAutoScrolling) {return}
+      const isNearBottom = conv.scrollHeight - conv.scrollTop - conv.clientHeight < 120
+      state.shouldAutoScroll = isNearBottom
     }, { passive: true })
   }
 

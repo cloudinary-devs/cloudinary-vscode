@@ -1,7 +1,6 @@
 import * as vscode from "vscode";
+import { getDocsAiApiBase } from "./docsAiConfig";
 import { getNonce, getScriptUri, getStyleUri } from "./webviewUtils";
-
-const DOCS_AI_API_BASE = "https://cld-docs-ai-delta.vercel.app";
 
 export class DocsAiViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = "cloudinaryDocsAI";
@@ -79,12 +78,14 @@ export class DocsAiViewProvider implements vscode.WebviewViewProvider {
     const nonce = getNonce();
     const appName = JSON.stringify(vscode.env.appName);
     const initialPromptJson = JSON.stringify(initialPrompt ?? "");
+    const apiBase = getDocsAiApiBase();
+    const apiBaseJson = JSON.stringify(apiBase);
 
     const csp = [
       "default-src 'none'",
       `style-src ${webview.cspSource} 'unsafe-inline'`,
       `script-src ${webview.cspSource} 'nonce-${nonce}'`,
-      `connect-src ${DOCS_AI_API_BASE}`,
+      `connect-src ${apiBase}`,
       `img-src ${webview.cspSource} https: data:`,
       `font-src ${webview.cspSource}`,
     ].join("; ");
@@ -138,6 +139,7 @@ export class DocsAiViewProvider implements vscode.WebviewViewProvider {
   <script nonce="${nonce}">
     window.__IDE_NAME__ = ${appName};
     window.__INITIAL_PROMPT__ = ${initialPromptJson};
+    window.__DOCS_AI_API_BASE__ = ${apiBaseJson};
   </script>
   <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>
