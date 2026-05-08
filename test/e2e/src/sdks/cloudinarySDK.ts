@@ -1,3 +1,4 @@
+import { browser } from '@wdio/globals';
 import * as cloudinary from 'cloudinary';
 
 /** Optional overrides; values fall back to `E2E_*` environment variables. */
@@ -35,5 +36,15 @@ export class CloudinarySDK {
      */
     get V2(): typeof cloudinary.v2 {
         return cloudinary.v2;
+    }
+
+    /**
+     * Waits until the asset is uploaded and the display name is the expected one.
+     */
+    public async waitUntilAssetIsUploaded(publicId: string) {
+        await browser.waitUntil(async () => {
+            const byPublicId = await this.V2.api.resource(publicId);
+            return byPublicId.public_id === publicId;
+        }, { timeout: 15000, timeoutMsg: 'Asset not uploaded in time' });
     }
 }

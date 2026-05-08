@@ -27,6 +27,7 @@ async function main() {
       "src/webview/client/welcome.ts",
       "src/webview/client/homescreen.ts",
       "src/webview/client/library.ts",
+      "src/webview/client/docs-ai.ts",
     ],
     bundle: true,
     format: "iife",

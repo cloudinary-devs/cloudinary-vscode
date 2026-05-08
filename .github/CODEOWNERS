@@ -1,0 +1,2 @@
+# Restrict .github directory changes to the R&D team
+/.github/ @cloudinary-devs/cld-developers

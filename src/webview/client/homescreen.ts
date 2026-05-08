@@ -371,6 +371,116 @@ function initSearch(): void {
   });
 }
 
+// ── Docs AI launcher ──────────────────────────────────────────────────────────
+
+function submitDocsAiQuestion(question?: string): void {
+  const input = document.getElementById("hs-docs-ai-input") as HTMLTextAreaElement | null;
+  const prompt = (question ?? input?.value ?? "").trim();
+  if (!prompt) { return; }
+
+  if (input) {
+    input.value = "";
+    input.style.height = "auto";
+  }
+  updateDocsAiSubmit();
+  getVSCode()?.postMessage({ command: "showDocsAI", data: prompt });
+}
+
+function updateDocsAiSubmit(): void {
+  const input = document.getElementById("hs-docs-ai-input") as HTMLTextAreaElement | null;
+  const submit = document.getElementById("hs-docs-ai-submit") as HTMLButtonElement | null;
+  if (submit) {
+    submit.disabled = !input?.value.trim();
+  }
+}
+
+function initDocsAiPromptScroller(): void {
+  const scroller = document.querySelector<HTMLElement>(".hs-docs-ai-chips");
+  if (!scroller || scroller.children.length < 2) { return; }
+
+  scroller.addEventListener("click", (event: MouseEvent) => {
+    const target = event.target instanceof Element
+      ? event.target.closest<HTMLButtonElement>(".hs-docs-ai-chip")
+      : null;
+    if (!target || !scroller.contains(target)) { return; }
+    submitDocsAiQuestion(target.dataset.question);
+  });
+
+  if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) { return; }
+
+  const originalChips = Array.from(scroller.querySelectorAll<HTMLButtonElement>(".hs-docs-ai-chip"));
+  originalChips.forEach((chip) => {
+    const clone = chip.cloneNode(true) as HTMLButtonElement;
+    clone.tabIndex = -1;
+    clone.setAttribute("aria-hidden", "true");
+    scroller.appendChild(clone);
+  });
+
+  let pauseUntil = 0;
+  const pause = () => {
+    pauseUntil = Date.now() + 8000;
+  };
+
+  ["focusin", "mouseenter", "pointerdown", "wheel"].forEach((eventName) => {
+    scroller.addEventListener(eventName, pause, { passive: true });
+  });
+
+  const interval = window.setInterval(() => {
+    if (!document.body.contains(scroller)) {
+      window.clearInterval(interval);
+      return;
+    }
+    if (Date.now() < pauseUntil) { return; }
+
+    const chips = Array.from(scroller.querySelectorAll<HTMLButtonElement>(".hs-docs-ai-chip"));
+    const originalCount = originalChips.length;
+    if (chips.length <= originalCount) { return; }
+
+    const chipLeft = (chip: HTMLElement) => chip.offsetLeft - scroller.offsetLeft;
+    const nearestIndex = chips.reduce((nearest, chip, index) => {
+      const distance = Math.abs(chipLeft(chip) - scroller.scrollLeft);
+      const nearestDistance = Math.abs(chipLeft(chips[nearest]) - scroller.scrollLeft);
+      return distance < nearestDistance ? index : nearest;
+    }, 0);
+    const normalizedIndex = nearestIndex >= originalCount ? nearestIndex - originalCount : nearestIndex;
+
+    if (nearestIndex >= originalCount) {
+      scroller.scrollTo({ left: chipLeft(chips[normalizedIndex]), behavior: "auto" });
+    }
+
+    const nextIndex = normalizedIndex + 1;
+    scroller.scrollTo({ left: chipLeft(chips[nextIndex]), behavior: "smooth" });
+
+    if (nextIndex >= originalCount) {
+      window.setTimeout(() => {
+        scroller.scrollTo({ left: chipLeft(chips[nextIndex - originalCount]), behavior: "auto" });
+      }, 900);
+    }
+  }, 3200);
+}
+
+function initDocsAiHome(): void {
+  const input = document.getElementById("hs-docs-ai-input") as HTMLTextAreaElement | null;
+  const submit = document.getElementById("hs-docs-ai-submit") as HTMLButtonElement | null;
+
+  input?.addEventListener("input", () => {
+    input.style.height = "auto";
+    input.style.height = `${Math.min(input.scrollHeight, 200)}px`;
+    updateDocsAiSubmit();
+  });
+
+  input?.addEventListener("keydown", (e: KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      submitDocsAiQuestion();
+    }
+  });
+
+  submit?.addEventListener("click", () => submitDocsAiQuestion());
+
+  initDocsAiPromptScroller();
+}
+
 // ── Init ──────────────────────────────────────────────────────────────────────
 
 function init(): void {
@@ -402,6 +512,7 @@ function init(): void {
 
   // Search input
   initSearch();
+  initDocsAiHome();
   initPlatformDropdown();
   initScopeToggle();
 

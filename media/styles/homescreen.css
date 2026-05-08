@@ -436,6 +436,137 @@ body {
   background: var(--vscode-panel-border, rgba(128, 128, 128, 0.14));
 }
 
+/* ── Docs AI home launcher ── */
+.hs-docs-ai-home {
+  margin: 10px 0 0;
+  padding: 18px 0 4px;
+  border-top: 1px solid var(--vscode-panel-border, rgba(128,128,128,0.14));
+}
+
+.hs-docs-ai-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  padding: 18px 0 0;
+  text-align: center;
+  color: var(--vscode-descriptionForeground);
+}
+
+.hs-docs-ai-empty-heading {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--vscode-foreground);
+  letter-spacing: 0;
+}
+
+.hs-docs-ai-empty-sub {
+  margin: -8px 0 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--vscode-descriptionForeground);
+}
+
+.hs-docs-ai-empty-input-row {
+  position: relative;
+  width: 100%;
+  margin-top: 4px;
+}
+
+.hs-docs-ai-empty-input {
+  width: 100%;
+  min-height: 100px;
+  max-height: 200px;
+  padding: 14px 46px 40px 14px;
+  overflow-y: auto;
+  resize: none;
+  background: var(--vscode-input-background, #3c3c3c);
+  border: 1px solid var(--vscode-input-border, rgba(255,255,255,0.15));
+  border-radius: 12px;
+  outline: none;
+  color: var(--vscode-input-foreground, #fff);
+  font-family: inherit;
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.hs-docs-ai-empty-input:focus {
+  border-color: #4A5FD9;
+}
+
+.hs-docs-ai-empty-input::placeholder {
+  color: var(--vscode-input-placeholderForeground, rgba(255,255,255,0.4));
+}
+
+.hs-docs-ai-empty-send-btn {
+  position: absolute;
+  right: 8px;
+  bottom: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: #4A5FD9;
+  cursor: pointer;
+  color: #fff;
+  transition: opacity 0.15s;
+}
+
+.hs-docs-ai-empty-send-btn:hover { opacity: 0.85; }
+.hs-docs-ai-empty-send-btn:disabled { opacity: 0.3; cursor: default; }
+
+.hs-docs-ai-chips {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0 0 2px;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+}
+
+.hs-docs-ai-chips::-webkit-scrollbar {
+  display: none;
+}
+
+.hs-docs-ai-chip {
+  flex: 0 0 auto;
+  width: max-content;
+  max-width: none;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 8px;
+  background: #4A5FD9;
+  color: #fff;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1.25;
+  text-align: left;
+  white-space: nowrap;
+  scroll-snap-align: start;
+  transition: opacity 0.15s;
+}
+
+.hs-docs-ai-chip:hover {
+  opacity: 0.85;
+}
+
+.hs-docs-ai-empty-send-btn:focus-visible,
+.hs-docs-ai-chip:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: 2px;
+}
+
 /* ── Footer ── */
 .hs-footer {
   padding: 8px 16px 12px;

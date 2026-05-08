@@ -11,6 +11,7 @@ import registerConfigureAiTools from "./configureAiTools";
 import { CloudinaryService } from "../cloudinary/cloudinaryService";
 import { HomescreenViewProvider } from "../webview/homescreenView";
 import { LibraryWebviewViewProvider } from "../webview/libraryView";
+import { DocsAiViewProvider } from "../webview/docsAiView";
 
 /**
  * Registers all Cloudinary-related commands with the VS Code command registry.
@@ -25,7 +26,8 @@ function registerAllCommands(
   environmentTarget: Parameters<typeof registerSwitchEnv>[1],
   statusBar: vscode.StatusBarItem,
   homescreenProvider: HomescreenViewProvider,
-  libraryWebview?: LibraryWebviewViewProvider
+  libraryWebview: LibraryWebviewViewProvider,
+  docsAiProvider: DocsAiViewProvider
 ) {
   context.subscriptions.push(
     vscode.commands.registerCommand("cloudinary.showHomescreen", () => {
@@ -41,8 +43,20 @@ function registerAllCommands(
   );
 
   context.subscriptions.push(
+    vscode.commands.registerCommand("cloudinary.showDocsAI", (initialPrompt?: string) => {
+      docsAiProvider.queuePrompt(initialPrompt);
+      vscode.commands.executeCommand("setContext", "cloudinary.activeView", "docsAi");
+      vscode.commands.executeCommand("workbench.view.extension.cloudinary");
+      setTimeout(() => {
+        vscode.commands.executeCommand("cloudinaryDocsAI.focus");
+        docsAiProvider.flushPendingPrompt(250);
+      }, 150);
+    })
+  );
+
+  context.subscriptions.push(
     vscode.commands.registerCommand("cloudinary.refresh", async () => {
-      await libraryWebview?.refresh();
+      await libraryWebview.refresh();
     })
   );
 

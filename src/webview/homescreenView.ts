@@ -105,6 +105,9 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
           case "showLibrary":
             vscode.commands.executeCommand("cloudinary.showLibrary");
             break;
+          case "showDocsAI":
+            vscode.commands.executeCommand("cloudinary.showDocsAI", message.data);
+            break;
           case "openUploadWidget":
             vscode.commands.executeCommand("cloudinary.openUploadWidget");
             break;
@@ -254,7 +257,7 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
         </div>
 
         <div class="hs-actions">
-          <button id="hs-btn-library" class="hs-action" data-command="showLibrary">
+          <button id="hs-btn-library" class="hs-action" data-command="showLibrary" data-testid="hs-browse-library-button">
             <span class="hs-action-icon hs-action-icon--blue" aria-hidden="true">
               <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M1 2.828c.885-.37 2.154-.769 3.388-.893 1.33-.134 2.458.063 3.112.752v9.746c-.935-.53-2.12-.603-3.213-.493-1.18.12-2.37.461-3.287.811V2.828zm7.5-.141c.654-.689 1.782-.886 3.112-.752 1.234.124 2.503.523 3.388.893v9.923c-.918-.35-2.107-.692-3.287-.81-1.094-.111-2.278-.039-3.213.492V2.687zM8 1.783C7.015.936 5.587.81 4.287.94c-1.514.153-3.042.672-3.994 1.105A.5.5 0 0 0 0 2.5v11a.5.5 0 0 0 .707.455c.882-.4 2.303-.881 3.68-1.02 1.409-.142 2.59.087 3.223.877a.5.5 0 0 0 .78 0c.633-.79 1.814-1.019 3.222-.877 1.378.139 2.8.62 3.681 1.02A.5.5 0 0 0 16 13.5v-11a.5.5 0 0 0-.293-.455c-.952-.433-2.48-.952-3.994-1.105C10.413.809 8.985.936 8 1.783z"/></svg>
             </span>
@@ -359,6 +362,33 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
             </div>
 
           </div><!-- /hs-ai-panel -->
+
+          <section class="hs-docs-ai-home" aria-labelledby="hs-docs-ai-heading">
+            <div class="hs-docs-ai-empty">
+              <h2 id="hs-docs-ai-heading" class="hs-docs-ai-empty-heading">Ask Cloudinary</h2>
+              <p class="hs-docs-ai-empty-sub">Ask me anything about our products and documentation.</p>
+              <div class="hs-docs-ai-empty-input-row">
+                <textarea
+                  id="hs-docs-ai-input"
+                  class="hs-docs-ai-empty-input"
+                  rows="1"
+                  placeholder="Send a message..."
+                  autocomplete="off"
+                  dir="auto"
+                  spellcheck="true"
+                  aria-label="Ask Cloudinary documentation"
+                ></textarea>
+                <button id="hs-docs-ai-submit" class="hs-docs-ai-empty-send-btn" type="button" title="Send message" aria-label="Send message" disabled>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                </button>
+              </div>
+              <div class="hs-docs-ai-chips" aria-label="Suggested documentation questions">
+                <button class="hs-docs-ai-chip" type="button" data-question="How do I upload images?">How do I upload images?</button>
+                <button class="hs-docs-ai-chip" type="button" data-question="Explain image transformations">Explain image transformations</button>
+                <button class="hs-docs-ai-chip" type="button" data-question="What SDKs does Cloudinary support?">What SDKs does Cloudinary support?</button>
+              </div>
+            </div>
+          </section>
         </div>
 
         <div class="hs-footer">

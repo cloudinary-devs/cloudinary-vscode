@@ -1,11 +1,23 @@
 import { browser, expect } from "@wdio/globals"
 import { TreeItem } from "wdio-vscode-service"
 import allureReporter from '@wdio/allure-reporter'
+import { HomeScreenViewPage } from "../webViewTabs/HomeScreenViewPage.js";
+
+/**
+ * Actions available in the Side Bar View.
+ */
+export enum SideBarViewActions {
+    UPLOAD = ' Upload',
+    SEARCH = ' Search',
+    REFRESH = '  Refresh',
+}
 
 /**
  * Utility class for interacting with the Side Bar View in VS Code.
  */
 class SideBarViewUtils {
+    public readonly homeScreenViewPage = new HomeScreenViewPage();
+
     /**
      * Gets the Side Bar View instance.
      */
@@ -47,15 +59,54 @@ class SideBarViewUtils {
     public async validateContentItemsExist(expectedItems: string[]) {
         await allureReporter.addStep(`Validate content items exist: [${expectedItems.join(', ')}]`);
         await this.waitContentToLoad();
+        let itemLabels: string[] = [];
+        await browser.waitUntil(async () => {
+            try {
+                const content = await this.getSideBarViewContent();
+                const sections = await content.getSections();
+                const visibleItems = await sections[0].getVisibleItems() as TreeItem[];
+                itemLabels = await Promise.all(
+                    visibleItems.map(item => item.getLabel())
+                );
+                return itemLabels.includes(expectedItems[0]);
+            } catch {
+                return false;
+            }
+        }, { timeout: 15000, timeoutMsg: 'Timed out waiting for content items to be available' });
+
+        for (const expected of expectedItems) {
+            expect(itemLabels).toContain(expected);
+        }
+    }
+
+    /**
+     * Waits for the content of the Side Bar View to load.
+     */
+    public async clickAction(action: SideBarViewActions) {
+        await allureReporter.addStep(`Click the "${action.trim()}" action button`);
+        const sideBarView = await this.getSideBarView();
+        const titlePart = sideBarView.getTitlePart();
+        const actionButton = await titlePart.elem.$(`.//*[@title='${action}' or @aria-label='${action}']`);
+        await actionButton.waitForClickable();
+        await actionButton.click();
+    }
+
+    /**
+     * Validates that the Side Bar View contains exactly the expected items and no others.
+     */
+    public async validateContentItemsNumber(expectedItemsNumber: number) {
+        await allureReporter.addStep(`Validate only ${expectedItemsNumber} items are visible`);
+        await this.waitContentToLoad();
         const content = await this.getSideBarViewContent();
         const sections = await content.getSections();
         const visibleItems = await sections[0].getVisibleItems() as TreeItem[];
         const itemLabels = await Promise.all(
             visibleItems.map(item => item.getLabel())
         );
-        for (const expected of expectedItems) {
-            expect(itemLabels).toContain(expected);
-        }
+
+        await browser.waitUntil(async () => {
+            return itemLabels.length === expectedItemsNumber;
+        }, { timeout: 15000, timeoutMsg: `Expected ${itemLabels.length} items, but got ${expectedItemsNumber} items` })
     }
 
     /**
