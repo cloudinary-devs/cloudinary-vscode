@@ -4,8 +4,6 @@ import { CloudinarySDK } from '../src/sdks/cloudinarySDK.js';
 import { activityBarUtils } from '../src/vscodeComponentsUtils/ActivityBarUtils.js';
 import { SideBarViewActions, sideBarViewUtils } from '../src/vscodeComponentsUtils/SideBarViewUtils.js';
 import { pathUtils } from '../src/utils/pathUtils.js';
-import { inputBoxUtils } from '../src/vscodeComponentsUtils/InputBoxUtils.js';
-import { browser } from '@wdio/globals';
 
 describe('Search asset from side bar', () => {
 
@@ -33,10 +31,12 @@ describe('Search asset from side bar', () => {
 
     it('should find the uploaded asset via sidebar search', async () => {
         await activityBarUtils.openView('Cloudinary');
+        await sideBarViewUtils.homeScreenViewPage.clickBrowseLibraryButton();
+        await sideBarViewUtils.waitContentToLoad();
 
         await sideBarViewUtils.clickAction(SideBarViewActions.SEARCH);
 
-        await inputBoxUtils.fillAndConfirm(assetPublicID);
+        await sideBarViewUtils.homeScreenViewPage.fillSearchInput(assetPublicID);
 
         await sideBarViewUtils.validateContentItemsExist(['Clear Search', assetPublicID]);
         await sideBarViewUtils.validateContentItemsNumber(2);

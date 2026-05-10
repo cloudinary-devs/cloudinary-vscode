@@ -56,6 +56,7 @@ jobs:
           retention-days: 30
 
       - name: Set timestamp.
+        if: always()
         id: timestamp
         run: echo "TIMESTAMP=$(date +%Y%m%d_%H%M%S_%3N)" >> $GITHUB_ENV
 

@@ -39,6 +39,7 @@ describe('Asset Explorer Tetsts', () => {
         const expectedItems = [firstAssetPublicID, secondAssetPublicID];
         
         await activityBarUtils.openView('Cloudinary');
+        await sideBarViewUtils.homeScreenViewPage.clickBrowseLibraryButton();
 
         await sideBarViewUtils.validateSideBarViewTitle(expectedTitle);
 
