@@ -79,7 +79,7 @@ When the existing utils don't cover a step:
 - Place in `test/e2e/src/webViewTabs/`
 - Extend `WebViewTabBase`
 
-**Do NOT create convenience methods that combine multiple utils** (e.g. don't create `sideBarViewUtils.search()` that internally calls `inputBoxUtils.fillAndConfirm()`). The spec file is where utils get composed together.
+**Do NOT create convenience methods that combine multiple utils** (e.g. don't create `sideBarViewUtils.search()` that internally calls `homeScreenViewPage.fillSearchInput()`). The spec file is where utils get composed together.
 
 ### Step 4: Write the spec file
 
@@ -154,7 +154,7 @@ Before presenting the result, verify:
 - [ ] Asset IDs use `crypto.randomUUID().substring(0, 8)`
 - [ ] File is named `camelCase.spec.ts` under `test/e2e/specs/`
 - [ ] One `describe` block with one feature area
-- [ ] Spec composes util calls directly (e.g. `clickAction()` + `inputBoxUtils.fillAndConfirm()` as separate calls)
+- [ ] Spec composes util calls directly (e.g. `clickAction()` + `homeScreenViewPage.fillSearchInput()` as separate calls)
 
 ## Example: Converting a user flow to a test
 
@@ -169,7 +169,7 @@ Before presenting the result, verify:
 **Step-by-step mapping:**
 - Step 1 → `beforeEach` (seed via `cloudinarySDK.V2.uploader.upload()`)
 - Step 2 → `sideBarViewUtils.clickAction(SideBarViewActions.SEARCH)` (reuses existing `clickAction`)
-- Step 3 → `inputBoxUtils.fillAndConfirm(assetPublicID)` (separate call, NOT wrapped inside sideBarViewUtils)
+- Step 3 → `sideBarViewUtils.homeScreenViewPage.fillSearchInput(assetPublicID)` (separate call, NOT wrapped inside sideBarViewUtils)
 - Step 4 → `sideBarViewUtils.validateContentItemsExist(...)` + `sideBarViewUtils.validateContentItemsNumber(...)` (two calls)
 - Cleanup → `afterEach` deletes the asset
 
@@ -214,7 +214,7 @@ describe('Search asset from side bar', () => {
 
         await sideBarViewUtils.clickAction(SideBarViewActions.SEARCH);
 
-        await inputBoxUtils.fillAndConfirm(assetPublicID);
+        await sideBarViewUtils.homeScreenViewPage.fillSearchInput(assetPublicID);
 
         await sideBarViewUtils.validateContentItemsExist(['Clear Search', assetPublicID]);
         await sideBarViewUtils.validateContentItemsNumber(2);
@@ -223,7 +223,7 @@ describe('Search asset from side bar', () => {
 ```
 
 **Key patterns demonstrated:**
-- Utils are composed directly in the spec (`clickAction` + `inputBoxUtils.fillAndConfirm` as separate calls)
-- No cross-util imports — `SideBarViewUtils` does NOT import `InputBoxUtils`
+- Utils are composed directly in the spec (`clickAction` + `homeScreenViewPage.fillSearchInput` as separate calls)
+- No cross-util imports — `SideBarViewUtils` does NOT import webview page objects directly
 - Validations are split: `validateContentItemsExist` for labels + `validateContentItemsNumber` for count
 - `SideBarViewActions.SEARCH` enum is imported alongside the util

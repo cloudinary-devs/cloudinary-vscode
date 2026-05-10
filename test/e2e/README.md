@@ -141,7 +141,7 @@ describe('Search asset from side bar', () => {
 
         await sideBarViewUtils.clickAction(SideBarViewActions.SEARCH);
 
-        await inputBoxUtils.fillAndConfirm(assetPublicID);
+        await sideBarViewUtils.homeScreenViewPage.fillSearchInput(assetPublicID);
 
         await sideBarViewUtils.validateContentItemsExist(['Clear Search', assetPublicID]);
         await sideBarViewUtils.validateContentItemsNumber(2);
