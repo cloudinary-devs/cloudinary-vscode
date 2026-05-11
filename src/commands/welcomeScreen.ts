@@ -1,21 +1,23 @@
 import * as vscode from "vscode";
-import { CloudinaryTreeDataProvider } from "../tree/treeDataProvider";
+import { CloudinaryService } from "../cloudinary/cloudinaryService";
 import {
   createWebviewDocument,
   getScriptUri,
 } from "../webview/webviewUtils";
 import { escapeHtml } from "../webview/utils/helpers";
 
+type WelcomeScreenCloudinaryState = Pick<CloudinaryService, "cloudName" | "apiKey">;
+
 /**
  * Registers the welcome screen command.
  */
 function registerWelcomeScreen(
   context: vscode.ExtensionContext,
-  provider: CloudinaryTreeDataProvider
+  cloudinaryState: WelcomeScreenCloudinaryState
 ) {
   context.subscriptions.push(
     vscode.commands.registerCommand("cloudinary.openWelcomeScreen", () => {
-      createWelcomePanel(context, provider);
+      createWelcomePanel(context, cloudinaryState);
     })
   );
 }
@@ -25,7 +27,7 @@ function registerWelcomeScreen(
  */
 function createWelcomePanel(
   context: vscode.ExtensionContext,
-  provider: CloudinaryTreeDataProvider
+  cloudinaryState: WelcomeScreenCloudinaryState
 ): vscode.WebviewPanel {
   const panel = vscode.window.createWebviewPanel(
     "cloudinaryWelcome",
@@ -56,7 +58,7 @@ function createWelcomePanel(
     title: "Welcome to Cloudinary",
     webview: panel.webview,
     extensionUri: context.extensionUri,
-    bodyContent: getWelcomeContent(provider),
+    bodyContent: getWelcomeContent(cloudinaryState),
     additionalScripts: [welcomeScriptUri],
   });
 
@@ -77,7 +79,7 @@ function createWelcomePanel(
           vscode.env.openExternal(vscode.Uri.parse(message.data));
         }
         break;
-      case "focusTreeView":
+      case "focusDashboard":
         vscode.commands.executeCommand("workbench.view.extension.cloudinary");
         break;
     }
@@ -89,9 +91,9 @@ function createWelcomePanel(
 /**
  * Generates the welcome screen body content.
  */
-function getWelcomeContent(provider: CloudinaryTreeDataProvider): string {
-  const hasConfig = !!(provider.cloudName && provider.apiKey);
-  const cloudName = escapeHtml(provider.cloudName || "");
+function getWelcomeContent(cloudinaryState: WelcomeScreenCloudinaryState): string {
+  const hasConfig = !!(cloudinaryState.cloudName && cloudinaryState.apiKey);
+  const cloudName = escapeHtml(cloudinaryState.cloudName || "");
 
   return `
   <style>
@@ -347,9 +349,9 @@ function getWelcomeContent(provider: CloudinaryTreeDataProvider): string {
           <div class="wg-status-detail">${hasConfig ? "Your environment is ready. Open the dashboard to explore your media." : "Add your Cloudinary API credentials to get started."}</div>
         </div>
         ${hasConfig
-          ? `<button class="wg-btn wg-btn--ghost" onclick="focusTreeView()">Open Dashboard →</button>`
-          : `<button class="wg-btn wg-btn--primary" onclick="openGlobalConfig()">Configure →</button>`
-        }
+      ? `<button class="wg-btn wg-btn--ghost" onclick="focusDashboard()">Open Dashboard →</button>`
+      : `<button class="wg-btn wg-btn--primary" onclick="openGlobalConfig()">Configure →</button>`
+    }
       </div>
 
       <!-- ── Setup steps ── -->
@@ -381,7 +383,7 @@ function getWelcomeContent(provider: CloudinaryTreeDataProvider): string {
             <div class="wg-step-title">Explore the Dashboard</div>
             <p class="wg-step-desc">The Cloudinary sidebar gives you instant access to your media library, upload tools, and AI integrations — all without leaving your editor. Open it from the activity bar on the left.</p>
             <div class="wg-step-actions">
-              <button class="wg-btn wg-btn--primary" onclick="focusTreeView()">Open Dashboard</button>
+              <button class="wg-btn wg-btn--primary" onclick="focusDashboard()">Open Dashboard</button>
             </div>
           </div>
         </div>
@@ -390,7 +392,7 @@ function getWelcomeContent(provider: CloudinaryTreeDataProvider): string {
           <div class="wg-step-num">3</div>
           <div class="wg-step-body">
             <div class="wg-step-title">Browse &amp; manage your media</div>
-            <p class="wg-step-desc">Search and explore assets in the tree view. Preview images and videos, copy delivery URLs, upload new files with drag-and-drop, and manage transformations — all from VS Code.</p>
+            <p class="wg-step-desc">Search and explore assets in the media library. Preview images and videos, copy delivery URLs, upload new files with drag-and-drop, and manage transformations — all from VS Code.</p>
             <div class="wg-step-actions">
               <button class="wg-btn wg-btn--ghost" onclick="openExternal('https://cloudinary.com/documentation/how_to_integrate_cloudinary')">View Documentation</button>
             </div>

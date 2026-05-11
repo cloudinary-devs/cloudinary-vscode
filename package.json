@@ -58,6 +58,7 @@
         {
           "id": "cloudinaryMediaLibrary",
           "name": "",
+          "type": "webview",
           "when": "cloudinary.activeView == 'library'"
         }
       ]
@@ -136,60 +137,7 @@
         "title": "Configure AI Tools",
         "category": "Cloudinary"
       }
-    ],
-    "menus": {
-      "view/title": [
-        {
-          "command": "cloudinary.showHomescreen",
-          "when": "view == cloudinaryMediaLibrary",
-          "group": "navigation@0"
-        },
-        {
-          "command": "cloudinary.refresh",
-          "when": "view == cloudinaryMediaLibrary",
-          "group": "navigation@1"
-        },
-        {
-          "command": "cloudinary.openUploadWidget",
-          "when": "view == cloudinaryMediaLibrary",
-          "group": "navigation@2"
-        },
-        {
-          "command": "cloudinary.searchAssets",
-          "when": "view == cloudinaryMediaLibrary",
-          "group": "navigation@3"
-        },
-        {
-          "command": "cloudinary.viewOptions",
-          "when": "view == cloudinaryMediaLibrary",
-          "group": "navigation@4"
-        },
-        {
-          "command": "cloudinary.openGlobalConfig",
-          "when": "view == cloudinaryMediaLibrary",
-          "group": "navigation@5"
-        }
-      ],
-      "view/item/context": [
-        {
-          "command": "cloudinary.copyUrl",
-          "when": "view == cloudinaryMediaLibrary && viewItem == 'asset'"
-        },
-        {
-          "command": "cloudinary.copyPublicId",
-          "when": "view == cloudinaryMediaLibrary && viewItem == 'asset'"
-        },
-        {
-          "command": "cloudinary.copyOptimizedUrl",
-          "when": "view == cloudinaryMediaLibrary && viewItem == 'asset'"
-        },
-        {
-          "command": "cloudinary.uploadToFolder",
-          "when": "view == cloudinaryMediaLibrary && viewItem == 'folder'",
-          "group": "inline"
-        }
-      ]
-    }
+    ]
   },
   "scripts": {
     "compile": "npm run check-types && node esbuild.js",

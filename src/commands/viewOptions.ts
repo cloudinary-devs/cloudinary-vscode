@@ -1,24 +1,31 @@
 import * as vscode from "vscode";
-import { CloudinaryTreeDataProvider } from "../tree/treeDataProvider";
+import { LibraryWebviewViewProvider } from "../webview/libraryView";
 
 type ResourceType = "all" | "image" | "video" | "raw";
 type SortDirection = "asc" | "desc";
+type ViewStateUpdate = {
+  resourceTypeFilter?: ResourceType;
+  sortDirection?: SortDirection;
+};
+type ViewAwareLibraryWebview = LibraryWebviewViewProvider & {
+  applyView?: (opts: ViewStateUpdate) => Thenable<void> | Promise<void>;
+};
 
 interface ViewOption {
   label: string;
   description?: string;
   kind?: vscode.QuickPickItemKind;
-  action?: () => void;
+  viewState?: ViewStateUpdate;
 }
 
 /**
  * Registers a command that opens a Quick Pick with view options (filter and sort).
  * @param context - VS Code extension context.
- * @param provider - Cloudinary tree data provider instance.
+ * @param libraryWebview - Cloudinary library webview provider.
  */
 function registerViewOptions(
   context: vscode.ExtensionContext,
-  provider: CloudinaryTreeDataProvider
+  libraryWebview?: LibraryWebviewViewProvider
 ) {
   context.subscriptions.push(
     vscode.commands.registerCommand(
@@ -30,34 +37,34 @@ function registerViewOptions(
           {
             label: "$(file) All Types",
             description: "Show all asset types",
-            action: () => provider.refresh({ resourceTypeFilter: "all" as ResourceType }),
+            viewState: { resourceTypeFilter: "all" as ResourceType },
           },
           {
             label: "$(file-media) Images Only",
             description: "Show only images",
-            action: () => provider.refresh({ resourceTypeFilter: "image" as ResourceType }),
+            viewState: { resourceTypeFilter: "image" as ResourceType },
           },
           {
             label: "$(device-camera-video) Videos Only",
             description: "Show only videos",
-            action: () => provider.refresh({ resourceTypeFilter: "video" as ResourceType }),
+            viewState: { resourceTypeFilter: "video" as ResourceType },
           },
           {
             label: "$(file-binary) Raw Files Only",
             description: "Show only raw files",
-            action: () => provider.refresh({ resourceTypeFilter: "raw" as ResourceType }),
+            viewState: { resourceTypeFilter: "raw" as ResourceType },
           },
           // Sort section
           { label: "Sort Order", kind: vscode.QuickPickItemKind.Separator },
           {
             label: "$(arrow-down) Newest First",
             description: "Most recently uploaded assets first",
-            action: () => provider.refresh({ sortDirection: "desc" as SortDirection }),
+            viewState: { sortDirection: "desc" as SortDirection },
           },
           {
             label: "$(arrow-up) Oldest First",
             description: "Oldest uploaded assets first",
-            action: () => provider.refresh({ sortDirection: "asc" as SortDirection }),
+            viewState: { sortDirection: "asc" as SortDirection },
           },
         ];
 
@@ -66,8 +73,8 @@ function registerViewOptions(
           matchOnDescription: true,
         });
 
-        if (selected && selected.action) {
-          selected.action();
+        if (selected?.viewState) {
+          await (libraryWebview as ViewAwareLibraryWebview | undefined)?.applyView?.(selected.viewState);
         }
       }
     )

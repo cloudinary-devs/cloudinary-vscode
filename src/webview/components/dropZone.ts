@@ -428,7 +428,7 @@ export function createUploadedAssetsSection(
   return `
     <div id="uploaded-assets" class="uploaded-assets hidden">
       <div class="uploaded-assets__header">
-        <h3 class="uploaded-assets__title">✅ ${escapeHtml(title)}</h3>
+        <h3 class="uploaded-assets__title">${escapeHtml(title)}</h3>
         ${clearButtonHtml}
       </div>
       <div id="asset-grid" class="asset-grid">
@@ -437,4 +437,3 @@ export function createUploadedAssetsSection(
     </div>
   `;
 }
-

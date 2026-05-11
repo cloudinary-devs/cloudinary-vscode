@@ -21,8 +21,8 @@ function openExternal(url: string): void {
 /**
  * Focus the Cloudinary sidebar (opens the dashboard).
  */
-function focusTreeView(): void {
-  getVSCode()?.postMessage({ command: "focusTreeView" });
+function focusDashboard(): void {
+  getVSCode()?.postMessage({ command: "focusDashboard" });
 }
 
 /**
@@ -46,14 +46,14 @@ declare global {
   interface Window {
     openGlobalConfig: typeof openGlobalConfig;
     openExternal: typeof openExternal;
-    focusTreeView: typeof focusTreeView;
+    focusDashboard: typeof focusDashboard;
     getConfigExample: typeof getConfigExample;
   }
 }
 
 window.openGlobalConfig = openGlobalConfig;
 window.openExternal = openExternal;
-window.focusTreeView = focusTreeView;
+window.focusDashboard = focusDashboard;
 window.getConfigExample = getConfigExample;
 
 // Initialize common functionality when this script loads
