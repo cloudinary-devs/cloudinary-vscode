@@ -187,5 +187,6 @@ export async function confirmRename(id, newTitle) {
   renamingId = null
   renderHistoryDropdown()
   renderTabBar()
+  callbacks.syncRecentConversations()
   persistTabState()
 }

@@ -30,6 +30,13 @@ import {
   getPlatformCovers,
 } from "../aiToolsService";
 
+export interface DocsAiRecentConversation {
+  id: string;
+  title: string;
+  createdAt?: number;
+  updatedAt?: number;
+}
+
 export class HomescreenViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = "cloudinaryHomescreen";
 
@@ -43,6 +50,8 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
   private _cachedSkills: SkillInfo[] | undefined;
   private _currentPlatform: string = "claude-code";
   private _currentScope: Scope = "project";
+  private _docsAiRecentConversations: DocsAiRecentConversation[] = [];
+  private _requestDocsAiRecentConversations: (() => void) | undefined;
 
   async resolveWebviewView(
     webviewView: vscode.WebviewView,
@@ -99,6 +108,10 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
           case "ready":
             await this._sendHomescreenData();
             break;
+          case "refreshDocsAiRecentConversations":
+            this._requestDocsAiRecentConversations?.();
+            this._sendDocsAiRecentConversations();
+            break;
           case "openGlobalConfig":
             vscode.commands.executeCommand("cloudinary.openGlobalConfig");
             break;
@@ -107,6 +120,9 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
             break;
           case "showDocsAI":
             vscode.commands.executeCommand("cloudinary.showDocsAI", message.data);
+            break;
+          case "showDocsAIConversation":
+            vscode.commands.executeCommand("cloudinary.showDocsAIConversation", message.data);
             break;
           case "openUploadWidget":
             vscode.commands.executeCommand("cloudinary.openUploadWidget");
@@ -187,6 +203,17 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
     await this._sendHomescreenData();
   }
 
+  setDocsAiRecentConversations(conversations: DocsAiRecentConversation[]): void {
+    this._docsAiRecentConversations = conversations
+      .filter((conversation) => conversation.id && conversation.title)
+      .sort((a, b) => (b.updatedAt ?? b.createdAt ?? 0) - (a.updatedAt ?? a.createdAt ?? 0));
+    this._sendDocsAiRecentConversations();
+  }
+
+  setDocsAiRecentConversationsRefresh(handler: () => void): void {
+    this._requestDocsAiRecentConversations = handler;
+  }
+
   private async _sendHomescreenData(): Promise<void> {
     const view = this._webviewView;
     if (!view) { return; }
@@ -202,6 +229,15 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
     } catch { /* use default */ }
 
     this._safePost({ command: "homescreenData", hasConfig, cloudName, folderMode, envCount });
+    this._sendDocsAiRecentConversations();
+    this._requestDocsAiRecentConversations?.();
+  }
+
+  private _sendDocsAiRecentConversations(): void {
+    this._safePost({
+      command: "docsAiRecentConversations",
+      conversations: this._docsAiRecentConversations,
+    });
   }
 
   private _getBodyContent(logoUri: vscode.Uri): string {
@@ -383,9 +419,19 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
                 </button>
               </div>
               <div class="hs-docs-ai-chips" aria-label="Suggested documentation questions">
+                <button class="hs-docs-ai-chip" type="button" data-question="What's new in Cloudinary?">What's new in Cloudinary?</button>
                 <button class="hs-docs-ai-chip" type="button" data-question="How do I upload images?">How do I upload images?</button>
                 <button class="hs-docs-ai-chip" type="button" data-question="Explain image transformations">Explain image transformations</button>
                 <button class="hs-docs-ai-chip" type="button" data-question="What SDKs does Cloudinary support?">What SDKs does Cloudinary support?</button>
+              </div>
+              <div class="hs-docs-ai-history-toggle-wrap">
+                <button id="hs-docs-ai-history-toggle" class="hs-docs-ai-history-toggle hidden" type="button" title="View recent conversations" aria-label="View recent conversations" aria-expanded="false">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                  <span class="hs-docs-ai-history-toggle-label">View recent conversations</span>
+                </button>
+              </div>
+              <div id="hs-docs-ai-recent" class="hs-docs-ai-history-panel hidden" aria-label="Conversation history">
+                <div id="hs-docs-ai-recent-list" class="hs-docs-ai-recent-list"></div>
               </div>
             </div>
           </section>

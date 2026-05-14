@@ -29,6 +29,10 @@ export const INITIAL_PROMPT =
   typeof window !== 'undefined' && typeof window.__INITIAL_PROMPT__ === 'string'
     ? window.__INITIAL_PROMPT__.trim()
     : ''
+export const INITIAL_CONVERSATION_ID =
+  typeof window !== 'undefined' && typeof window.__INITIAL_CONVERSATION_ID__ === 'string'
+    ? window.__INITIAL_CONVERSATION_ID__.trim()
+    : ''
 
 export const state = {
   messages: [],
@@ -49,6 +53,7 @@ export const tabMessagesCache = new Map()
 export const tabStreamState = new Map()
 
 export const starterQuestions = [
+  'What\'s new in Cloudinary?',
   'How do I upload images?',
   'Explain image transformations',
   'How do I optimize videos?',
@@ -143,4 +148,5 @@ export function timeAgo(ts) {
 export const callbacks = {
   render: () => {},
   renderHistoryDropdown: () => {},
+  syncRecentConversations: () => {},
 }

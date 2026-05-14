@@ -31,7 +31,12 @@ function registerAllCommands(
 ) {
   context.subscriptions.push(
     vscode.commands.registerCommand("cloudinary.showHomescreen", () => {
+      docsAiProvider.requestRecentConversations();
       vscode.commands.executeCommand("setContext", "cloudinary.activeView", "homescreen");
+      vscode.commands.executeCommand("workbench.view.extension.cloudinary");
+      setTimeout(() => {
+        void homescreenProvider.refresh();
+      }, 150);
     })
   );
 
@@ -50,6 +55,18 @@ function registerAllCommands(
       setTimeout(() => {
         vscode.commands.executeCommand("cloudinaryDocsAI.focus");
         docsAiProvider.flushPendingPrompt(250);
+      }, 150);
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand("cloudinary.showDocsAIConversation", (conversationId?: string) => {
+      docsAiProvider.queueConversation(conversationId);
+      vscode.commands.executeCommand("setContext", "cloudinary.activeView", "docsAi");
+      vscode.commands.executeCommand("workbench.view.extension.cloudinary");
+      setTimeout(() => {
+        vscode.commands.executeCommand("cloudinaryDocsAI.focus");
+        docsAiProvider.flushPendingConversation(250);
       }, 150);
     })
   );

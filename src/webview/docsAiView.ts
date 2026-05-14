@@ -1,14 +1,27 @@
 import * as vscode from "vscode";
 import { getDocsAiApiBase } from "./docsAiConfig";
 import { getNonce, getScriptUri, getStyleUri } from "./webviewUtils";
+import type { DocsAiRecentConversation } from "./homescreenView";
 
 export class DocsAiViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = "cloudinaryDocsAI";
 
   private _view: vscode.WebviewView | undefined;
   private _pendingPrompt: string | undefined;
+  private _pendingConversationId: string | undefined;
+  private readonly _recentConversationsStorageKey = "cloudinary.docsAiRecentConversations";
 
-  constructor(private readonly _extensionUri: vscode.Uri) {}
+  constructor(
+    private readonly _extensionUri: vscode.Uri,
+    private readonly _globalState: vscode.Memento,
+    private readonly _onRecentConversationsChange: (conversations: DocsAiRecentConversation[]) => void
+  ) {
+    const cached = this._globalState.get<DocsAiRecentConversation[]>(
+      this._recentConversationsStorageKey,
+      []
+    );
+    this._onRecentConversationsChange(cached);
+  }
 
   resolveWebviewView(view: vscode.WebviewView): void {
     this._view = view;
@@ -21,8 +34,17 @@ export class DocsAiViewProvider implements vscode.WebviewViewProvider {
       localResourceRoots: [vscode.Uri.joinPath(this._extensionUri, "media")],
     };
 
+    view.webview.onDidReceiveMessage((message: { command?: string; conversations?: DocsAiRecentConversation[] }) => {
+      if (message.command === "docsAiRecentConversations") {
+        this._handleRecentConversations(message.conversations);
+      } else if (message.command === "showHomescreen") {
+        vscode.commands.executeCommand("cloudinary.showHomescreen");
+      }
+    });
+
     const initialPrompt = this.consumePendingPrompt();
-    view.webview.html = this.getHtml(view.webview, initialPrompt);
+    const initialConversationId = this.consumePendingConversationId();
+    view.webview.html = this.getHtml(view.webview, initialPrompt, initialConversationId);
   }
 
   refresh(): void {
@@ -31,7 +53,12 @@ export class DocsAiViewProvider implements vscode.WebviewViewProvider {
       return;
     }
     const initialPrompt = this.consumePendingPrompt();
-    view.webview.html = this.getHtml(view.webview, initialPrompt);
+    const initialConversationId = this.consumePendingConversationId();
+    view.webview.html = this.getHtml(view.webview, initialPrompt, initialConversationId);
+  }
+
+  requestRecentConversations(): void {
+    this._view?.webview.postMessage({ command: "syncRecentConversations" });
   }
 
   queuePrompt(prompt: unknown): void {
@@ -40,6 +67,7 @@ export class DocsAiViewProvider implements vscode.WebviewViewProvider {
       return;
     }
     this._pendingPrompt = value;
+    this._pendingConversationId = undefined;
     this.flushPendingPrompt();
   }
 
@@ -66,18 +94,74 @@ export class DocsAiViewProvider implements vscode.WebviewViewProvider {
     postPrompt();
   }
 
+  queueConversation(conversationId: unknown): void {
+    const value = typeof conversationId === "string" ? conversationId.trim() : "";
+    if (!value) {
+      return;
+    }
+    this._pendingPrompt = undefined;
+    this._pendingConversationId = value;
+    this.flushPendingConversation();
+  }
+
+  flushPendingConversation(delay = 0): void {
+    const view = this._view;
+    if (!view || !this._pendingConversationId) {
+      return;
+    }
+
+    const postConversation = () => {
+      if (!this._view || !this._pendingConversationId) {
+        return;
+      }
+      const conversationId = this._pendingConversationId;
+      this._pendingConversationId = undefined;
+      this._view.webview.postMessage({ command: "openConversation", conversationId });
+    };
+
+    if (delay > 0) {
+      setTimeout(postConversation, delay);
+      return;
+    }
+
+    postConversation();
+  }
+
   private consumePendingPrompt(): string | undefined {
     const prompt = this._pendingPrompt;
     this._pendingPrompt = undefined;
     return prompt;
   }
 
-  private getHtml(webview: vscode.Webview, initialPrompt?: string): string {
+  private consumePendingConversationId(): string | undefined {
+    const conversationId = this._pendingConversationId;
+    this._pendingConversationId = undefined;
+    return conversationId;
+  }
+
+  private _handleRecentConversations(conversations: DocsAiRecentConversation[] | undefined): void {
+    if (!Array.isArray(conversations)) {
+      return;
+    }
+
+    const recent = conversations
+      .filter((conversation) => conversation.id && conversation.title)
+      .sort((a, b) => (b.updatedAt ?? b.createdAt ?? 0) - (a.updatedAt ?? a.createdAt ?? 0));
+    void this._globalState.update(this._recentConversationsStorageKey, recent);
+    this._onRecentConversationsChange(recent);
+  }
+
+  private getHtml(
+    webview: vscode.Webview,
+    initialPrompt?: string,
+    initialConversationId?: string
+  ): string {
     const cssUri = getStyleUri(webview, this._extensionUri, "docs-ai.css");
     const scriptUri = getScriptUri(webview, this._extensionUri, "docs-ai.js");
     const nonce = getNonce();
     const appName = JSON.stringify(vscode.env.appName);
     const initialPromptJson = JSON.stringify(initialPrompt ?? "");
+    const initialConversationIdJson = JSON.stringify(initialConversationId ?? "");
     const apiBase = getDocsAiApiBase();
     const apiBaseJson = JSON.stringify(apiBase);
 
@@ -105,6 +189,9 @@ export class DocsAiViewProvider implements vscode.WebviewViewProvider {
       <div id="tab-bar" class="tab-bar">
         <div class="tab-scroll"></div>
         <div class="tab-actions">
+          <button id="home-btn" class="tab-action-btn" title="Home" aria-label="Home">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 10v10h14V10"/><path d="M9 20v-6h6v6"/></svg>
+          </button>
           <button id="new-chat-btn" class="tab-action-btn" title="New chat" aria-label="New chat">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           </button>
@@ -139,6 +226,7 @@ export class DocsAiViewProvider implements vscode.WebviewViewProvider {
   <script nonce="${nonce}">
     window.__IDE_NAME__ = ${appName};
     window.__INITIAL_PROMPT__ = ${initialPromptJson};
+    window.__INITIAL_CONVERSATION_ID__ = ${initialConversationIdJson};
     window.__DOCS_AI_API_BASE__ = ${apiBaseJson};
   </script>
   <script nonce="${nonce}" src="${scriptUri}"></script>

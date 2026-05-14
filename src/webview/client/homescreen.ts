@@ -38,6 +38,18 @@ interface HomescreenDataMessage {
   envCount: number;
 }
 
+interface DocsAiRecentConversation {
+  id: string;
+  title: string;
+  createdAt?: number;
+  updatedAt?: number;
+}
+
+interface DocsAiRecentConversationsMessage {
+  command: "docsAiRecentConversations";
+  conversations: DocsAiRecentConversation[];
+}
+
 interface AiToolsProgressMessage {
   command: "aiToolsProgress";
   item: string;
@@ -49,12 +61,15 @@ interface AiToolsResultMessage {
   errors: string[];
 }
 
-type InboundMessage = AiToolsDataMessage | AiToolsProgressMessage | AiToolsResultMessage;
+type InboundMessage = AiToolsDataMessage | AiToolsProgressMessage | AiToolsResultMessage | DocsAiRecentConversationsMessage;
 
 // ── Module state ──────────────────────────────────────────────────────────────
 
 let _isOpen = false;
 let _cachedData: Omit<AiToolsDataMessage, "command"> | null = null;
+let _docsAiRecentSource: "none" | "host" | "local" = "none";
+let _docsAiConversations: DocsAiRecentConversation[] = [];
+let _docsAiHistoryExpanded = false;
 
 
 // ── DOM helpers ───────────────────────────────────────────────────────────────
@@ -77,6 +92,96 @@ function escapeHtml(text: string): string {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+}
+
+function timeAgo(timestamp?: number): string {
+  if (!timestamp || !Number.isFinite(timestamp)) {
+    return "";
+  }
+  const seconds = Math.floor((Date.now() - timestamp) / 1000);
+  if (seconds < 60) { return "just now"; }
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) { return `${minutes}m`; }
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) { return `${hours}h`; }
+  const days = Math.floor(hours / 24);
+  if (days < 30) { return `${days}d`; }
+  return new Date(timestamp).toLocaleDateString();
+}
+
+function groupDocsAiConversations(conversations: DocsAiRecentConversation[]): { label: string; items: DocsAiRecentConversation[] }[] {
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const yesterdayStart = todayStart - 86400000;
+  const weekStart = todayStart - 6 * 86400000;
+
+  const today: DocsAiRecentConversation[] = [];
+  const yesterday: DocsAiRecentConversation[] = [];
+  const week: DocsAiRecentConversation[] = [];
+  const older: DocsAiRecentConversation[] = [];
+
+  conversations.forEach((conversation) => {
+    const timestamp = conversation.updatedAt ?? conversation.createdAt ?? 0;
+    if (timestamp >= todayStart) {
+      today.push(conversation);
+    } else if (timestamp >= yesterdayStart) {
+      yesterday.push(conversation);
+    } else if (timestamp >= weekStart) {
+      week.push(conversation);
+    } else {
+      older.push(conversation);
+    }
+  });
+
+  return [
+    { label: "Today", items: today },
+    { label: "Yesterday", items: yesterday },
+    { label: "Previous 7 days", items: week },
+    { label: "Older", items: older },
+  ].filter((group) => group.items.length > 0);
+}
+
+function openDocsAiDb(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    if (!("indexedDB" in window)) {
+      reject(new Error("IndexedDB unavailable"));
+      return;
+    }
+
+    const request = indexedDB.open("CloudinaryVSCodeChatDB", 2);
+
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains("conversations")) {
+        const convStore = db.createObjectStore("conversations", { keyPath: "id" });
+        convStore.createIndex("updatedAt", "updatedAt", { unique: false });
+      }
+      if (!db.objectStoreNames.contains("messages")) {
+        const msgStore = db.createObjectStore("messages", { keyPath: "id" });
+        msgStore.createIndex("conversationId", "conversationId", { unique: false });
+      }
+      if (!db.objectStoreNames.contains("tabState")) {
+        db.createObjectStore("tabState", { keyPath: "id" });
+      }
+    };
+
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function loadDocsAiConversations(): Promise<DocsAiRecentConversation[]> {
+  const db = await openDocsAiDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction("conversations", "readonly");
+    const request = tx.objectStore("conversations").getAll();
+    request.onsuccess = () => {
+      const conversations = (request.result || []) as DocsAiRecentConversation[];
+      conversations.sort((a, b) => (b.updatedAt ?? b.createdAt ?? 0) - (a.updatedAt ?? a.createdAt ?? 0));
+      resolve(conversations);
+    };
+    request.onerror = () => reject(request.error);
+  });
 }
 
 // ── State rendering ───────────────────────────────────────────────────────────
@@ -394,6 +499,97 @@ function updateDocsAiSubmit(): void {
   }
 }
 
+function renderDocsAiRecentConversations(
+  conversations: DocsAiRecentConversation[],
+  source: "host" | "local" = "local"
+): void {
+  const container = document.getElementById("hs-docs-ai-recent");
+  const list = document.getElementById("hs-docs-ai-recent-list");
+  const historyToggle = document.getElementById("hs-docs-ai-history-toggle") as HTMLButtonElement | null;
+  if (!container || !list) { return; }
+
+  const nextConversations = conversations
+    .filter((conversation) => conversation.id && conversation.title)
+    .sort((a, b) => (b.updatedAt ?? b.createdAt ?? 0) - (a.updatedAt ?? a.createdAt ?? 0));
+
+  if (nextConversations.length === 0 && _docsAiRecentSource !== "none" && _docsAiRecentSource !== source) {
+    return;
+  }
+
+  _docsAiConversations = nextConversations;
+  _docsAiRecentSource = source;
+  if (historyToggle) {
+    const toggleText = _docsAiHistoryExpanded ? "Hide recent conversations" : "View recent conversations";
+    const toggleLabel = historyToggle.querySelector<HTMLElement>(".hs-docs-ai-history-toggle-label");
+    historyToggle.classList.toggle("hidden", _docsAiConversations.length === 0);
+    historyToggle.classList.toggle("is-active", _docsAiHistoryExpanded);
+    historyToggle.setAttribute("aria-expanded", String(_docsAiHistoryExpanded));
+    historyToggle.title = toggleText;
+    historyToggle.setAttribute("aria-label", toggleText);
+    if (toggleLabel) {
+      toggleLabel.textContent = toggleText;
+    }
+  }
+
+  if (_docsAiConversations.length === 0) {
+    _docsAiHistoryExpanded = false;
+    if (historyToggle) {
+      historyToggle.classList.remove("is-active");
+      historyToggle.setAttribute("aria-expanded", "false");
+    }
+    container.classList.add("hidden");
+    list.innerHTML = "";
+    return;
+  }
+
+  const visibleConversations = _docsAiHistoryExpanded ? _docsAiConversations : [];
+
+  container.classList.toggle("hidden", !_docsAiHistoryExpanded);
+
+  const renderRow = (conversation: DocsAiRecentConversation) => {
+    const timestamp = conversation.updatedAt ?? conversation.createdAt;
+    return `<button class="hs-docs-ai-recent-item" type="button" data-conv-id="${escapeHtml(conversation.id)}">
+      <svg class="hs-docs-ai-recent-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      <span class="hs-docs-ai-recent-title">${escapeHtml(conversation.title)}</span>
+      <span class="hs-docs-ai-recent-time">${escapeHtml(timeAgo(timestamp))}</span>
+    </button>`;
+  };
+
+  list.classList.toggle("hs-docs-ai-recent-list--expanded", _docsAiHistoryExpanded);
+  if (_docsAiHistoryExpanded) {
+    if (visibleConversations.length === 0) {
+      list.innerHTML = `<div class="hs-docs-ai-history-empty">No previous chats yet</div>`;
+    } else {
+      list.innerHTML = groupDocsAiConversations(visibleConversations).map((group) => `
+        <div class="hs-docs-ai-history-group">
+          <div class="hs-docs-ai-history-group-label">${group.label}</div>
+          ${group.items.map(renderRow).join("")}
+        </div>
+      `).join("");
+    }
+  } else {
+    list.innerHTML = "";
+  }
+
+  list.querySelectorAll<HTMLButtonElement>(".hs-docs-ai-recent-item").forEach((button) => {
+    button.addEventListener("click", () => {
+      const conversationId = button.dataset.convId;
+      if (conversationId) {
+        getVSCode()?.postMessage({ command: "showDocsAIConversation", data: conversationId });
+      }
+    });
+  });
+}
+
+async function refreshDocsAiRecentConversations(): Promise<void> {
+  try {
+    const conversations = await loadDocsAiConversations();
+    renderDocsAiRecentConversations(conversations, "local");
+  } catch {
+    // The Docs AI webview also pushes a cached recent list through VS Code.
+  }
+}
+
 function initDocsAiPromptScroller(): void {
   const scroller = document.querySelector<HTMLElement>(".hs-docs-ai-chips");
   if (!scroller || scroller.children.length < 2) { return; }
@@ -477,8 +673,23 @@ function initDocsAiHome(): void {
   });
 
   submit?.addEventListener("click", () => submitDocsAiQuestion());
+  document.getElementById("hs-docs-ai-history-toggle")?.addEventListener("click", () => {
+    _docsAiHistoryExpanded = !_docsAiHistoryExpanded;
+    if (_docsAiHistoryExpanded) {
+      getVSCode()?.postMessage({ command: "refreshDocsAiRecentConversations" });
+      void refreshDocsAiRecentConversations();
+    }
+    renderDocsAiRecentConversations(_docsAiConversations, _docsAiRecentSource === "none" ? "local" : _docsAiRecentSource);
+  });
 
   initDocsAiPromptScroller();
+  void refreshDocsAiRecentConversations();
+  window.addEventListener("focus", () => void refreshDocsAiRecentConversations());
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) {
+      void refreshDocsAiRecentConversations();
+    }
+  });
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
@@ -539,6 +750,9 @@ function init(): void {
       }
       case "homescreenData":
         handleHomescreenData(msg as HomescreenDataMessage);
+        break;
+      case "docsAiRecentConversations":
+        renderDocsAiRecentConversations((msg as DocsAiRecentConversationsMessage).conversations ?? [], "host");
         break;
       case "aiToolsData":
         handleAiToolsData(msg as AiToolsDataMessage);

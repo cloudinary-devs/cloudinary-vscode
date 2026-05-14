@@ -6,7 +6,7 @@ import {
   API_BASE, API_URL, vscode, state, tabMessagesCache, tabStreamState,
   $, conversationEl, inputEl, scrollToBottom, normalizeSources,
   getSourceUrl, getSourceLabel, escapeHtml, pickStarters,
-  uid, convId, timeAgo, callbacks, IDE_PLATFORM, INITIAL_PROMPT,
+  uid, convId, timeAgo, callbacks, IDE_PLATFORM, INITIAL_PROMPT, INITIAL_CONVERSATION_ID,
 } from "./state"
 import {
   persistMessage, updateConversationTimestamp, persistTabState, loadConversations,
@@ -18,6 +18,24 @@ import { toggleHistoryDropdown, renderHistoryDropdown } from "./history"
 // Wire up callbacks so tabs.js and history.js can call render/renderHistoryDropdown without circular imports
 callbacks.render = render
 callbacks.renderHistoryDropdown = renderHistoryDropdown
+callbacks.syncRecentConversations = syncRecentConversations
+
+function syncRecentConversations() {
+  vscode.postMessage({
+    command: 'docsAiRecentConversations',
+    conversations: state.conversations.map(c => ({
+      id: c.id,
+      title: c.title,
+      createdAt: c.createdAt,
+      updatedAt: c.updatedAt,
+    })),
+  })
+}
+
+async function syncRecentConversationsFromStorage() {
+  await loadConversations()
+  syncRecentConversations()
+}
 
 // --- Feedback helpers ---
 
@@ -505,6 +523,7 @@ async function ask(text) {
     state.conversations.unshift(conv)
     try { await dbSaveConversation(conv) } catch (e) { console.error('Failed to create conversation:', e) }
     enforceConversationLimit()
+    syncRecentConversations()
 
     const activeTab = state.openTabs.find(t => t.id === askTabId)
     if (activeTab) {
@@ -602,6 +621,7 @@ async function ask(text) {
     if (conv) {
       conv.updatedAt = Date.now()
       try { await dbSaveConversation(conv) } catch (e) { console.error('Failed to update conversation:', e) }
+      syncRecentConversations()
     }
   }
 }
@@ -704,6 +724,7 @@ async function askFromEdit(text) {
     if (conv) {
       conv.updatedAt = Date.now()
       try { await dbSaveConversation(conv) } catch (e) { console.error('Failed to update conversation:', e) }
+      syncRecentConversations()
     }
   }
 }
@@ -790,21 +811,55 @@ async function migrateFromVSCodeState() {
   return id
 }
 
+async function loadInitialConversation(conversationId) {
+  const id = typeof conversationId === 'string' ? conversationId.trim() : ''
+  if (!id) {return false}
+
+  const conv = state.conversations.find(c => c.id === id)
+  if (!conv) {return false}
+
+  createTab(conv.id, conv.title)
+  state.currentConversationId = conv.id
+  try {
+    const msgs = await dbGetMessages(conv.id)
+    state.messages = msgs.map(m => ({ ...m, streaming: false }))
+  } catch (_) {
+    state.messages = []
+  }
+  persistTabState()
+  return true
+}
+
+async function openConversationFromHost(conversationId) {
+  const id = typeof conversationId === 'string' ? conversationId.trim() : ''
+  if (!id) {return}
+  await loadConversations()
+  await loadConversation(id)
+  syncRecentConversations()
+}
+
 // --- Init ---
 
 async function init() {
   const initialPrompt = INITIAL_PROMPT
+  const initialConversationId = INITIAL_CONVERSATION_ID
   const migratedId = await migrateFromVSCodeState()
   await loadConversations()
 
   let restoredTabState = null
-  if (!initialPrompt) {
+  if (!initialPrompt && !initialConversationId) {
     try { restoredTabState = await dbLoadTabState() } catch (_) {}
   }
 
   if (initialPrompt) {
     createTab(null, 'New Chat')
     persistTabState()
+  } else if (initialConversationId) {
+    const loaded = await loadInitialConversation(initialConversationId)
+    if (!loaded) {
+      createTab(null, 'New Chat')
+      persistTabState()
+    }
   } else if (restoredTabState && restoredTabState.openTabs && restoredTabState.openTabs.length > 0) {
     state.openTabs = restoredTabState.openTabs
     state.activeTabId = restoredTabState.activeTabId
@@ -848,6 +903,7 @@ async function init() {
 
   renderTabBar()
   render()
+  syncRecentConversations()
 
   const conv = conversationEl()
   if (conv) {
@@ -877,6 +933,10 @@ async function init() {
 
   $('#send-btn')?.addEventListener('click', () => ask())
   $('#stop-btn')?.addEventListener('click', stopGeneration)
+  $('#home-btn')?.addEventListener('click', () => {
+    syncRecentConversations()
+    vscode.postMessage({ command: 'showHomescreen' })
+  })
   $('#new-chat-btn')?.addEventListener('click', newChat)
   $('#history-btn')?.addEventListener('click', toggleHistoryDropdown)
   $('#more-btn')?.addEventListener('click', toggleMoreMenu)
@@ -885,6 +945,10 @@ async function init() {
     const msg = event.data
     if (msg?.command === 'askPrompt') {
       askFromHomePrompt(msg.prompt)
+    } else if (msg?.command === 'openConversation') {
+      openConversationFromHost(msg.conversationId)
+    } else if (msg?.command === 'syncRecentConversations') {
+      syncRecentConversationsFromStorage()
     }
   })
 

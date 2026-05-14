@@ -22,6 +22,7 @@ export async function updateConversationTimestamp() {
   if (conv) {
     conv.updatedAt = Date.now()
     try { await dbSaveConversation(conv) } catch (e) { console.error('Failed to update conversation:', e) }
+    callbacks.syncRecentConversations()
   }
 }
 
@@ -37,6 +38,7 @@ export async function loadConversations() {
   try {
     state.conversations = await dbGetAllConversations()
     await enforceConversationLimit()
+    callbacks.syncRecentConversations()
   } catch (e) {
     console.error('Failed to load conversations:', e)
     state.conversations = []
@@ -54,6 +56,7 @@ export async function enforceConversationLimit() {
     try { await dbDeleteConversation(id) } catch (_) {}
     state.conversations = state.conversations.filter(c => c.id !== id)
   }
+  callbacks.syncRecentConversations()
 }
 
 // --- Tab management ---
@@ -269,6 +272,7 @@ export async function deleteConversation(id) {
 
     renderTabBar()
     callbacks.renderHistoryDropdown()
+    callbacks.syncRecentConversations()
     persistTabState()
 
     if (conv) {
@@ -279,6 +283,7 @@ export async function deleteConversation(id) {
           state.conversations.splice(Math.min(convIndex, state.conversations.length), 0, conv)
           state.conversations.sort((a, b) => b.updatedAt - a.updatedAt)
           callbacks.renderHistoryDropdown()
+          callbacks.syncRecentConversations()
         } catch (e) { console.error('Failed to undo delete:', e) }
       })
     }
@@ -356,6 +361,7 @@ export function renderMoreMenu() {
       renderTabBar()
       callbacks.render()
       callbacks.renderHistoryDropdown()
+      callbacks.syncRecentConversations()
       persistTabState()
     })
   })

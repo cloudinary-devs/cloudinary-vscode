@@ -74,7 +74,12 @@ export async function activate(context: vscode.ExtensionContext) {
     )
   );
 
-  const docsAiProvider = new DocsAiViewProvider(context.extensionUri);
+  const docsAiProvider = new DocsAiViewProvider(
+    context.extensionUri,
+    context.globalState,
+    (recentConversations) => homescreenProvider.setDocsAiRecentConversations(recentConversations)
+  );
+  homescreenProvider.setDocsAiRecentConversationsRefresh(() => docsAiProvider.requestRecentConversations());
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(
       DocsAiViewProvider.viewType,
