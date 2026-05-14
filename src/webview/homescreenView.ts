@@ -113,7 +113,9 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
             break;
           case "refreshDocsAiRecentConversations":
             this._requestDocsAiRecentConversations?.();
-            this._sendDocsAiRecentConversations();
+            if (this._docsAiRecentConversations.length > 0) {
+              this._sendDocsAiRecentConversations();
+            }
             break;
           case "clearDocsAiConversations":
             this._docsAiRecentConversations = [];

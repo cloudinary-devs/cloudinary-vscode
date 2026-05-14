@@ -675,6 +675,9 @@ function renderDocsAiRecentConversations(
 async function refreshDocsAiRecentConversations(): Promise<void> {
   try {
     const conversations = await loadDocsAiConversations();
+    if (conversations.length === 0 && _docsAiConversations.length > 0) {
+      return;
+    }
     renderDocsAiRecentConversations(conversations, "local");
   } catch {
     // The Docs AI webview also pushes a cached recent list through VS Code.
