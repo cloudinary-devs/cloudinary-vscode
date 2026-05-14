@@ -44,7 +44,6 @@ export const state = {
   shouldAutoScroll: true,
   isAutoScrolling: false,
   historyOpen: false,
-  moreMenuOpen: false,
   openTabs: [],
   activeTabId: null,
 }

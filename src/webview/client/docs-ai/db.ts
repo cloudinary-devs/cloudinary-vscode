@@ -93,6 +93,21 @@ export async function dbDeleteConversation(id) {
   }
 }
 
+export async function dbClearChatState() {
+  const db = await openDB()
+  const stores = ['conversations', 'messages', 'tabState'].filter(storeName => db.objectStoreNames.contains(storeName))
+  if (stores.length === 0) {return}
+
+  await new Promise((resolve, reject) => {
+    const tx = db.transaction(stores, 'readwrite')
+    for (const storeName of stores) {
+      tx.objectStore(storeName).clear()
+    }
+    tx.oncomplete = () => resolve()
+    tx.onerror = () => reject(tx.error)
+  })
+}
+
 export async function dbDeleteMessagesAfter(conversationId, createdAtCutoff) {
   const msgs = await dbGetMessages(conversationId)
   const toDelete = msgs.filter(m => m.createdAt > createdAtCutoff)

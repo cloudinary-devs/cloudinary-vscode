@@ -1,9 +1,62 @@
 // @ts-nocheck
 
 import { state, tabMessagesCache, tabStreamState, $, escapeHtml, tabId, callbacks } from "./state"
-import { dbGetMessages, dbSaveConversation, dbSaveMessage, dbDeleteConversation, dbGetAllConversations, dbSaveTabState } from "./db"
+import { dbGetMessages, dbSaveConversation, dbSaveMessage, dbDeleteConversation, dbGetAllConversations, dbSaveTabState, dbClearChatState } from "./db"
 
 const MAX_CONVERSATIONS = 50
+
+function showClearChatsConfirmation(onConfirm) {
+  document.querySelector('.docs-ai-confirm-overlay')?.remove()
+
+  const previouslyFocused = document.activeElement instanceof HTMLElement
+    ? document.activeElement
+    : null
+  const overlay = document.createElement('div')
+  overlay.className = 'docs-ai-confirm-overlay'
+  overlay.setAttribute('role', 'presentation')
+  overlay.innerHTML = `
+    <div class="docs-ai-confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="docs-ai-confirm-title" aria-describedby="docs-ai-confirm-message">
+      <h2 id="docs-ai-confirm-title" class="docs-ai-confirm-title">Delete all conversations?</h2>
+      <p id="docs-ai-confirm-message" class="docs-ai-confirm-message">This will permanently remove all chat history.</p>
+      <div class="docs-ai-confirm-actions">
+        <button class="docs-ai-confirm-btn docs-ai-confirm-cancel" type="button">Cancel</button>
+        <button class="docs-ai-confirm-btn docs-ai-confirm-delete" type="button">Delete All</button>
+      </div>
+    </div>
+  `
+
+  const cancelButton = overlay.querySelector('.docs-ai-confirm-cancel')
+  const deleteButton = overlay.querySelector('.docs-ai-confirm-delete')
+  if (!cancelButton || !deleteButton) {return}
+
+  function close() {
+    document.removeEventListener('keydown', handleKeydown)
+    overlay.remove()
+    previouslyFocused?.focus()
+  }
+
+  function handleKeydown(event) {
+    if (event.key === 'Escape') {
+      close()
+    }
+  }
+
+  cancelButton.addEventListener('click', close)
+  deleteButton.addEventListener('click', () => {
+    close()
+    onConfirm()
+  })
+  overlay.addEventListener('mousedown', (event) => {
+    if (event.target === overlay) {
+      close()
+    }
+  })
+
+  document.body.appendChild(overlay)
+  document.addEventListener('keydown', handleKeydown)
+  requestAnimationFrame(() => overlay.classList.add('is-visible'))
+  cancelButton.focus()
+}
 
 // --- Persistence helpers ---
 
@@ -205,25 +258,44 @@ export async function loadConversation(cid) {
   }
 }
 
-function showConfirmModal(title, message, onConfirm) {
-  const overlay = document.createElement('div')
-  overlay.className = 'confirm-overlay'
-  overlay.innerHTML = `
-    <div class="confirm-modal">
-      <div class="confirm-title">${title}</div>
-      <div class="confirm-message">${message}</div>
-      <div class="confirm-actions">
-        <button class="confirm-cancel">Cancel</button>
-        <button class="confirm-delete">Delete All</button>
-      </div>
-    </div>`
-  document.body.appendChild(overlay)
-  requestAnimationFrame(() => overlay.classList.add('visible'))
+export async function clearAllChats() {
+  state.abortController?.abort()
+  for (const streamState of tabStreamState.values()) {
+    streamState.abortController?.abort()
+  }
 
-  const close = () => overlay.remove()
-  overlay.querySelector('.confirm-cancel').addEventListener('click', close)
-  overlay.querySelector('.confirm-delete').addEventListener('click', () => { close(); onConfirm() })
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) {close()} })
+  tabStreamState.clear()
+  tabMessagesCache.clear()
+
+  try {
+    await dbClearChatState()
+  } catch (e) {
+    console.error('Failed to clear conversations:', e)
+    return
+  }
+
+  state.conversations = []
+  state.openTabs = []
+  createTab(null, 'New Chat')
+  state.currentConversationId = null
+  state.messages = []
+  state.streaming = false
+  state.loading = false
+  state.abortController = null
+  state.historyOpen = false
+
+  renderTabBar()
+  callbacks.render()
+  callbacks.renderHistoryDropdown()
+  callbacks.syncRecentConversations()
+  persistTabState()
+}
+
+export function confirmClearAllChats() {
+  if (state.conversations.length === 0) {return}
+  showClearChatsConfirmation(() => {
+    clearAllChats()
+  })
 }
 
 let undoTimeout = null
@@ -321,48 +393,6 @@ export function renderTabBar() {
     btn.addEventListener('click', (e) => {
       e.stopPropagation()
       closeTab(btn.dataset.tabId)
-    })
-  })
-}
-
-// --- More menu ---
-
-export function toggleMoreMenu() {
-  state.moreMenuOpen = !state.moreMenuOpen
-  renderMoreMenu()
-}
-
-export function renderMoreMenu() {
-  const menu = $('#more-menu')
-  if (!menu) {return}
-
-  if (!state.moreMenuOpen) {
-    menu.style.display = 'none'
-    return
-  }
-
-  menu.style.display = 'block'
-  menu.innerHTML = `
-    <button class="more-menu-item" id="clear-all-btn">Clear all chats</button>
-  `
-
-  menu.querySelector('#clear-all-btn')?.addEventListener('click', () => {
-    state.moreMenuOpen = false
-    renderMoreMenu()
-    showConfirmModal('Delete all conversations?', 'This will permanently remove all chat history.', async () => {
-      for (const c of [...state.conversations]) {
-        await dbDeleteConversation(c.id)
-      }
-      state.conversations = []
-      state.openTabs = []
-      createTab(null, 'New Chat')
-      state.currentConversationId = null
-      state.messages = []
-      renderTabBar()
-      callbacks.render()
-      callbacks.renderHistoryDropdown()
-      callbacks.syncRecentConversations()
-      persistTabState()
     })
   })
 }

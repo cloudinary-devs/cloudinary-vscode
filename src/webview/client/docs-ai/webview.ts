@@ -11,7 +11,7 @@ import {
 import {
   persistMessage, updateConversationTimestamp, persistTabState, loadConversations,
   createTab, switchTab, closeTab, newChat, loadConversation, deleteConversation,
-  renderTabBar, toggleMoreMenu, renderMoreMenu, enforceConversationLimit,
+  renderTabBar, enforceConversationLimit,
 } from "./tabs"
 import { toggleHistoryDropdown, renderHistoryDropdown } from "./history"
 
@@ -609,7 +609,8 @@ async function ask(text) {
       render()
     }
 
-    if (msg) {
+    const conv = state.conversations.find(c => c.id === askConversationId)
+    if (msg && conv) {
       try {
         await dbSaveMessage({ ...msg, conversationId: askConversationId, streaming: false })
       } catch (e) {
@@ -617,7 +618,6 @@ async function ask(text) {
       }
     }
 
-    const conv = state.conversations.find(c => c.id === askConversationId)
     if (conv) {
       conv.updatedAt = Date.now()
       try { await dbSaveConversation(conv) } catch (e) { console.error('Failed to update conversation:', e) }
@@ -713,14 +713,14 @@ async function askFromEdit(text) {
       state.streaming = false
       render()
     }
-    if (msg) {
+    const conv = state.conversations.find(c => c.id === askConversationId)
+    if (msg && conv) {
       try {
         await dbSaveMessage({ ...msg, conversationId: askConversationId, streaming: false })
       } catch (e) {
         console.error('Failed to persist assistant message:', e)
       }
     }
-    const conv = state.conversations.find(c => c.id === askConversationId)
     if (conv) {
       conv.updatedAt = Date.now()
       try { await dbSaveConversation(conv) } catch (e) { console.error('Failed to update conversation:', e) }
@@ -767,7 +767,6 @@ async function askFromHomePrompt(text) {
     state.loading = false
     state.abortController = null
     state.historyOpen = false
-    state.moreMenuOpen = false
     renderTabBar()
     render()
     renderHistoryDropdown()
@@ -939,7 +938,6 @@ async function init() {
   })
   $('#new-chat-btn')?.addEventListener('click', newChat)
   $('#history-btn')?.addEventListener('click', toggleHistoryDropdown)
-  $('#more-btn')?.addEventListener('click', toggleMoreMenu)
 
   window.addEventListener('message', (event) => {
     const msg = event.data
@@ -959,14 +957,6 @@ async function init() {
       if (dropdown && !dropdown.contains(e.target) && historyBtn && !historyBtn.contains(e.target)) {
         state.historyOpen = false
         renderHistoryDropdown()
-      }
-    }
-    if (state.moreMenuOpen) {
-      const menu = $('#more-menu')
-      const moreBtn = $('#more-btn')
-      if (menu && !menu.contains(e.target) && moreBtn && !moreBtn.contains(e.target)) {
-        state.moreMenuOpen = false
-        renderMoreMenu()
       }
     }
   })

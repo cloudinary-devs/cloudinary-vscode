@@ -37,12 +37,15 @@ export interface DocsAiRecentConversation {
   updatedAt?: number;
 }
 
+const DOCS_AI_RECENT_CONVERSATIONS_STORAGE_KEY = "cloudinary.docsAiRecentConversations";
+
 export class HomescreenViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = "cloudinaryHomescreen";
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
     private readonly _service: CloudinaryService,
+    private readonly _globalState: vscode.Memento,
     private readonly _libraryWebview?: LibraryWebviewViewProvider
   ) { }
 
@@ -110,6 +113,11 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
             break;
           case "refreshDocsAiRecentConversations":
             this._requestDocsAiRecentConversations?.();
+            this._sendDocsAiRecentConversations();
+            break;
+          case "clearDocsAiConversations":
+            this._docsAiRecentConversations = [];
+            await this._globalState.update(DOCS_AI_RECENT_CONVERSATIONS_STORAGE_KEY, []);
             this._sendDocsAiRecentConversations();
             break;
           case "openGlobalConfig":

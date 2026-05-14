@@ -64,6 +64,7 @@ export async function activate(context: vscode.ExtensionContext) {
   const homescreenProvider = new HomescreenViewProvider(
     context.extensionUri,
     cloudinaryService,
+    context.globalState,
     libraryWebviewProvider
   );
   context.subscriptions.push(

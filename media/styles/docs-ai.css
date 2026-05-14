@@ -117,36 +117,9 @@ html, body {
   background: var(--vscode-toolbar-hoverBackground, rgba(255,255,255,0.1));
 }
 
-/* More menu */
-.more-menu {
-  display: none;
-  position: absolute;
-  top: 100%;
-  right: 4px;
-  background: var(--vscode-dropdown-background, var(--vscode-sideBar-background));
-  border: 1px solid var(--vscode-widget-border, rgba(255,255,255,0.1));
-  border-radius: 4px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-  min-width: 140px;
-  padding: 4px 0;
-  z-index: 20;
-}
-
-.more-menu-item {
-  display: block;
-  width: 100%;
-  text-align: left;
-  background: none;
-  border: none;
-  color: var(--vscode-foreground);
-  font-size: 12px;
-  font-family: inherit;
-  padding: 6px 12px;
-  cursor: pointer;
-  transition: background 0.1s;
-}
-.more-menu-item:hover {
-  background: var(--vscode-list-hoverBackground, rgba(255,255,255,0.05));
+#more-btn,
+#more-menu {
+  display: none !important;
 }
 
 /* History dropdown */
@@ -190,6 +163,132 @@ html, body {
   overflow-y: auto;
   flex: 1;
   padding-bottom: 6px;
+}
+
+.history-footer {
+  flex-shrink: 0;
+  margin: 0 10px 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.14));
+}
+
+.history-clear-all {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 30px;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--vscode-descriptionForeground);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 11.5px;
+  line-height: 1.2;
+  transition: color 0.12s ease, background 0.12s ease;
+}
+
+.history-clear-all:hover {
+  color: var(--vscode-errorForeground, #f44);
+  background: rgba(239, 68, 68, 0.12);
+}
+
+.history-clear-all:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
+.docs-ai-confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.58);
+  opacity: 0;
+  transition: opacity 0.14s ease;
+}
+
+.docs-ai-confirm-overlay.is-visible {
+  opacity: 1;
+}
+
+.docs-ai-confirm-dialog {
+  width: min(320px, calc(100vw - 40px));
+  padding: 20px;
+  border: 1px solid var(--vscode-editorWidget-border, rgba(255, 255, 255, 0.18));
+  border-radius: 8px;
+  background: var(--vscode-editorWidget-background, #252526);
+  box-shadow: 0 20px 44px rgba(0, 0, 0, 0.42);
+  color: var(--vscode-foreground);
+  transform: translateY(4px);
+  transition: transform 0.14s ease;
+}
+
+.docs-ai-confirm-overlay.is-visible .docs-ai-confirm-dialog {
+  transform: translateY(0);
+}
+
+.docs-ai-confirm-title {
+  margin: 0 0 8px;
+  color: var(--vscode-foreground);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.docs-ai-confirm-message {
+  margin: 0;
+  color: var(--vscode-descriptionForeground);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.docs-ai-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.docs-ai-confirm-btn {
+  min-height: 32px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 6px;
+  color: var(--vscode-button-foreground, #fff);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.docs-ai-confirm-cancel {
+  background: var(--vscode-button-secondaryBackground, rgba(255, 255, 255, 0.12));
+  color: var(--vscode-button-secondaryForeground, var(--vscode-foreground));
+}
+
+.docs-ai-confirm-cancel:hover {
+  background: var(--vscode-button-secondaryHoverBackground, rgba(255, 255, 255, 0.18));
+}
+
+.docs-ai-confirm-delete {
+  background: #dc2626;
+  color: #fff;
+}
+
+.docs-ai-confirm-delete:hover {
+  background: #ef4444;
+}
+
+.docs-ai-confirm-btn:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: 2px;
 }
 
 .history-empty {
@@ -1085,57 +1184,3 @@ html, body {
   border-radius: 4px;
 }
 .undo-btn:hover { background: rgba(74, 95, 217, 0.15); }
-
-/* Confirm Modal */
-.confirm-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 2000;
-  opacity: 0;
-  transition: opacity 0.15s;
-}
-.confirm-overlay.visible { opacity: 1; }
-.confirm-modal {
-  background: var(--vscode-editorWidget-background, #252526);
-  border: 1px solid var(--vscode-editorWidget-border, rgba(255,255,255,0.12));
-  border-radius: 10px;
-  padding: 24px;
-  max-width: 320px;
-  width: 90%;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
-}
-.confirm-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--vscode-foreground, #ccc);
-  margin-bottom: 8px;
-}
-.confirm-message {
-  font-size: 13px;
-  color: var(--vscode-descriptionForeground, #999);
-  margin-bottom: 20px;
-  line-height: 1.5;
-}
-.confirm-actions { display: flex; gap: 8px; justify-content: flex-end; }
-.confirm-cancel, .confirm-delete {
-  padding: 7px 16px;
-  border-radius: 6px;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  border: none;
-}
-.confirm-cancel {
-  background: rgba(255,255,255,0.1);
-  color: var(--vscode-foreground, #ccc);
-}
-.confirm-cancel:hover { background: rgba(255,255,255,0.15); }
-.confirm-delete {
-  background: #dc2626;
-  color: #fff;
-}
-.confirm-delete:hover { background: #b91c1c; }

@@ -2,7 +2,7 @@
 
 import { state, $, escapeHtml, timeAgo, callbacks } from "./state"
 import { dbSaveConversation } from "./db"
-import { loadConversation, deleteConversation, renderTabBar, persistTabState } from "./tabs"
+import { loadConversation, deleteConversation, renderTabBar, persistTabState, confirmClearAllChats } from "./tabs"
 
 let historySearch = ''
 let renamingId = null
@@ -34,14 +34,7 @@ export function toggleHistoryDropdown() {
   state.historyOpen = !state.historyOpen
   historySearch = ''
   renamingId = null
-  if (state.historyOpen) { state.moreMenuOpen = false; renderMoreMenuFromHistory() }
   renderHistoryDropdown()
-}
-
-function renderMoreMenuFromHistory() {
-  const menu = $('#more-menu')
-  if (!menu) {return}
-  menu.style.display = 'none'
 }
 
 export function renderHistoryDropdown() {
@@ -73,11 +66,21 @@ export function renderHistoryDropdown() {
     `).join('')
   }
 
+  const clearAllHtml = state.conversations.length > 0 ? `
+    <div class="history-footer">
+      <button id="history-clear-all" class="history-clear-all" type="button">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+        <span>Clear all chats</span>
+      </button>
+    </div>
+  ` : ''
+
   dropdown.innerHTML = `
     <div class="history-search-row">
       <input id="history-search" class="history-search" type="text" placeholder="Search..." value="${escapeHtml(historySearch)}" />
     </div>
     <div class="history-list">${bodyHtml}</div>
+    ${clearAllHtml}
   `
 
   attachDropdownListeners()
@@ -128,6 +131,11 @@ function attachDropdownListeners() {
       if (newInput) { newInput.focus(); newInput.selectionStart = newInput.selectionEnd = newInput.value.length }
     })
   }
+
+  dropdown.querySelector('#history-clear-all')?.addEventListener('click', (e) => {
+    e.stopPropagation()
+    confirmClearAllChats()
+  })
 
   dropdown.querySelectorAll('.history-item').forEach(item => {
     item.addEventListener('click', (e) => {

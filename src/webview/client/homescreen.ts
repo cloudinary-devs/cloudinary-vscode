@@ -78,6 +78,59 @@ function el<T extends HTMLElement>(id: string): T {
   return document.getElementById(id) as T;
 }
 
+function showClearChatsConfirmation(onConfirm: () => void | Promise<void>): void {
+  document.querySelector(".docs-ai-confirm-overlay")?.remove();
+
+  const previouslyFocused = document.activeElement instanceof HTMLElement
+    ? document.activeElement
+    : null;
+  const overlay = document.createElement("div");
+  overlay.className = "docs-ai-confirm-overlay";
+  overlay.setAttribute("role", "presentation");
+  overlay.innerHTML = `
+    <div class="docs-ai-confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="docs-ai-confirm-title" aria-describedby="docs-ai-confirm-message">
+      <h2 id="docs-ai-confirm-title" class="docs-ai-confirm-title">Delete all conversations?</h2>
+      <p id="docs-ai-confirm-message" class="docs-ai-confirm-message">This will permanently remove all chat history.</p>
+      <div class="docs-ai-confirm-actions">
+        <button class="docs-ai-confirm-btn docs-ai-confirm-cancel" type="button">Cancel</button>
+        <button class="docs-ai-confirm-btn docs-ai-confirm-delete" type="button">Delete All</button>
+      </div>
+    </div>
+  `;
+
+  const cancelButton = overlay.querySelector<HTMLButtonElement>(".docs-ai-confirm-cancel");
+  const deleteButton = overlay.querySelector<HTMLButtonElement>(".docs-ai-confirm-delete");
+  if (!cancelButton || !deleteButton) { return; }
+
+  function close(): void {
+    document.removeEventListener("keydown", handleKeydown);
+    overlay.remove();
+    previouslyFocused?.focus();
+  }
+
+  function handleKeydown(event: KeyboardEvent): void {
+    if (event.key === "Escape") {
+      close();
+    }
+  }
+
+  cancelButton.addEventListener("click", close);
+  deleteButton.addEventListener("click", () => {
+    close();
+    void onConfirm();
+  });
+  overlay.addEventListener("mousedown", (event) => {
+    if (event.target === overlay) {
+      close();
+    }
+  });
+
+  document.body.appendChild(overlay);
+  document.addEventListener("keydown", handleKeydown);
+  requestAnimationFrame(() => overlay.classList.add("is-visible"));
+  cancelButton.focus();
+}
+
 function show(id: string): void {
   el(id)?.classList.remove("hidden");
 }
@@ -181,6 +234,37 @@ async function loadDocsAiConversations(): Promise<DocsAiRecentConversation[]> {
       resolve(conversations);
     };
     request.onerror = () => reject(request.error);
+  });
+}
+
+async function clearDocsAiConversationStores(): Promise<void> {
+  const db = await openDocsAiDb();
+  const stores = ["conversations", "messages", "tabState"].filter((storeName) =>
+    db.objectStoreNames.contains(storeName)
+  );
+  if (stores.length === 0) { return; }
+
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(stores, "readwrite");
+    stores.forEach((storeName) => tx.objectStore(storeName).clear());
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+async function clearDocsAiRecentConversations(): Promise<void> {
+  if (_docsAiConversations.length === 0) { return; }
+
+  showClearChatsConfirmation(async () => {
+    try {
+      await clearDocsAiConversationStores();
+      _docsAiHistoryExpanded = false;
+      _docsAiRecentSource = "local";
+      renderDocsAiRecentConversations([], "local");
+      getVSCode()?.postMessage({ command: "clearDocsAiConversations" });
+    } catch (error) {
+      console.error("Failed to clear Docs AI conversations:", error);
+    }
   });
 }
 
@@ -512,10 +596,6 @@ function renderDocsAiRecentConversations(
     .filter((conversation) => conversation.id && conversation.title)
     .sort((a, b) => (b.updatedAt ?? b.createdAt ?? 0) - (a.updatedAt ?? a.createdAt ?? 0));
 
-  if (nextConversations.length === 0 && _docsAiRecentSource !== "none" && _docsAiRecentSource !== source) {
-    return;
-  }
-
   _docsAiConversations = nextConversations;
   _docsAiRecentSource = source;
   if (historyToggle) {
@@ -565,7 +645,14 @@ function renderDocsAiRecentConversations(
           <div class="hs-docs-ai-history-group-label">${group.label}</div>
           ${group.items.map(renderRow).join("")}
         </div>
-      `).join("");
+      `).join("") + `
+        <div class="hs-docs-ai-history-footer">
+          <button id="hs-docs-ai-clear-all" class="hs-docs-ai-clear-all" type="button">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+            <span>Clear all chats</span>
+          </button>
+        </div>
+      `;
     }
   } else {
     list.innerHTML = "";
@@ -578,6 +665,10 @@ function renderDocsAiRecentConversations(
         getVSCode()?.postMessage({ command: "showDocsAIConversation", data: conversationId });
       }
     });
+  });
+
+  list.querySelector<HTMLButtonElement>("#hs-docs-ai-clear-all")?.addEventListener("click", () => {
+    void clearDocsAiRecentConversations();
   });
 }
 

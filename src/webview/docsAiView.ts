@@ -198,13 +198,9 @@ export class DocsAiViewProvider implements vscode.WebviewViewProvider {
           <button id="history-btn" class="tab-action-btn" title="Chat history" aria-label="Chat history">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
           </button>
-          <button id="more-btn" class="tab-action-btn" title="More options" aria-label="More options">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
-          </button>
         </div>
       </div>
       <div id="history-dropdown" class="history-dropdown"></div>
-      <div id="more-menu" class="more-menu"></div>
     </div>
 
     <div id="conversation"></div>

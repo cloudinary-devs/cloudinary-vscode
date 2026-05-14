@@ -636,6 +636,131 @@ body {
   text-align: left;
 }
 
+.hs-docs-ai-history-footer {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.14));
+}
+
+.hs-docs-ai-clear-all {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 30px;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--vscode-descriptionForeground);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 11.5px;
+  line-height: 1.2;
+  transition: color 0.12s ease, background 0.12s ease;
+}
+
+.hs-docs-ai-clear-all:hover {
+  color: var(--vscode-errorForeground, #f44);
+  background: rgba(239, 68, 68, 0.12);
+}
+
+.hs-docs-ai-clear-all:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
+.docs-ai-confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.58);
+  opacity: 0;
+  transition: opacity 0.14s ease;
+}
+
+.docs-ai-confirm-overlay.is-visible {
+  opacity: 1;
+}
+
+.docs-ai-confirm-dialog {
+  width: min(320px, calc(100vw - 40px));
+  padding: 20px;
+  border: 1px solid var(--vscode-editorWidget-border, rgba(255, 255, 255, 0.18));
+  border-radius: 8px;
+  background: var(--vscode-editorWidget-background, #252526);
+  box-shadow: 0 20px 44px rgba(0, 0, 0, 0.42);
+  color: var(--vscode-foreground);
+  transform: translateY(4px);
+  transition: transform 0.14s ease;
+}
+
+.docs-ai-confirm-overlay.is-visible .docs-ai-confirm-dialog {
+  transform: translateY(0);
+}
+
+.docs-ai-confirm-title {
+  margin: 0 0 8px;
+  color: var(--vscode-foreground);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.docs-ai-confirm-message {
+  margin: 0;
+  color: var(--vscode-descriptionForeground);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.docs-ai-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.docs-ai-confirm-btn {
+  min-height: 32px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 6px;
+  color: var(--vscode-button-foreground, #fff);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.docs-ai-confirm-cancel {
+  background: var(--vscode-button-secondaryBackground, rgba(255, 255, 255, 0.12));
+  color: var(--vscode-button-secondaryForeground, var(--vscode-foreground));
+}
+
+.docs-ai-confirm-cancel:hover {
+  background: var(--vscode-button-secondaryHoverBackground, rgba(255, 255, 255, 0.18));
+}
+
+.docs-ai-confirm-delete {
+  background: #dc2626;
+  color: #fff;
+}
+
+.docs-ai-confirm-delete:hover {
+  background: #ef4444;
+}
+
+.docs-ai-confirm-btn:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: 2px;
+}
+
 .hs-docs-ai-recent-item {
   display: flex;
   align-items: center;
