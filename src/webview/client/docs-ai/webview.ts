@@ -14,6 +14,7 @@ import {
   renderTabBar, enforceConversationLimit,
 } from "./tabs"
 import { toggleHistoryDropdown, renderHistoryDropdown } from "./history"
+import { initActionToolbar } from "../actionToolbar"
 
 // Wire up callbacks so tabs.js and history.js can call render/renderHistoryDropdown without circular imports
 callbacks.render = render
@@ -932,9 +933,13 @@ async function init() {
 
   $('#send-btn')?.addEventListener('click', () => ask())
   $('#stop-btn')?.addEventListener('click', stopGeneration)
-  $('#home-btn')?.addEventListener('click', () => {
-    syncRecentConversations()
-    vscode.postMessage({ command: 'showHomescreen' })
+  initActionToolbar({
+    onAction: (action) => {
+      if (action === 'showHomescreen') {
+        syncRecentConversations()
+      }
+      vscode.postMessage({ command: 'runToolbar', action })
+    },
   })
   $('#new-chat-btn')?.addEventListener('click', newChat)
   $('#history-btn')?.addEventListener('click', toggleHistoryDropdown)

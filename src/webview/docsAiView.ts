@@ -2,6 +2,13 @@ import * as vscode from "vscode";
 import { getDocsAiApiBase } from "./docsAiConfig";
 import { getNonce, getScriptUri, getStyleUri } from "./webviewUtils";
 import type { DocsAiRecentConversation } from "./homescreenView";
+import { renderActionToolbar } from "./components/actionToolbar";
+
+type DocsAiMessage = {
+  command?: string;
+  action?: string;
+  conversations?: DocsAiRecentConversation[];
+};
 
 export class DocsAiViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = "cloudinaryDocsAI";
@@ -34,11 +41,13 @@ export class DocsAiViewProvider implements vscode.WebviewViewProvider {
       localResourceRoots: [vscode.Uri.joinPath(this._extensionUri, "media")],
     };
 
-    view.webview.onDidReceiveMessage((message: { command?: string; conversations?: DocsAiRecentConversation[] }) => {
+    view.webview.onDidReceiveMessage((message: DocsAiMessage) => {
       if (message.command === "docsAiRecentConversations") {
         this._handleRecentConversations(message.conversations);
       } else if (message.command === "showHomescreen") {
         vscode.commands.executeCommand("cloudinary.showHomescreen");
+      } else if (message.command === "runToolbar") {
+        this._handleToolbarAction(message.action);
       }
     });
 
@@ -157,6 +166,7 @@ export class DocsAiViewProvider implements vscode.WebviewViewProvider {
     initialConversationId?: string
   ): string {
     const cssUri = getStyleUri(webview, this._extensionUri, "docs-ai.css");
+    const toolbarCssUri = getStyleUri(webview, this._extensionUri, "action-toolbar.css");
     const scriptUri = getScriptUri(webview, this._extensionUri, "docs-ai.js");
     const nonce = getNonce();
     const appName = JSON.stringify(vscode.env.appName);
@@ -180,18 +190,17 @@ export class DocsAiViewProvider implements vscode.WebviewViewProvider {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="Content-Security-Policy" content="${csp}">
+  <link rel="stylesheet" href="${toolbarCssUri}">
   <link rel="stylesheet" href="${cssUri}">
   <title>Cloudinary Docs AI</title>
 </head>
 <body>
   <div class="chat-shell">
     <div class="header-wrapper">
+      ${renderActionToolbar({ id: "docs-ai-toolbar", ariaLabel: "Docs AI actions" })}
       <div id="tab-bar" class="tab-bar">
         <div class="tab-scroll"></div>
         <div class="tab-actions">
-          <button id="home-btn" class="tab-action-btn" title="Home" aria-label="Home">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 10v10h14V10"/><path d="M9 20v-6h6v6"/></svg>
-          </button>
           <button id="new-chat-btn" class="tab-action-btn" title="New chat" aria-label="New chat">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           </button>
@@ -228,5 +237,18 @@ export class DocsAiViewProvider implements vscode.WebviewViewProvider {
   <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>
 </html>`;
+  }
+
+  private _handleToolbarAction(action: string | undefined): void {
+    const commandMap: Record<string, string> = {
+      refresh: "cloudinary.docsAi.refresh",
+      openUploadWidget: "cloudinary.openUploadWidget",
+      showHomescreen: "cloudinary.showHomescreen",
+      openGlobalConfig: "cloudinary.openGlobalConfig",
+    };
+    const command = action ? commandMap[action] : undefined;
+    if (command) {
+      vscode.commands.executeCommand(command);
+    }
   }
 }

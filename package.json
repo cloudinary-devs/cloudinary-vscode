@@ -57,8 +57,9 @@
         },
         {
           "id": "cloudinaryMediaLibrary",
-          "name": "",
+          "name": "Library",
           "type": "webview",
+          "contextualTitle": "Cloudinary Library",
           "when": "cloudinary.activeView == 'library'"
         },
         {
@@ -166,21 +167,7 @@
         "icon": "$(refresh)",
         "category": "Cloudinary"
       }
-    ],
-    "menus": {
-      "view/title": [
-        {
-          "command": "cloudinary.docsAi.refresh",
-          "when": "view == cloudinaryDocsAI",
-          "group": "navigation@1"
-        },
-        {
-          "command": "cloudinary.showHomescreen",
-          "when": "view == cloudinaryDocsAI",
-          "group": "navigation@0"
-        }
-      ]
-    }
+    ]
   },
   "scripts": {
     "compile": "npm run check-types && node esbuild.js",

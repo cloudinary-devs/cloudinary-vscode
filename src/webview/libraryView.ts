@@ -13,7 +13,7 @@ import {
   getScriptUri,
   getStyleUri,
 } from './webviewUtils';
-import { actionIcons } from './icons';
+import { renderActionToolbar } from './components/actionToolbar';
 
 export class LibraryWebviewViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'cloudinaryMediaLibrary';
@@ -49,9 +49,7 @@ export class LibraryWebviewViewProvider implements vscode.WebviewViewProvider {
 
     const scriptUri = getScriptUri(view.webview, this._extensionUri, 'library.js');
     const cssUri = getStyleUri(view.webview, this._extensionUri, 'library.css');
-    const logoUri = view.webview.asWebviewUri(
-      vscode.Uri.joinPath(this._extensionUri, 'resources', 'cloudinary_icon_blue.png')
-    );
+    const toolbarCssUri = getStyleUri(view.webview, this._extensionUri, 'action-toolbar.css');
 
     const sel = (current: string, value: string): string =>
       current === value ? ' selected' : '';
@@ -64,25 +62,7 @@ export class LibraryWebviewViewProvider implements vscode.WebviewViewProvider {
       extensionUri: this._extensionUri,
       bodyContent: `
         <header class="lib-header">
-          <div class="lib-brand">
-            <span class="lib-brand__logo-wrap" aria-hidden="true">
-              <img class="lib-brand__logo" src="${logoUri}" alt="" />
-            </span>
-            <span class="lib-brand__name">Cloudinary</span>
-            <span class="lib-brand__env" id="lib-env" aria-label="Active cloud"></span>
-          </div>
-          <div id="lib-toolbar" class="lib-toolbar" role="toolbar" aria-label="Library actions">
-            <div class="lib-tb-group">
-              <button class="lib-tb-btn" data-action="showHomescreen" title="Home" aria-label="Home">${actionIcons.home('sm')}</button>
-              <button class="lib-tb-btn" data-action="refresh" title="Refresh" aria-label="Refresh">${actionIcons.refresh('sm')}</button>
-            </div>
-            <div class="lib-tb-group">
-              <button class="lib-tb-btn" data-action="openUploadWidget" title="Upload" aria-label="Upload">${actionIcons.upload('sm')}</button>
-            </div>
-            <div class="lib-tb-group lib-tb-group--utility">
-              <button class="lib-tb-btn" data-action="openGlobalConfig" title="Configuration" aria-label="Configuration">${actionIcons.settings('sm')}</button>
-            </div>
-          </div>
+          ${renderActionToolbar({ id: 'lib-toolbar', ariaLabel: 'Library actions' })}
           <div id="lib-filter" class="lib-filter" role="group" aria-label="Filter and sort">
             <label class="lib-filter__group">
               <span class="lib-filter__label">Type</span>
@@ -121,7 +101,7 @@ export class LibraryWebviewViewProvider implements vscode.WebviewViewProvider {
         </header>
         <div id="lib-root" class="lib-root" role="tree" aria-label="Media library"></div>
       `,
-      additionalStyles: [cssUri],
+      additionalStyles: [toolbarCssUri, cssUri],
       additionalScripts: [scriptUri],
     });
 

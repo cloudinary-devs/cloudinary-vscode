@@ -8,6 +8,7 @@ import { assetIcon, folderIcon, menuIcons, rowIcons } from './libraryIcons';
 import { showMenu } from './libraryMenu';
 import { spliceOutRangeAtDepth } from './libraryRowSplice';
 import { VirtualList } from './libraryVirtualList';
+import { initActionToolbar } from './actionToolbar';
 
 type Row =
   | { kind: 'folder'; folder: ClientFolder; depth: number; expanded: boolean }
@@ -689,14 +690,10 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   document.documentElement.style.setProperty('--lib-row-height', `${ROW_HEIGHT}px`);
 
-  document.querySelectorAll<HTMLButtonElement>('#lib-toolbar .lib-tb-btn').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const action = btn.dataset.action;
-      if (!action) {
-        return;
-      }
+  initActionToolbar({
+    onAction: (action) => {
       getVSCode()?.postMessage({ command: 'runToolbar', action });
-    });
+    },
   });
 
   initSearchBar();
