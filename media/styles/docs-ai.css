@@ -1001,6 +1001,30 @@ html, body {
 
 .md hr { border: none; height: 1px; background: var(--vscode-widget-border); margin: 0.4rem 0; }
 
+.md .doc-citation {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  margin: 0 1px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--vscode-textLink-foreground, #3794ff) 18%, transparent);
+  color: var(--vscode-textLink-foreground, #3794ff);
+  font-size: 0.78em;
+  font-weight: 700;
+  line-height: 1;
+  text-decoration: none;
+  vertical-align: baseline;
+  white-space: nowrap;
+}
+
+.md .doc-citation:hover {
+  background: color-mix(in srgb, var(--vscode-textLink-foreground, #3794ff) 28%, transparent);
+  text-decoration: none;
+}
+
 /* Sources */
 .sources { margin-top: 4px; }
 
@@ -1036,15 +1060,42 @@ html, body {
 .source-item {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
+  gap: 5px;
   font-size: 11px;
   color: var(--vscode-textLink-foreground, #3794ff);
   text-decoration: none;
-  padding: 2px 0;
+  padding: 3px 6px 3px 4px;
+  border: 1px solid color-mix(in srgb, var(--vscode-textLink-foreground, #3794ff) 24%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--vscode-textLink-foreground, #3794ff) 10%, transparent);
   white-space: nowrap;
 }
-.source-item:hover { text-decoration: underline; }
+.source-item:hover {
+  background: color-mix(in srgb, var(--vscode-textLink-foreground, #3794ff) 16%, transparent);
+  text-decoration: none;
+}
 .source-item svg { flex-shrink: 0; opacity: 0.6; }
+
+.source-index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--vscode-textLink-foreground, #3794ff);
+  color: var(--vscode-button-foreground, #fff);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.source-title {
+  overflow: hidden;
+  max-width: 220px;
+  text-overflow: ellipsis;
+}
 
 /* Follow-ups */
 .follow-ups {

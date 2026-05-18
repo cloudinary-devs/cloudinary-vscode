@@ -227,7 +227,7 @@ function render() {
     let bubbleContent = ''
     if (m.role === 'assistant') {
       if (m.content) {
-        bubbleContent = `<div class="md" dir="auto">${renderMarkdown(m.content)}</div>`
+        bubbleContent = `<div class="md" dir="auto">${renderMarkdown(m.content, m.sources || [])}</div>`
       } else {
         bubbleContent = '<p class="muted">Thinking...</p>'
       }
@@ -244,9 +244,10 @@ function render() {
             <span>Sources</span>
             <span class="chevron ${m.sourcesOpen ? 'chevron-open' : ''}"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></span>
           </button>
-          ${m.sourcesOpen ? `<div class="sources-list">${m.sources.map(s =>
+          ${m.sourcesOpen ? `<div class="sources-list">${m.sources.map((s, index) =>
             `<a href="${escapeHtml(getSourceUrl(s))}" target="_blank" rel="noopener noreferrer" class="source-item">
-              <span>${escapeHtml(getSourceLabel(s))}</span>
+              <span class="source-index">${index + 1}</span>
+              <span class="source-title">${escapeHtml(getSourceLabel(s))}</span>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
             </a>`).join('')}</div>` : ''}
         </div>`

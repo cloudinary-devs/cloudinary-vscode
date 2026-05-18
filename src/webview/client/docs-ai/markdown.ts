@@ -16,7 +16,7 @@ const removeWithChildren = new Set([
   'script', 'select', 'style', 'svg', 'textarea', 'video',
 ])
 const allowedAttrs = {
-  a: new Set(['href', 'rel', 'target', 'title']),
+  a: new Set(['class', 'href', 'rel', 'target', 'title']),
   button: new Set(['aria-label', 'class', 'data-code', 'title', 'type']),
   code: new Set(['class']),
   div: new Set(['class']),
@@ -26,7 +26,7 @@ const allowedAttrs = {
   td: new Set(['align']),
 }
 const allowedClassNames = new Set([
-  'code-block', 'code-copy', 'code-header', 'code-lang', 'hljs',
+  'code-block', 'code-copy', 'code-header', 'code-lang', 'doc-citation', 'hljs',
 ])
 
 function escapeHtml(value) {
@@ -177,10 +177,116 @@ renderer.code = function ({ text, lang }) {
   </div>`
 }
 
-export function renderMarkdown(content) {
-  const processed = content.replace(
-    /content\/documentation\/([a-zA-Z0-9_\-]+)\.html\.md/g,
-    (_, f) => `[${f.replace(/_/g, ' ')}](https://cloudinary.com/documentation/${f})`
+function sourcePath(source) {
+  if (typeof source === 'string') {return source}
+  return source?.path || source?.source || source?.id || source?.slug || source?.url || ''
+}
+
+function sourceSlug(source) {
+  const path = sourcePath(source)
+  try {
+    const url = new URL(path)
+    const match = url.pathname.match(/\/documentation\/([^/#?]+)/)
+    if (match) {return match[1]}
+  } catch (_) {}
+
+  return path
+    .replace(/^https?:\/\/(?:www\.)?cloudinary\.com\/documentation\//, '')
+    .replace(/^content\/documentation\//, '')
+    .replace(/\.html\.md$/, '')
+    .replace(/\.md$/, '')
+    .replace(/^\/+|\/+$/g, '')
+}
+
+function sourceUrl(source) {
+  if (source && typeof source === 'object' && source.url) {return source.url}
+  const slug = sourceSlug(source)
+  return `https://cloudinary.com/documentation/${slug}`
+}
+
+function sourceLabel(source) {
+  if (source && typeof source === 'object' && source.title) {return source.title}
+  const label = sourceSlug(source).replace(/_/g, ' ')
+  return label.charAt(0).toUpperCase() + label.slice(1)
+}
+
+function sourceAliases(source) {
+  const path = sourcePath(source)
+  const slug = sourceSlug(source)
+  const basename = slug.split('/').pop() || slug
+  return [
+    path,
+    slug,
+    basename,
+    `${slug}.md`,
+    `${basename}.md`,
+    `${slug}.html.md`,
+    `${basename}.html.md`,
+    `content/documentation/${slug}.html.md`,
+    `content/documentation/${basename}.html.md`,
+  ].filter(Boolean)
+}
+
+function normalizeAlias(value) {
+  return String(value || '')
+    .trim()
+    .replace(/^`|`$/g, '')
+    .replace(/^["']|["']$/g, '')
+    .replace(/^https?:\/\/(?:www\.)?cloudinary\.com\/documentation\//, '')
+    .replace(/^content\/documentation\//, '')
+    .replace(/\.html\.md$/, '')
+    .replace(/\.md$/, '')
+    .replace(/^\/+|\/+$/g, '')
+    .toLowerCase()
+}
+
+function buildCitationMap(sources) {
+  const map = new Map()
+  ;(sources || []).forEach((source, index) => {
+    sourceAliases(source).forEach(alias => {
+      map.set(normalizeAlias(alias), { index: index + 1, source })
+    })
+  })
+  return map
+}
+
+function citationHtml(citation) {
+  const href = escapeAttribute(sourceUrl(citation.source))
+  const title = escapeAttribute(sourceLabel(citation.source))
+  return `<a class="doc-citation" href="${href}" title="${title}" target="_blank" rel="noopener noreferrer">[${citation.index}]</a>`
+}
+
+function replaceInlineCitations(content, sources) {
+  const citationMap = buildCitationMap(sources)
+  if (!citationMap.size) {return content}
+
+  let processed = content.replace(/\(([^()\n]{3,240})\)/g, (match, inner) => {
+    const parts = inner.split(',').map(part => part.trim()).filter(Boolean)
+    if (!parts.length) {return match}
+
+    const citations = parts.map(part => citationMap.get(normalizeAlias(part)))
+    if (citations.some(citation => !citation)) {return match}
+
+    const unique = []
+    const seen = new Set()
+    citations.forEach(citation => {
+      if (seen.has(citation.index)) {return}
+      seen.add(citation.index)
+      unique.push(citation)
+    })
+
+    return unique.map(citationHtml).join(' ')
+  })
+
+  processed = processed.replace(
+    /content\/documentation\/([a-zA-Z0-9_/-]+)\.html\.md|([a-zA-Z0-9_/-]+)\.md/g,
+    (match) => citationMap.has(normalizeAlias(match)) ? citationHtml(citationMap.get(normalizeAlias(match))) : match
   )
+
+  return processed
+}
+
+export function renderMarkdown(content, sources = []) {
+  const processed = replaceInlineCitations(content, sources)
   try { return sanitizeMarkdownHtml(marked(processed, { renderer })) } catch (_) { return escapeHtml(content) }
 }

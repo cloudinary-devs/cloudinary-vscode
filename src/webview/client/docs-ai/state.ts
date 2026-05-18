@@ -109,19 +109,50 @@ export function scrollToBottom() {
 export function normalizeSources(payload) {
   if (!Array.isArray(payload)) {return []}
   return payload.map(item => {
-    if (typeof item === 'string') {return item}
-    if (item && typeof item === 'object') {return item.path || item.source || item.id || null}
+    if (typeof item === 'string') {return { path: item }}
+    if (item && typeof item === 'object') {
+      const path = item.path || item.source || item.id || item.slug || item.title || item.url || null
+      if (!path) {return null}
+      return {
+        path,
+        title: item.title || item.name || item.label || '',
+        url: item.url || item.href || '',
+      }
+    }
     return null
   }).filter(Boolean)
 }
 
-export function getSourceUrl(path) {
-  let d = path.replace(/^content\/documentation\//, '').replace(/\.html\.md$/, '').replace(/\.md$/, '')
+export function getSourcePath(source) {
+  if (typeof source === 'string') {return source}
+  return source?.path || source?.source || source?.id || source?.slug || source?.url || ''
+}
+
+export function getSourceSlug(source) {
+  const path = getSourcePath(source)
+  try {
+    const url = new URL(path)
+    const docMatch = url.pathname.match(/\/documentation\/([^/#?]+)/)
+    if (docMatch) {return docMatch[1]}
+  } catch (_) {}
+
+  return path
+    .replace(/^https?:\/\/(?:www\.)?cloudinary\.com\/documentation\//, '')
+    .replace(/^content\/documentation\//, '')
+    .replace(/\.html\.md$/, '')
+    .replace(/\.md$/, '')
+    .replace(/^\/+|\/+$/g, '')
+}
+
+export function getSourceUrl(source) {
+  if (source && typeof source === 'object' && source.url) {return source.url}
+  const d = getSourceSlug(source)
   return `https://cloudinary.com/documentation/${d}`
 }
 
-export function getSourceLabel(path) {
-  const label = path.replace(/^content\/documentation\//, '').replace(/\.html\.md$/, '').replace(/\.md$/, '').replace(/_/g, ' ')
+export function getSourceLabel(source) {
+  if (source && typeof source === 'object' && source.title) {return source.title}
+  const label = getSourceSlug(source).replace(/_/g, ' ')
   return label.charAt(0).toUpperCase() + label.slice(1)
 }
 
