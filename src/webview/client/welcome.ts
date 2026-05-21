@@ -2,7 +2,7 @@
  * Welcome Screen specific functionality.
  */
 
-import { initCommon, getVSCode } from "./common";
+import { copyToClipboard, initCommon, getVSCode } from "./common";
 
 /**
  * Open global configuration file.
@@ -58,3 +58,31 @@ window.getConfigExample = getConfigExample;
 
 // Initialize common functionality when this script loads
 initCommon();
+
+document.addEventListener("click", async (event) => {
+  const target = (event.target as HTMLElement | null)?.closest(
+    "[data-welcome-action]"
+  ) as HTMLElement | null;
+
+  if (!target) {return;}
+
+  event.preventDefault();
+  const action = target.dataset.welcomeAction;
+
+  switch (action) {
+    case "openGlobalConfig":
+      openGlobalConfig();
+      break;
+    case "focusDashboard":
+      focusDashboard();
+      break;
+    case "openExternal":
+      if (target.dataset.url) {
+        openExternal(target.dataset.url);
+      }
+      break;
+    case "copyConfigExample":
+      await copyToClipboard(getConfigExample(), target);
+      break;
+  }
+});

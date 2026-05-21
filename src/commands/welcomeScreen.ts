@@ -80,7 +80,7 @@ function createWelcomePanel(
         }
         break;
       case "focusDashboard":
-        vscode.commands.executeCommand("workbench.view.extension.cloudinary");
+        vscode.commands.executeCommand("cloudinary.showHomescreen");
         break;
     }
   });
@@ -349,8 +349,8 @@ function getWelcomeContent(cloudinaryState: WelcomeScreenCloudinaryState): strin
           <div class="wg-status-detail">${hasConfig ? "Your environment is ready. Open the dashboard to explore your media." : "Add your Cloudinary API credentials to get started."}</div>
         </div>
         ${hasConfig
-      ? `<button class="wg-btn wg-btn--ghost" onclick="focusDashboard()">Open Dashboard →</button>`
-      : `<button class="wg-btn wg-btn--primary" onclick="openGlobalConfig()">Configure →</button>`
+      ? `<button class="wg-btn wg-btn--ghost" data-welcome-action="focusDashboard">Open Dashboard →</button>`
+      : `<button class="wg-btn wg-btn--primary" data-welcome-action="openGlobalConfig">Configure →</button>`
     }
       </div>
 
@@ -371,8 +371,8 @@ function getWelcomeContent(cloudinaryState: WelcomeScreenCloudinaryState): strin
               Credentials are never stored in VS Code settings — they stay in a local file you control.
             </p>
             <div class="wg-step-actions">
-              <button class="wg-btn wg-btn--primary" onclick="openGlobalConfig()">${hasConfig ? "View Config File" : "Open Config File"}</button>
-              <button class="wg-btn wg-btn--ghost" onclick="openExternal('https://console.cloudinary.com/settings/api-keys')">Get API Keys</button>
+              <button class="wg-btn wg-btn--primary" data-welcome-action="openGlobalConfig">${hasConfig ? "View Config File" : "Open Config File"}</button>
+              <button class="wg-btn wg-btn--ghost" data-welcome-action="openExternal" data-url="https://console.cloudinary.com/settings/api-keys">Get API Keys</button>
             </div>
           </div>
         </div>
@@ -383,7 +383,7 @@ function getWelcomeContent(cloudinaryState: WelcomeScreenCloudinaryState): strin
             <div class="wg-step-title">Explore the Dashboard</div>
             <p class="wg-step-desc">The Cloudinary sidebar gives you instant access to your media library, upload tools, and AI integrations — all without leaving your editor. Open it from the activity bar on the left.</p>
             <div class="wg-step-actions">
-              <button class="wg-btn wg-btn--primary" onclick="focusDashboard()">Open Dashboard</button>
+              <button class="wg-btn wg-btn--primary" data-welcome-action="focusDashboard">Open Dashboard</button>
             </div>
           </div>
         </div>
@@ -394,7 +394,7 @@ function getWelcomeContent(cloudinaryState: WelcomeScreenCloudinaryState): strin
             <div class="wg-step-title">Browse &amp; manage your media</div>
             <p class="wg-step-desc">Search and explore assets in the media library. Preview images and videos, copy delivery URLs, upload new files with drag-and-drop, and manage transformations — all from VS Code.</p>
             <div class="wg-step-actions">
-              <button class="wg-btn wg-btn--ghost" onclick="openExternal('https://cloudinary.com/documentation/how_to_integrate_cloudinary')">View Documentation</button>
+              <button class="wg-btn wg-btn--ghost" data-welcome-action="openExternal" data-url="https://cloudinary.com/documentation/how_to_integrate_cloudinary">View Documentation</button>
             </div>
           </div>
         </div>
@@ -410,7 +410,7 @@ function getWelcomeContent(cloudinaryState: WelcomeScreenCloudinaryState): strin
             The cloud name is the key. You can define multiple environments.
           </p>
           <div class="wg-code">
-            <button class="wg-btn wg-btn--ghost wg-btn--sm wg-code-copy" onclick="copyToClipboard(getConfigExample(), this)">Copy</button>
+            <button class="wg-btn wg-btn--ghost wg-btn--sm wg-code-copy" data-welcome-action="copyConfigExample">Copy</button>
             <pre>{
   "your-cloud-name": {
     "apiKey": "your-api-key",
@@ -420,7 +420,7 @@ function getWelcomeContent(cloudinaryState: WelcomeScreenCloudinaryState): strin
           </div>
           <p class="wg-config-note" style="margin-top:12px;margin-bottom:0;">
             Find your credentials at
-            <span class="wg-link" onclick="openExternal('https://console.cloudinary.com/settings/api-keys')">Console → Settings → API Keys</span>.
+            <span class="wg-link" data-welcome-action="openExternal" data-url="https://console.cloudinary.com/settings/api-keys">Console → Settings → API Keys</span>.
             You can optionally include <span class="wg-mono">uploadPreset</span> for upload configuration.
           </p>
         </div>
@@ -432,32 +432,32 @@ function getWelcomeContent(cloudinaryState: WelcomeScreenCloudinaryState): strin
       <div class="wg-resources">
         <div class="wg-section-label">Resources</div>
         <div class="wg-res-grid">
-          <div class="wg-res-card" onclick="openExternal('https://cloudinary.com/documentation')">
+          <div class="wg-res-card" data-welcome-action="openExternal" data-url="https://cloudinary.com/documentation">
             <div class="wg-res-icon">📖</div>
             <div class="wg-res-title">Documentation</div>
             <div class="wg-res-desc">Guides, API reference &amp; tutorials</div>
           </div>
-          <div class="wg-res-card" onclick="openExternal('https://console.cloudinary.com')">
+          <div class="wg-res-card" data-welcome-action="openExternal" data-url="https://console.cloudinary.com">
             <div class="wg-res-icon">🖥</div>
             <div class="wg-res-title">Console</div>
             <div class="wg-res-desc">Manage your media &amp; settings online</div>
           </div>
-          <div class="wg-res-card" onclick="openExternal('https://cloudinary.com/documentation/upload_images')">
+          <div class="wg-res-card" data-welcome-action="openExternal" data-url="https://cloudinary.com/documentation/upload_images">
             <div class="wg-res-icon">⬆</div>
             <div class="wg-res-title">Upload Guide</div>
             <div class="wg-res-desc">Learn to upload &amp; organize assets</div>
           </div>
-          <div class="wg-res-card" onclick="openExternal('https://cloudinary.com/documentation/image_transformations')">
+          <div class="wg-res-card" data-welcome-action="openExternal" data-url="https://cloudinary.com/documentation/image_transformations">
             <div class="wg-res-icon">✨</div>
             <div class="wg-res-title">Transformations</div>
             <div class="wg-res-desc">Resize, crop &amp; optimize media</div>
           </div>
-          <div class="wg-res-card" onclick="openExternal('https://support.cloudinary.com')">
+          <div class="wg-res-card" data-welcome-action="openExternal" data-url="https://support.cloudinary.com">
             <div class="wg-res-icon">💬</div>
             <div class="wg-res-title">Support</div>
             <div class="wg-res-desc">Get help from the Cloudinary team</div>
           </div>
-          <div class="wg-res-card" onclick="openExternal('https://cloudinary.com/users/register_free')">
+          <div class="wg-res-card" data-welcome-action="openExternal" data-url="https://cloudinary.com/users/register_free">
             <div class="wg-res-icon">🌱</div>
             <div class="wg-res-title">Free Account</div>
             <div class="wg-res-desc">New to Cloudinary? Sign up free</div>
