@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { AnalyticsService, type AnalyticsPayload } from "../analytics/analyticsService";
 import { getDocsAiApiBase } from "./docsAiConfig";
 import { getNonce, getScriptUri, getStyleUri } from "./webviewUtils";
 import type { DocsAiRecentConversation } from "./homescreenView";
@@ -7,6 +8,8 @@ import { renderActionToolbar } from "./components/actionToolbar";
 type DocsAiMessage = {
   command?: string;
   action?: string;
+  eventName?: string;
+  payload?: AnalyticsPayload;
   conversations?: DocsAiRecentConversation[];
 };
 
@@ -21,6 +24,7 @@ export class DocsAiViewProvider implements vscode.WebviewViewProvider {
   constructor(
     private readonly _extensionUri: vscode.Uri,
     private readonly _globalState: vscode.Memento,
+    private readonly _analytics: AnalyticsService | undefined,
     private readonly _onRecentConversationsChange: (conversations: DocsAiRecentConversation[]) => void
   ) {
     const cached = this._globalState.get<DocsAiRecentConversation[]>(
@@ -44,6 +48,8 @@ export class DocsAiViewProvider implements vscode.WebviewViewProvider {
     view.webview.onDidReceiveMessage((message: DocsAiMessage) => {
       if (message.command === "docsAiRecentConversations") {
         this._handleRecentConversations(message.conversations);
+      } else if (message.command === "analyticsEvent") {
+        this._handleAnalyticsEvent(message);
       } else if (message.command === "showHomescreen") {
         vscode.commands.executeCommand("cloudinary.showHomescreen");
       } else if (message.command === "runToolbar") {
@@ -53,6 +59,11 @@ export class DocsAiViewProvider implements vscode.WebviewViewProvider {
 
     const initialPrompt = this.consumePendingPrompt();
     const initialConversationId = this.consumePendingConversationId();
+    this._analytics?.track("docs_ai_opened", {
+      entry_point: "webview_ready",
+      has_initial_prompt: !!initialPrompt,
+      has_initial_conversation: !!initialConversationId,
+    });
     view.webview.html = this.getHtml(view.webview, initialPrompt, initialConversationId);
   }
 
@@ -158,6 +169,14 @@ export class DocsAiViewProvider implements vscode.WebviewViewProvider {
       .sort((a, b) => (b.updatedAt ?? b.createdAt ?? 0) - (a.updatedAt ?? a.createdAt ?? 0));
     void this._globalState.update(this._recentConversationsStorageKey, recent);
     this._onRecentConversationsChange(recent);
+  }
+
+  private _handleAnalyticsEvent(message: DocsAiMessage): void {
+    if (!message.eventName) {
+      return;
+    }
+
+    this._analytics?.track(message.eventName, message.payload ?? {});
   }
 
   private getHtml(

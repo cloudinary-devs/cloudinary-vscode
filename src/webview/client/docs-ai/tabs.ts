@@ -226,6 +226,17 @@ export function newChat() {
 export async function loadConversation(cid) {
   const existingTab = state.openTabs.find(t => t.conversationId === cid)
   if (existingTab) {
+    const conv = state.conversations.find(c => c.id === cid)
+    if (conv) {
+      const now = Date.now()
+      const createdAt = Number(conv.createdAt || now)
+      const updatedAt = Number(conv.updatedAt || createdAt)
+      callbacks.trackAnalytics('conversation_resumed', {
+        conversation_id: conv.id,
+        age_since_created_hours: Math.max(0, Math.round((now - createdAt) / 36_000) / 100),
+        age_since_last_message_hours: Math.max(0, Math.round((now - updatedAt) / 36_000) / 100),
+      })
+    }
     await switchTab(existingTab.id)
     return
   }
@@ -239,6 +250,16 @@ export async function loadConversation(cid) {
 
     const conv = state.conversations.find(c => c.id === cid)
     const title = conv ? conv.title : 'Chat'
+    if (conv) {
+      const now = Date.now()
+      const createdAt = Number(conv.createdAt || now)
+      const updatedAt = Number(conv.updatedAt || createdAt)
+      callbacks.trackAnalytics('conversation_resumed', {
+        conversation_id: conv.id,
+        age_since_created_hours: Math.max(0, Math.round((now - createdAt) / 36_000) / 100),
+        age_since_last_message_hours: Math.max(0, Math.round((now - updatedAt) / 36_000) / 100),
+      })
+    }
 
     const activeTab = state.openTabs.find(t => t.id === state.activeTabId)
     if (activeTab && !activeTab.conversationId && state.messages.length === 0) {

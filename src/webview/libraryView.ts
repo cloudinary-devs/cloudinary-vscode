@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { AnalyticsService } from '../analytics/analyticsService';
 import { isPlaceholderConfig } from '../config/configUtils';
 import { CloudinaryService } from '../cloudinary/cloudinaryService';
 import {
@@ -31,6 +32,7 @@ export class LibraryWebviewViewProvider implements vscode.WebviewViewProvider {
   constructor(
     private readonly _extensionUri: vscode.Uri,
     private readonly _service: CloudinaryService,
+    private readonly _analytics?: AnalyticsService,
   ) {}
 
   resolveWebviewView(view: vscode.WebviewView): void {
@@ -113,6 +115,7 @@ export class LibraryWebviewViewProvider implements vscode.WebviewViewProvider {
   private async handleMessage(message: any): Promise<void> {
     switch (message?.command) {
       case 'ready':
+        this._analytics?.track('library_opened', { entry_point: 'webview_ready' });
         this.post({
           command: 'envChanged',
           cloudName: this._service.cloudName || '',
@@ -127,6 +130,11 @@ export class LibraryWebviewViewProvider implements vscode.WebviewViewProvider {
       case 'openAsset':
         if (message.asset) {
           const asset = message.asset as ClientAsset;
+          this._analytics?.track('asset_opened', {
+            entry_point: 'library',
+            resource_type: asset.resource_type,
+            asset_type: asset.type,
+          });
           const filename =
             asset.display_name ||
             asset.public_id.split('/').pop() ||
@@ -163,6 +171,10 @@ export class LibraryWebviewViewProvider implements vscode.WebviewViewProvider {
             data: message.data,
           });
         } else if (action === 'uploadToFolder') {
+          this._analytics?.track('upload_widget_opened', {
+            entry_point: 'library_context',
+            folder_selected: true,
+          });
           void vscode.commands.executeCommand('cloudinary.uploadToFolder', {
             label: message.data?.name || '',
             data: message.data,
@@ -194,6 +206,13 @@ export class LibraryWebviewViewProvider implements vscode.WebviewViewProvider {
     this._viewState.searchQuery = query && query.trim().length > 0
       ? query.trim()
       : null;
+    if (this._viewState.searchQuery) {
+      this._analytics?.track('asset_search', {
+        entry_point: 'library',
+        query_length: this._viewState.searchQuery.length,
+        resource_type: this._viewState.resourceTypeFilter,
+      });
+    }
     try {
       await this.refreshCurrentView();
     } catch (err: any) {
@@ -217,6 +236,10 @@ export class LibraryWebviewViewProvider implements vscode.WebviewViewProvider {
     }
 
     this._cache.clear();
+    this._analytics?.track('library_view_changed', {
+      resource_type: this._viewState.resourceTypeFilter,
+      sort_direction: this._viewState.sortDirection,
+    });
     this.post({
       command: 'viewStateChanged',
       resourceTypeFilter: this._viewState.resourceTypeFilter,
