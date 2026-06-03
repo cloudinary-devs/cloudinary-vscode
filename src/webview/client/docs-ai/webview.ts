@@ -20,6 +20,7 @@ import { initActionToolbar } from "../actionToolbar"
 callbacks.render = render
 callbacks.renderHistoryDropdown = renderHistoryDropdown
 callbacks.syncRecentConversations = syncRecentConversations
+callbacks.trackAnalytics = trackAnalytics
 
 function syncRecentConversations() {
   vscode.postMessage({
@@ -30,6 +31,26 @@ function syncRecentConversations() {
       createdAt: c.createdAt,
       updatedAt: c.updatedAt,
     })),
+  })
+}
+
+function trackAnalytics(eventName, payload = {}) {
+  vscode.postMessage({
+    command: 'analyticsEvent',
+    eventName,
+    payload,
+  })
+}
+
+function trackConversationResumed(conv, entryPoint) {
+  if (!conv) {return}
+  const now = Date.now()
+  const createdAt = Number(conv.createdAt || now)
+  const updatedAt = Number(conv.updatedAt || createdAt)
+  trackAnalytics('conversation_resumed', {
+    conversation_id: conv.id,
+    age_since_created_hours: Math.max(0, Math.round((now - createdAt) / 36_000) / 100),
+    age_since_last_message_hours: Math.max(0, Math.round((now - updatedAt) / 36_000) / 100),
   })
 }
 
@@ -133,6 +154,12 @@ function showFeedbackForm(article, msg) {
   form.querySelector('.feedback-submit-btn').addEventListener('click', () => {
     const comment = form.querySelector('.feedback-comment').value.trim()
     sendFeedbackToApi(msg, 'down', selectedStar || undefined, comment || undefined)
+    trackAnalytics('conversation_rated', {
+      rating: 'down',
+      star_rating: selectedStar || undefined,
+      has_comment: !!comment,
+      conversation_id: msg.conversationId || state.currentConversationId,
+    })
 
     const inner = form.querySelector('.feedback-form-inner')
     inner.innerHTML = `
@@ -315,6 +342,11 @@ function render() {
         btn.classList.add('copied')
         setTimeout(() => { label.textContent = orig; btn.classList.remove('copied') }, 1500)
       }
+      trackAnalytics('copy_message', {
+        copy_type: 'code',
+        code_length: code.length,
+        conversation_id: state.currentConversationId,
+      })
     })
   })
 
@@ -341,6 +373,12 @@ function render() {
         btn.classList.remove('copied')
         btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>'
       }, 1500)
+      trackAnalytics('copy_message', {
+        copy_type: 'message',
+        copied_role: msg.role,
+        copied_length: text.length,
+        conversation_id: msg.conversationId || state.currentConversationId,
+      })
     })
   })
 
@@ -359,6 +397,12 @@ function render() {
         updateFeedbackButtons(btn.closest('.msg-actions'), msg)
         closeFeedbackForm(article)
         sendFeedbackToApi(msg, wasSelected ? 'none' : 'up')
+        if (!wasSelected) {
+          trackAnalytics('conversation_rated', {
+            rating: 'up',
+            conversation_id: msg.conversationId || state.currentConversationId,
+          })
+        }
         return
       }
 
@@ -516,6 +560,7 @@ async function ask(text) {
   }
 
   const askTabId = state.activeTabId
+  const wasNewConversation = !state.currentConversationId
 
   if (!state.currentConversationId) {
     const id = convId()
@@ -538,6 +583,20 @@ async function ask(text) {
 
   const askConversationId = state.currentConversationId
   const askMessages = state.messages
+  const language = navigator.language || ''
+
+  if (wasNewConversation) {
+    trackAnalytics('chat_started', {
+      conversation_id: askConversationId,
+      language,
+    })
+  }
+  trackAnalytics('message_sent', {
+    conversation_id: askConversationId,
+    language,
+    message_length: prompt.length,
+    is_first_message: wasNewConversation,
+  })
 
   const userMsg = { id: uid(), role: 'user', content: prompt, conversationId: askConversationId, createdAt: Date.now() }
   const assistantId = uid()
@@ -827,6 +886,7 @@ async function loadInitialConversation(conversationId) {
   } catch (_) {
     state.messages = []
   }
+  trackConversationResumed(conv, 'initial_conversation')
   persistTabState()
   return true
 }

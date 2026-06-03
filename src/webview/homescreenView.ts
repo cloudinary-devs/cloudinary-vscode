@@ -4,6 +4,7 @@
  */
 
 import * as vscode from "vscode";
+import { AnalyticsService } from "../analytics/analyticsService";
 import { CloudinaryService } from "../cloudinary/cloudinaryService";
 import { createWebviewDocument, getScriptUri, getStyleUri } from "./webviewUtils";
 import type { LibraryWebviewViewProvider } from "./libraryView";
@@ -46,7 +47,8 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
     private readonly _extensionUri: vscode.Uri,
     private readonly _service: CloudinaryService,
     private readonly _globalState: vscode.Memento,
-    private readonly _libraryWebview?: LibraryWebviewViewProvider
+    private readonly _libraryWebview?: LibraryWebviewViewProvider,
+    private readonly _analytics?: AnalyticsService
   ) { }
 
   private _webviewView: vscode.WebviewView | undefined;
@@ -109,6 +111,7 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
       }) => {
         switch (message.command) {
           case "ready":
+            this._analytics?.track("home_opened", { entry_point: "webview_ready" });
             await this._sendHomescreenData();
             break;
           case "refreshDocsAiRecentConversations":
@@ -123,6 +126,7 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
             this._sendDocsAiRecentConversations();
             break;
           case "openGlobalConfig":
+            this._analytics?.track("config_opened", { entry_point: "homescreen" });
             vscode.commands.executeCommand("cloudinary.openGlobalConfig");
             break;
           case "showLibrary":
@@ -143,6 +147,10 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
           case "searchAssets":
             if (message.data?.trim()) {
               const query = message.data.trim();
+              this._analytics?.track("asset_search", {
+                entry_point: "homescreen",
+                query_length: query.length,
+              });
               await this._libraryWebview?.setSearch(query);
               vscode.commands.executeCommand("cloudinary.showLibrary");
             }

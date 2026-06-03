@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { AnalyticsService } from "../analytics/analyticsService";
 import { createWebviewDocument, getScriptUri } from "../webview/webviewUtils";
 import { escapeHtml, formatFileSize } from "../webview/utils/helpers";
 import { assetIcons, actionIcons } from "../webview/icons";
@@ -39,12 +40,17 @@ function getAssetIcon(type: string): string {
   }
 }
 
-function registerPreview(context: vscode.ExtensionContext) {
+function registerPreview(context: vscode.ExtensionContext, analytics?: AnalyticsService) {
   context.subscriptions.push(
     vscode.commands.registerCommand(
       "cloudinary.openAsset",
       (asset: AssetData) => {
         const publicId = asset.public_id;
+        analytics?.track("asset_opened", {
+          resource_type: asset.resource_type || asset.displayType,
+          asset_type: asset.type,
+          entry_point: "preview_command",
+        });
 
         // Check if panel for this asset already exists
         const existingPanel = openPanels.get(publicId);
@@ -113,6 +119,7 @@ function registerPreview(context: vscode.ExtensionContext) {
         panel.webview.onDidReceiveMessage(async (message) => {
           if (message.command === "copyToClipboard" && message.text) {
             await vscode.env.clipboard.writeText(message.text);
+            analytics?.track("copy_asset_url", { copy_type: "preview" });
           }
         });
       }

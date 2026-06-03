@@ -11,12 +11,15 @@ import { registerAllCommands } from "./commands/registerCommands";
 import { CloudinaryService, Credentials } from "./cloudinary/cloudinaryService";
 import { createCloudinarySdkAdapter } from "./cloudinary/cloudinarySdkAdapter";
 import { v2 as cloudinary } from "cloudinary";
+import packageJson from "../package.json";
+import { AnalyticsService } from "./analytics/analyticsService";
 import { generateUserAgent } from "./utils/userAgent";
 import { HomescreenViewProvider } from "./webview/homescreenView";
 import { LibraryWebviewViewProvider } from "./webview/libraryView";
 import { DocsAiViewProvider } from "./webview/docsAiView";
 import { resetUploadPanel } from "./commands/uploadWidget";
 import { resetAllPreviewPanels } from "./commands/previewAsset";
+import { detectEditorPlatform } from "./aiToolsService";
 
 let statusBar: vscode.StatusBarItem;
 
@@ -44,13 +47,22 @@ function getStatusBarTooltip(dynamicFolders: boolean): string {
  */
 export async function activate(context: vscode.ExtensionContext) {
   const cloudinaryService = new CloudinaryService(createCloudinarySdkAdapter());
+  const analytics = new AnalyticsService({
+    extensionVersion: packageJson.version,
+    storage: context.globalState,
+    getCloudName: () => cloudinaryService.cloudName,
+    getDebugId: () => process.env.CLOUDINARY_ANALYTICS_DEBUG_ID,
+    getIdePlatform: detectEditorPlatform,
+  });
+  analytics.track("extension_activated");
 
   // Set initial view to homescreen
   vscode.commands.executeCommand("setContext", "cloudinary.activeView", "homescreen");
 
   const libraryWebviewProvider = new LibraryWebviewViewProvider(
     context.extensionUri,
-    cloudinaryService
+    cloudinaryService,
+    analytics
   );
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(
@@ -65,7 +77,8 @@ export async function activate(context: vscode.ExtensionContext) {
     context.extensionUri,
     cloudinaryService,
     context.globalState,
-    libraryWebviewProvider
+    libraryWebviewProvider,
+    analytics
   );
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(
@@ -78,6 +91,7 @@ export async function activate(context: vscode.ExtensionContext) {
   const docsAiProvider = new DocsAiViewProvider(
     context.extensionUri,
     context.globalState,
+    analytics,
     (recentConversations) => homescreenProvider.setDocsAiRecentConversations(recentConversations)
   );
   homescreenProvider.setDocsAiRecentConversationsRefresh(() => docsAiProvider.requestRecentConversations());
@@ -225,7 +239,8 @@ export async function activate(context: vscode.ExtensionContext) {
       statusBar,
       homescreenProvider,
       libraryWebviewProvider,
-      docsAiProvider
+      docsAiProvider,
+      analytics
     );
     return;
   }
@@ -328,7 +343,8 @@ export async function activate(context: vscode.ExtensionContext) {
     statusBar,
     homescreenProvider,
     libraryWebviewProvider,
-    docsAiProvider
+    docsAiProvider,
+    analytics
   );
 }
 

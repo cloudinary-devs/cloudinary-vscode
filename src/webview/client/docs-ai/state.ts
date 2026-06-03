@@ -179,4 +179,5 @@ export const callbacks = {
   render: () => {},
   renderHistoryDropdown: () => {},
   syncRecentConversations: () => {},
+  trackAnalytics: () => {},
 }

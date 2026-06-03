@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { AnalyticsService } from "../analytics/analyticsService";
 import { CloudinaryService } from "../cloudinary/cloudinaryService";
 import { UploadPreset } from "../cloudinary/types";
 import { v2 as cloudinary } from "cloudinary";
@@ -111,14 +112,16 @@ function withSignedAuthenticatedUrl(asset: any): any {
  */
 function registerUpload(
   context: vscode.ExtensionContext,
-  cloudinaryStateTarget: UploadWidgetCloudinaryStateTarget
+  cloudinaryStateTarget: UploadWidgetCloudinaryStateTarget,
+  analytics?: AnalyticsService
 ) {
   const cloudinaryState = getUploadCloudinaryState(cloudinaryStateTarget);
 
   context.subscriptions.push(
     vscode.commands.registerCommand("cloudinary.openUploadWidget", async () => {
       try {
-        await openOrRevealUploadPanel("", cloudinaryState, context);
+        analytics?.track("upload_widget_opened", { entry_point: "command" });
+        await openOrRevealUploadPanel("", cloudinaryState, context, analytics);
       } catch (err: any) {
         vscode.window.showErrorMessage(
           `Failed to open upload widget: ${err.message}`
@@ -133,7 +136,11 @@ function registerUpload(
       async (folderItem: { label: string; data: { path?: string } }) => {
         try {
           const folderPath = folderItem.data.path || "";
-          await openOrRevealUploadPanel(folderPath, cloudinaryState, context);
+          analytics?.track("upload_widget_opened", {
+            entry_point: "folder_context",
+            folder_selected: !!folderPath,
+          });
+          await openOrRevealUploadPanel(folderPath, cloudinaryState, context, analytics);
         } catch (err: any) {
           vscode.window.showErrorMessage(
             `Failed to open upload widget: ${err.message}`
@@ -178,7 +185,8 @@ function getUploadCloudinaryState(
 async function openOrRevealUploadPanel(
   folderPath: string,
   cloudinaryState: UploadWidgetCloudinaryState,
-  context: vscode.ExtensionContext
+  context: vscode.ExtensionContext,
+  analytics?: AnalyticsService
 ): Promise<void> {
   currentFolderPath = folderPath;
 
@@ -195,7 +203,7 @@ async function openOrRevealUploadPanel(
     }
   }
 
-  uploadPanel = await createUploadPanel(cloudinaryState, context);
+  uploadPanel = await createUploadPanel(cloudinaryState, context, analytics);
 
   uploadPanel.onDidDispose(() => {
     uploadPanel = undefined;
@@ -338,7 +346,8 @@ function getUploadOptions(
  */
 async function createUploadPanel(
   cloudinaryState: UploadWidgetCloudinaryState,
-  context: vscode.ExtensionContext
+  context: vscode.ExtensionContext,
+  analytics?: AnalyticsService
 ): Promise<vscode.WebviewPanel> {
   const cloudName = cloudinaryState.cloudName!;
   const panel = vscode.window.createWebviewPanel(
@@ -414,6 +423,11 @@ async function createUploadPanel(
       );
 
       try {
+        analytics?.track("upload_started", {
+          upload_source: "file",
+          folder_selected: !!folder,
+          preset_selected: !!presetName,
+        });
         safePostToPanel(panel, { command: "uploadStarted", fileId: message.fileId });
 
         const result = withSignedAuthenticatedUrl(
@@ -427,9 +441,21 @@ async function createUploadPanel(
           fileId: message.fileId,
           asset: result,
         });
+        analytics?.track("upload_succeeded", {
+          upload_source: "file",
+          resource_type: result.resource_type,
+          asset_type: result.type,
+          folder_selected: !!folder,
+          preset_selected: !!presetName,
+        });
 
         vscode.commands.executeCommand("cloudinary.refresh");
       } catch (err: any) {
+        analytics?.track("upload_failed", {
+          upload_source: "file",
+          folder_selected: !!folder,
+          preset_selected: !!presetName,
+        });
         safePostToPanel(panel, {
           command: "uploadError",
           fileId: message.fileId,
@@ -465,6 +491,11 @@ async function createUploadPanel(
       const fileId = message.fileId || `url-${Date.now()}`;
 
       try {
+        analytics?.track("upload_started", {
+          upload_source: "url",
+          folder_selected: !!folder,
+          preset_selected: !!presetName,
+        });
         safePostToPanel(panel, { command: "uploadStarted", fileId, fileName: message.url });
         safePostToPanel(panel, { command: "uploadProgress", fileId, percent: 50 });
 
@@ -475,8 +506,20 @@ async function createUploadPanel(
         result._originalFileName = urlFileName;
 
         safePostToPanel(panel, { command: "uploadComplete", fileId, asset: result });
+        analytics?.track("upload_succeeded", {
+          upload_source: "url",
+          resource_type: result.resource_type,
+          asset_type: result.type,
+          folder_selected: !!folder,
+          preset_selected: !!presetName,
+        });
         vscode.commands.executeCommand("cloudinary.refresh");
       } catch (err: any) {
+        analytics?.track("upload_failed", {
+          upload_source: "url",
+          folder_selected: !!folder,
+          preset_selected: !!presetName,
+        });
         safePostToPanel(panel, {
           command: "uploadError",
           fileId,
@@ -488,6 +531,7 @@ async function createUploadPanel(
 
     if (message.command === "copyToClipboard" && message.text) {
       await vscode.env.clipboard.writeText(message.text);
+      analytics?.track("copy_asset_url", { copy_type: "upload_result" });
     }
 
     if (message.command === "refreshFolders") {
@@ -507,6 +551,11 @@ async function createUploadPanel(
         asset.public_id.split("/").pop() ||
         asset.public_id;
 
+      analytics?.track("asset_opened", {
+        entry_point: "upload_result",
+        resource_type: assetType,
+        asset_type: asset.type,
+      });
       vscode.commands.executeCommand("cloudinary.openAsset", {
         ...asset,
         displayType: assetType,
