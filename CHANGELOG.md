@@ -5,6 +5,32 @@ All notable changes to the Cloudinary VS Code extension will be documented in th
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.6] - 2026-06-03
+
+### Added
+- **Docs AI assistant** - In-editor chat with Cloudinary documentation. Includes chat history, source citations, and a dedicated webview panel.
+- **Homescreen sidebar** - Redesigned home view with search, environment switcher, recent conversations, and an AI tools panel.
+- **Configure AI Tools** - One-click installer for Cloudinary skills and MCP servers across Cursor, GitHub Copilot, Windsurf, Claude Code, and Universal targets. Scope-aware (global vs. workspace) with install-status detection.
+- **Webview-based asset explorer** - Replaces the native VS Code tree view. Supports streaming pagination, search, and parallel fetching.
+- **Analytics tracking** - Anonymous usage telemetry for commands and webview interactions. Sensitive payload keys are stripped before transmission; session id persisted in global state.
+- **CI: VSIX build artifacts** - Feature branches now produce installable VSIX builds with PR-comment download links.
+
+### Changed
+- **Welcome screen interactions** - Refreshed onboarding flow.
+- **Cloudinary webview toolbar** - Unified toolbar styling across Docs AI, library, and homescreen.
+- **Homescreen renders shell instantly** - Static shell paints first, data loads asynchronously.
+- **AI tools platform detection** - Auto-detects installed AI platforms (Cursor, Copilot, etc.) on panel open; defaults to GitHub Copilot when running inside VS Code.
+
+### Fixed
+- Preview and upload panels close on environment switch instead of attempting in-place update.
+- Home recent-conversations list refreshes correctly after new chats.
+- Upload panel title shows the active cloud name; presets refetched on environment switch.
+- Docs AI prompt handoff no longer flashes during transition.
+
+## [0.1.5]
+
+Skipped — released as part of 0.1.6.
+
 ## [0.1.4] - 2026-04-16
 
 ### Added
