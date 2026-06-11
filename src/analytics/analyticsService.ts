@@ -7,7 +7,7 @@ export type AnalyticsValue =
   | null
   | undefined;
 
-export type AnalyticsPayload = Record<string, AnalyticsValue>;
+export type AnalyticsPayload = Record<string, unknown>;
 
 type AnalyticsStorage = {
   get<T>(key: string, defaultValue: T): T;
@@ -20,27 +20,38 @@ type AnalyticsServiceOptions = {
   getCloudName?: () => string | null | undefined;
   getDebugId?: () => string | null | undefined;
   getIdePlatform?: () => string;
-  fetchFn?: (url: string) => Promise<unknown>;
+  fetchFn?: (url: string, init: { method: "POST" }) => Promise<unknown>;
   now?: () => Date;
   createSessionId?: () => string;
 };
 
 const ANALYTICS_ENDPOINT = "https://analytics-api.cloudinary.com";
+const ANALYTICS_FEATURE = "vscode_extension";
 const SESSION_STORAGE_KEY = "cloudinary.analyticsSessionId";
 const SENSITIVE_PAYLOAD_KEYS = new Set([
   "apikey",
   "api_key",
   "apisecret",
   "api_secret",
+  "accesstoken",
+  "access_token",
   "authorization",
+  "clientsecret",
+  "client_secret",
   "email",
+  "idtoken",
+  "id_token",
   "message",
   "message_content",
   "password",
   "phone",
   "prompt",
+  "refreshtoken",
+  "refresh_token",
   "secret",
   "token",
+  "useremail",
+  "user_email",
   "user_message",
 ]);
 const RESERVED_PAYLOAD_KEYS = new Set([
@@ -49,13 +60,18 @@ const RESERVED_PAYLOAD_KEYS = new Set([
   "ide_platform",
   "session_id",
   "event_time",
+  "event",
 ]);
 
 function isSafeEventName(eventName: string): boolean {
   return /^[a-z][a-z0-9_]*$/.test(eventName);
 }
 
-function normalizePayloadValue(value: AnalyticsValue): string | undefined {
+function normalizePayloadKey(key: string): string {
+  return key.trim().replace(/[-.\s]/g, "_").toLowerCase();
+}
+
+function normalizePayloadValue(value: unknown): string | undefined {
   if (value === null || value === undefined) {
     return undefined;
   }
@@ -65,11 +81,24 @@ function normalizePayloadValue(value: AnalyticsValue): string | undefined {
     return trimmed || undefined;
   }
 
-  return String(value);
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? String(value) : undefined;
+  }
+
+  if (typeof value === "boolean") {
+    return String(value);
+  }
+
+  return undefined;
 }
 
 function isSensitivePayloadKey(key: string): boolean {
-  return SENSITIVE_PAYLOAD_KEYS.has(key.trim().replace(/-/g, "_").toLowerCase());
+  const normalizedKey = normalizePayloadKey(key);
+  return SENSITIVE_PAYLOAD_KEYS.has(normalizedKey);
+}
+
+function isReservedPayloadKey(key: string): boolean {
+  return RESERVED_PAYLOAD_KEYS.has(normalizePayloadKey(key));
 }
 
 export class AnalyticsService {
@@ -78,7 +107,7 @@ export class AnalyticsService {
   private readonly getCloudName: () => string | null | undefined;
   private readonly getDebugId: () => string | null | undefined;
   private readonly getIdePlatform: () => string;
-  private readonly fetchFn: (url: string) => Promise<unknown>;
+  private readonly fetchFn: (url: string, init: { method: "POST" }) => Promise<unknown>;
   private readonly now: () => Date;
   private readonly createSessionId: () => string;
 
@@ -88,7 +117,7 @@ export class AnalyticsService {
     this.getCloudName = options.getCloudName ?? (() => undefined);
     this.getDebugId = options.getDebugId ?? (() => undefined);
     this.getIdePlatform = options.getIdePlatform ?? (() => "unknown");
-    this.fetchFn = options.fetchFn ?? ((url) => fetch(url));
+    this.fetchFn = options.fetchFn ?? ((url, init) => fetch(url, init));
     this.now = options.now ?? (() => new Date());
     this.createSessionId = options.createSessionId ?? randomUUID;
   }
@@ -106,7 +135,8 @@ export class AnalyticsService {
     const cloudName = normalizePayloadValue(this.getCloudName());
     const debugId = normalizePayloadValue(this.getDebugId());
     const params = new URLSearchParams({
-      source: "vscode_extension",
+      source: ANALYTICS_FEATURE,
+      event: eventName,
       extension_version: this.extensionVersion,
       ide_platform: this.getIdePlatform(),
       session_id: sessionId,
@@ -121,7 +151,7 @@ export class AnalyticsService {
     }
 
     for (const [key, value] of Object.entries(payload)) {
-      if (!key || RESERVED_PAYLOAD_KEYS.has(key) || isSensitivePayloadKey(key)) {
+      if (!key || isReservedPayloadKey(key) || isSensitivePayloadKey(key)) {
         continue;
       }
 
@@ -131,10 +161,10 @@ export class AnalyticsService {
       }
     }
 
-    const url = `${ANALYTICS_ENDPOINT}/${encodeURIComponent(eventName)}?${params.toString()}`;
+    const url = `${ANALYTICS_ENDPOINT}/${ANALYTICS_FEATURE}?${params.toString()}`;
 
     try {
-      await this.fetchFn(url);
+      await this.fetchFn(url, { method: "POST" });
     } catch {
       // Analytics must never interrupt extension workflows.
     }
