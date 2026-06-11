@@ -419,7 +419,7 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
 
           <section class="hs-docs-ai-home" aria-labelledby="hs-docs-ai-heading">
             <div class="hs-docs-ai-empty">
-              <h2 id="hs-docs-ai-heading" class="hs-docs-ai-empty-heading">Ask Cloudinary</h2>
+              <h2 id="hs-docs-ai-heading" class="hs-docs-ai-empty-heading">Ask Cloudinary AI</h2>
               <p class="hs-docs-ai-empty-sub">Ask me anything about our products and documentation.</p>
               <div class="hs-docs-ai-empty-input-row">
                 <textarea
@@ -430,7 +430,7 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
                   autocomplete="off"
                   dir="auto"
                   spellcheck="true"
-                  aria-label="Ask Cloudinary documentation"
+                  aria-label="Ask Cloudinary AI"
                 ></textarea>
                 <button id="hs-docs-ai-submit" class="hs-docs-ai-empty-send-btn" type="button" title="Send message" aria-label="Send message" disabled>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>

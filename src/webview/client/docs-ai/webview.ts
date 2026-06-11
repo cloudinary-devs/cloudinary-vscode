@@ -199,7 +199,7 @@ function render() {
 
     conv.innerHTML = `
       <div class="empty">
-        <div class="empty-heading">Ask Cloudinary</div>
+        <div class="empty-heading">Ask Cloudinary AI</div>
         <p class="empty-sub">Ask me anything about our products and documentation.</p>
         <div class="empty-input-row">
           <textarea id="empty-input" class="empty-input" rows="1" placeholder="Send a message..." autocomplete="off" dir="auto"></textarea>
