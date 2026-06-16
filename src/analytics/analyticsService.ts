@@ -27,6 +27,9 @@ type AnalyticsServiceOptions = {
 
 const ANALYTICS_ENDPOINT = "https://analytics-api.cloudinary.com";
 const ANALYTICS_FEATURE = "vscode_extension";
+// Parentheses and spaces are invalid in Cloudinary cloud names, so this
+// sentinel can never collide with a real configured cloud.
+const NO_CLOUD_CONFIGURED = "(not configured)";
 const SESSION_STORAGE_KEY = "cloudinary.analyticsSessionId";
 const SENSITIVE_PAYLOAD_KEYS = new Set([
   "apikey",
@@ -143,9 +146,10 @@ export class AnalyticsService {
       event_time: this.now().toISOString(),
     });
 
-    if (cloudName) {
-      params.set("cloud_name", cloudName);
-    }
+    // Always attribute the event to the active cloud, falling back to an
+    // explicit sentinel so "no cloud configured" is distinguishable from a
+    // dropped param downstream.
+    params.set("cloud_name", cloudName ?? NO_CLOUD_CONFIGURED);
     if (debugId) {
       params.set("debug_id", debugId);
     }

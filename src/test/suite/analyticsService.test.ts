@@ -50,6 +50,23 @@ suite("AnalyticsService", () => {
     assert.strictEqual(url.searchParams.get("count"), "2");
   });
 
+  test("marks the cloud as not configured when none is selected", async () => {
+    const urls: string[] = [];
+    const service = new AnalyticsService({
+      extensionVersion: "1.2.3",
+      storage: new FakeStorage(),
+      getCloudName: () => null,
+      fetchFn: async (url) => {
+        urls.push(url);
+      },
+    });
+
+    await service.send("extension_activated");
+
+    const url = new URL(urls[0]);
+    assert.strictEqual(url.searchParams.get("cloud_name"), "(not configured)");
+  });
+
   test("persists and reuses a session id", async () => {
     const storage = new FakeStorage();
     const urls: string[] = [];
