@@ -6,7 +6,8 @@ import {
   CloudinaryEnvironment,
   isPlaceholderConfig,
 } from "./config/configUtils";
-import detectFolderMode from "./config/detectFolderMode";
+import { detectFolderModeResult } from "./config/detectFolderMode";
+import { trackConfigValidation } from "./analytics/trackConfigValidation";
 import { registerAllCommands } from "./commands/registerCommands";
 import { CloudinaryService, Credentials } from "./cloudinary/cloudinaryService";
 import { createCloudinarySdkAdapter } from "./cloudinary/cloudinarySdkAdapter";
@@ -137,7 +138,8 @@ export async function activate(context: vscode.ExtensionContext) {
   const resolveDynamicFolders = async (
     cloudName: string,
     apiKey: string,
-    apiSecret: string
+    apiSecret: string,
+    entryPoint: string
   ): Promise<boolean> => {
     const cacheKey = `cloudinary.dynamicFolders.${cloudName}`;
     const cachedFolderMode = context.globalState.get(cacheKey) as boolean | undefined;
@@ -146,9 +148,16 @@ export async function activate(context: vscode.ExtensionContext) {
       return cachedFolderMode;
     }
 
-    const dynamicFolders = await detectFolderMode(cloudName, apiKey, apiSecret);
-    await context.globalState.update(cacheKey, dynamicFolders);
-    return dynamicFolders;
+    // Fresh validation: exercise the credentials and report success/error once.
+    const result = await detectFolderModeResult(cloudName, apiKey, apiSecret);
+    trackConfigValidation(analytics, result, entryPoint);
+
+    // Only cache a genuine success so a transient error doesn't permanently
+    // mislabel the account's folder mode (and so it is re-validated next time).
+    if (result.outcome === "success") {
+      await context.globalState.update(cacheKey, result.dynamicFolders);
+    }
+    return result.dynamicFolders;
   };
 
   const environmentTarget: Pick<
@@ -302,7 +311,8 @@ export async function activate(context: vscode.ExtensionContext) {
     const dynamicFolders = await resolveDynamicFolders(
       newCloudName!,
       env.apiKey,
-      env.apiSecret
+      env.apiSecret,
+      "config_change"
     );
     cloudinaryService.setCredentials({
       cloudName: newCloudName!,
@@ -327,7 +337,8 @@ export async function activate(context: vscode.ExtensionContext) {
   cloudinaryService.dynamicFolders = await resolveDynamicFolders(
     cloudinaryService.cloudName!,
     cloudinaryService.apiKey!,
-    cloudinaryService.apiSecret!
+    cloudinaryService.apiSecret!,
+    "activation"
   );
 
   // Update status bar with folder mode indicator

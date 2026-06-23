@@ -2,8 +2,10 @@ import * as vscode from "vscode";
 import { v2 as cloudinary } from "cloudinary";
 import { CloudinaryService, Credentials } from "../cloudinary/cloudinaryService";
 import { loadEnvironments, getGlobalConfigPath } from "../config/configUtils";
-import detectFolderMode from "../config/detectFolderMode";
+import { detectFolderModeResult } from "../config/detectFolderMode";
 import { generateUserAgent } from "../utils/userAgent";
+import { AnalyticsService } from "../analytics/analyticsService";
+import { trackConfigValidation } from "../analytics/trackConfigValidation";
 
 interface CloudinaryEnvironment {
   apiKey: string;
@@ -54,7 +56,8 @@ function getStatusBarTooltip(dynamicFolders: boolean): string {
 function registerSwitchEnv(
   context: vscode.ExtensionContext,
   target: EnvironmentTarget,
-  statusBar: vscode.StatusBarItem
+  statusBar: vscode.StatusBarItem,
+  analytics?: AnalyticsService
 ) {
   context.subscriptions.push(
     vscode.commands.registerCommand(
@@ -81,12 +84,20 @@ function registerSwitchEnv(
           if (typeof cachedFolderMode === "boolean") {
             dynamicFolders = cachedFolderMode;
           } else {
-            dynamicFolders = await detectFolderMode(
+            // Fresh validation: exercise the credentials and report success/error once.
+            const result = await detectFolderModeResult(
               selected,
               env.apiKey,
               env.apiSecret
             );
-            await context.globalState.update(cacheKey, dynamicFolders);
+            trackConfigValidation(analytics, result, "switch");
+            dynamicFolders = result.dynamicFolders;
+
+            // Only cache a genuine success so a transient error doesn't permanently
+            // mislabel the account's folder mode (and so it is re-validated next time).
+            if (result.outcome === "success") {
+              await context.globalState.update(cacheKey, dynamicFolders);
+            }
           }
 
           updateEnvironmentTarget(target, {

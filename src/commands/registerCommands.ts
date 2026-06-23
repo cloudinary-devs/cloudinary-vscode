@@ -96,7 +96,7 @@ function registerAllCommands(
   registerPreview(context, analytics);
   registerUpload(context, cloudinaryService, analytics);
   registerClipboard(context, analytics);
-  registerSwitchEnv(context, environmentTarget, statusBar);
+  registerSwitchEnv(context, environmentTarget, statusBar, analytics);
   registerWelcomeScreen(context, cloudinaryService);
   registerConfigureAiTools(context);
 }
