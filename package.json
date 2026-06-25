@@ -166,6 +166,12 @@
         "title": "Refresh Docs AI",
         "icon": "$(refresh)",
         "category": "Cloudinary"
+      },
+      {
+        "command": "cloudinary.refreshFolderMode",
+        "title": "Refresh Folder Mode",
+        "icon": "$(refresh)",
+        "category": "Cloudinary"
       }
     ]
   },

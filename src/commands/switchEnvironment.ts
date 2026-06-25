@@ -3,6 +3,7 @@ import { v2 as cloudinary } from "cloudinary";
 import { CloudinaryService, Credentials } from "../cloudinary/cloudinaryService";
 import { loadEnvironments, getGlobalConfigPath } from "../config/configUtils";
 import { detectFolderModeResult } from "../config/detectFolderMode";
+import { isFolderModeFresh, readFolderModeCache, writeFolderModeCache } from "../config/folderModeCache";
 import { generateUserAgent } from "../utils/userAgent";
 import { AnalyticsService } from "../analytics/analyticsService";
 import { trackConfigValidation } from "../analytics/trackConfigValidation";
@@ -77,12 +78,12 @@ function registerSwitchEnv(
 
         if (selected) {
           const env = environments[selected];
-          const cacheKey = `cloudinary.dynamicFolders.${selected}`;
-          const cachedFolderMode = context.globalState.get(cacheKey) as boolean | undefined;
+          const cached = readFolderModeCache(context.globalState, selected);
+          const freshCache = cached && isFolderModeFresh(cached) ? cached : undefined;
           let dynamicFolders: boolean;
 
-          if (typeof cachedFolderMode === "boolean") {
-            dynamicFolders = cachedFolderMode;
+          if (freshCache) {
+            dynamicFolders = freshCache.value;
           } else {
             // Fresh validation: exercise the credentials and report success/error once.
             const result = await detectFolderModeResult(
@@ -93,10 +94,12 @@ function registerSwitchEnv(
             trackConfigValidation(analytics, result, "switch");
             dynamicFolders = result.dynamicFolders;
 
-            // Only cache a genuine success so a transient error doesn't permanently
-            // mislabel the account's folder mode (and so it is re-validated next time).
             if (result.outcome === "success") {
-              await context.globalState.update(cacheKey, dynamicFolders);
+              await writeFolderModeCache(context.globalState, selected, dynamicFolders);
+            } else if (cached) {
+              // Prefer a stale last-known value over flipping to fixed mode on a
+              // transient failure. The failed validation is still tracked above.
+              dynamicFolders = cached.value;
             }
           }
 

@@ -7,6 +7,11 @@ import {
   isPlaceholderConfig,
 } from "./config/configUtils";
 import { detectFolderModeResult } from "./config/detectFolderMode";
+import {
+  isFolderModeFresh,
+  readFolderModeCache,
+  writeFolderModeCache,
+} from "./config/folderModeCache";
 import { trackConfigValidation } from "./analytics/trackConfigValidation";
 import { registerAllCommands } from "./commands/registerCommands";
 import { CloudinaryService, Credentials } from "./cloudinary/cloudinaryService";
@@ -139,23 +144,33 @@ export async function activate(context: vscode.ExtensionContext) {
     cloudName: string,
     apiKey: string,
     apiSecret: string,
-    entryPoint: string
+    entryPoint: string,
+    options: { force?: boolean } = {}
   ): Promise<boolean> => {
-    const cacheKey = `cloudinary.dynamicFolders.${cloudName}`;
-    const cachedFolderMode = context.globalState.get(cacheKey) as boolean | undefined;
+    // Cached entry (any age). Legacy plain-boolean entries are ignored so
+    // installs stuck on an outdated mode re-validate and self-heal.
+    const cached = readFolderModeCache(context.globalState, cloudName);
 
-    if (typeof cachedFolderMode === "boolean") {
-      return cachedFolderMode;
+    // Cloudinary accounts can migrate from fixed to dynamic folders, so a cached
+    // mode must not live forever. Use the cache only when it is still within the
+    // TTL and the caller has not asked for a forced refresh.
+    if (!options.force && cached && isFolderModeFresh(cached)) {
+      return cached.value;
     }
 
     // Fresh validation: exercise the credentials and report success/error once.
     const result = await detectFolderModeResult(cloudName, apiKey, apiSecret);
     trackConfigValidation(analytics, result, entryPoint);
 
-    // Only cache a genuine success so a transient error doesn't permanently
-    // mislabel the account's folder mode (and so it is re-validated next time).
     if (result.outcome === "success") {
-      await context.globalState.update(cacheKey, result.dynamicFolders);
+      await writeFolderModeCache(context.globalState, cloudName, result.dynamicFolders);
+      return result.dynamicFolders;
+    }
+
+    // Detection failed (network/credential error). Prefer a previously known-good
+    // value over flipping the account to fixed mode on a transient failure.
+    if (cached) {
+      return cached.value;
     }
     return result.dynamicFolders;
   };
@@ -308,11 +323,14 @@ export async function activate(context: vscode.ExtensionContext) {
       return;
     }
 
+    // The credentials file just changed; the keys (or the account's folder mode)
+    // may differ from what we cached, so force a fresh detection.
     const dynamicFolders = await resolveDynamicFolders(
       newCloudName!,
       env.apiKey,
       env.apiSecret,
-      "config_change"
+      "config_change",
+      { force: true }
     );
     cloudinaryService.setCredentials({
       cloudName: newCloudName!,
@@ -332,6 +350,43 @@ export async function activate(context: vscode.ExtensionContext) {
   });
 
   context.subscriptions.push(watcher);
+
+  // Manual escape hatch: force a fresh folder-mode detection. Useful after an
+  // account is migrated between fixed and dynamic folders, or to recover an
+  // install that cached the wrong mode.
+  context.subscriptions.push(
+    vscode.commands.registerCommand("cloudinary.refreshFolderMode", async () => {
+      const { cloudName, apiKey, apiSecret } = cloudinaryService;
+      if (!cloudName || !apiKey || !apiSecret || isPlaceholderConfig(cloudName, apiKey, apiSecret)) {
+        vscode.window.showWarningMessage(
+          "Configure Cloudinary credentials before refreshing the folder mode."
+        );
+        return;
+      }
+
+      const result = await detectFolderModeResult(cloudName, apiKey, apiSecret);
+      trackConfigValidation(analytics, result, "manual_refresh");
+
+      if (result.outcome !== "success") {
+        vscode.window.showWarningMessage(
+          "Could not refresh the Cloudinary folder mode. Check your credentials or connection, then try again."
+        );
+        return;
+      }
+
+      const dynamicFolders = result.dynamicFolders;
+      await writeFolderModeCache(context.globalState, cloudName, dynamicFolders);
+      cloudinaryService.dynamicFolders = dynamicFolders;
+
+      statusBar.text = getStatusBarText(cloudName, dynamicFolders);
+      statusBar.tooltip = getStatusBarTooltip(dynamicFolders);
+
+      await refreshEnvironmentViews();
+      vscode.window.showInformationMessage(
+        `Cloudinary folder mode: ${dynamicFolders ? "Dynamic" : "Fixed"} folders.`
+      );
+    })
+  );
 
   // Detect and cache folder mode
   cloudinaryService.dynamicFolders = await resolveDynamicFolders(
