@@ -32,7 +32,7 @@ interface AiToolsDataMessage {
 
 interface HomescreenDataMessage {
   command: "homescreenData";
-  hasConfig: boolean;
+  status: "connected" | "setupNeeded" | "checking";
   cloudName: string;
   folderMode: string;
   envCount: number;
@@ -487,18 +487,31 @@ function handleHomescreenData(msg: HomescreenDataMessage): void {
   const switchEnvBtn = document.getElementById("hs-btn-switch-env");
   const envCountEl = document.getElementById("hs-env-count");
 
-  statusDot?.classList.toggle("hs-status-dot--warn", !msg.hasConfig);
-  if (statusText) { statusText.textContent = msg.hasConfig ? "Connected" : "Setup needed"; }
+  const connected = msg.status === "connected";
+  const setupNeeded = msg.status === "setupNeeded";
+  const checking = msg.status === "checking";
+
+  // Only "Setup needed" is an alarming (warn) state. "Checking…" is neutral.
+  statusDot?.classList.toggle("hs-status-dot--warn", setupNeeded);
+  if (statusText) {
+    statusText.textContent = connected ? "Connected" : checking ? "Checking…" : "Setup needed";
+  }
   if (cloudNameEl) {
-    cloudNameEl.textContent = msg.hasConfig ? msg.cloudName : "Not configured";
-    cloudNameEl.classList.toggle("hs-cloud-name--placeholder", !msg.hasConfig);
+    // Show the cloud name whenever one is configured (even while checking or if
+    // rejected); only fall back to the placeholder when nothing is set up.
+    const showName = !!msg.cloudName && !setupNeeded;
+    cloudNameEl.textContent = showName ? msg.cloudName : "Not configured";
+    cloudNameEl.classList.toggle("hs-cloud-name--placeholder", !showName);
   }
   if (folderModeEl) {
+    // Folder mode is only meaningful once credentials are confirmed valid.
     folderModeEl.textContent = msg.folderMode;
-    folderModeEl.classList.toggle("hidden", !msg.hasConfig);
+    folderModeEl.classList.toggle("hidden", !connected);
   }
-  setupBanner?.classList.toggle("hidden", msg.hasConfig);
-  searchEl?.classList.toggle("hidden", !msg.hasConfig);
+  // Prompt setup only when credentials are missing or rejected — not while checking.
+  setupBanner?.classList.toggle("hidden", !setupNeeded);
+  // Search needs working credentials; keep it hidden until connected.
+  searchEl?.classList.toggle("hidden", !connected);
   switchEnvBtn?.classList.toggle("hidden", msg.envCount <= 1);
   if (envCountEl) { envCountEl.textContent = String(msg.envCount); }
 }

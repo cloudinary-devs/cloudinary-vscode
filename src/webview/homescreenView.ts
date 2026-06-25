@@ -9,7 +9,7 @@ import { CloudinaryService } from "../cloudinary/cloudinaryService";
 import { createWebviewDocument, getScriptUri, getStyleUri } from "./webviewUtils";
 import type { LibraryWebviewViewProvider } from "./libraryView";
 import { loadEnvironments } from "../config/configUtils";
-import { isConnected } from "../config/connectionStatus";
+import { getConnectionStatus } from "../config/connectionStatus";
 import { buildAiToolsNextStepsMessage } from "../utils/aiToolsGuidance";
 import skillsConfig from "../utils/skills-config.json";
 import { actionIcons } from "./icons";
@@ -244,10 +244,17 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
     const view = this._webviewView;
     if (!view) { return; }
 
-    // "Connected" requires present credentials that have not been actively
-    // rejected. See isConnected() for why a pending/unknown validation stays
-    // optimistic rather than flashing "Setup needed" for a valid cloud.
-    const hasConfig = isConnected({
+    let envCount = 0;
+    try {
+      const envs = await loadEnvironments();
+      envCount = Object.keys(envs).length;
+    } catch { /* use default */ }
+
+    // Compute the status AFTER the await above and read it right before posting,
+    // so a send that started while validation was still in flight reflects the
+    // latest credentialsValid (avoids a stale "checking"/"connected" post racing
+    // ahead of the post-validation refresh). See getConnectionStatus().
+    const status = getConnectionStatus({
       cloudName: this._service.cloudName,
       apiKey: this._service.apiKey,
       apiSecret: this._service.apiSecret,
@@ -256,13 +263,7 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
     const cloudName = this._service.cloudName || "";
     const folderMode = this._service.dynamicFolders ? "Dynamic folders" : "Fixed folders";
 
-    let envCount = hasConfig ? 1 : 0;
-    try {
-      const envs = await loadEnvironments();
-      envCount = Object.keys(envs).length;
-    } catch { /* use default */ }
-
-    this._safePost({ command: "homescreenData", hasConfig, cloudName, folderMode, envCount });
+    this._safePost({ command: "homescreenData", status, cloudName, folderMode, envCount });
     this._sendDocsAiRecentConversations();
     this._requestDocsAiRecentConversations?.();
   }

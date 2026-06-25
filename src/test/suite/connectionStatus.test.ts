@@ -1,25 +1,39 @@
 import * as assert from "assert";
-import { isConnected } from "../../config/connectionStatus";
+import { getConnectionStatus } from "../../config/connectionStatus";
 
 const base = { cloudName: "demo", apiKey: "key", apiSecret: "secret" };
 
-suite("isConnected", () => {
+suite("getConnectionStatus", () => {
   test("present + validated → connected", () => {
-    assert.strictEqual(isConnected({ ...base, credentialsValid: true }), true);
+    assert.strictEqual(getConnectionStatus({ ...base, credentialsValid: true }), "connected");
   });
 
-  test("present + rejected → not connected", () => {
-    assert.strictEqual(isConnected({ ...base, credentialsValid: false }), false);
+  test("present + rejected → setupNeeded (never 'connected' for bad creds)", () => {
+    assert.strictEqual(getConnectionStatus({ ...base, credentialsValid: false }), "setupNeeded");
   });
 
-  test("present + unknown (pending/network) → stays connected (optimistic)", () => {
-    assert.strictEqual(isConnected({ ...base, credentialsValid: undefined }), true);
+  test("present + unknown (pending/offline) → checking (not connected, not broken)", () => {
+    assert.strictEqual(getConnectionStatus({ ...base, credentialsValid: undefined }), "checking");
   });
 
-  test("missing any field → not connected, regardless of validity", () => {
-    assert.strictEqual(isConnected({ cloudName: null, apiKey: "k", apiSecret: "s", credentialsValid: true }), false);
-    assert.strictEqual(isConnected({ cloudName: "c", apiKey: null, apiSecret: "s", credentialsValid: true }), false);
-    assert.strictEqual(isConnected({ cloudName: "c", apiKey: "k", apiSecret: null, credentialsValid: true }), false);
-    assert.strictEqual(isConnected({ cloudName: "", apiKey: "", apiSecret: "", credentialsValid: undefined }), false);
+  test("missing any field → setupNeeded regardless of validity", () => {
+    assert.strictEqual(
+      getConnectionStatus({ cloudName: null, apiKey: "k", apiSecret: "s", credentialsValid: true }),
+      "setupNeeded"
+    );
+    assert.strictEqual(
+      getConnectionStatus({ cloudName: "c", apiKey: null, apiSecret: "s", credentialsValid: true }),
+      "setupNeeded"
+    );
+    assert.strictEqual(
+      getConnectionStatus({ cloudName: "c", apiKey: "k", apiSecret: null, credentialsValid: undefined }),
+      "setupNeeded"
+    );
+  });
+
+  test("the cached-invalid-credentials repro: a stale cache cannot make rejected creds 'connected'", () => {
+    // Simulates DOC-11110 repro: folder mode was cached (so dynamicFolders is
+    // known) but the current secret is now rejected → credentialsValid=false.
+    assert.strictEqual(getConnectionStatus({ ...base, credentialsValid: false }), "setupNeeded");
   });
 });

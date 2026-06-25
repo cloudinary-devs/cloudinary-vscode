@@ -37,12 +37,28 @@ function updateEnvironmentTarget(
   target.dynamicFolders = credentials.dynamicFolders ?? false;
 }
 
-function getStatusBarText(cloudName: string, dynamicFolders: boolean): string {
+function getStatusBarText(
+  cloudName: string,
+  dynamicFolders: boolean,
+  credentialsValid?: boolean
+): string {
+  if (credentialsValid === false) {
+    return `$(warning) ${cloudName}: credentials invalid`;
+  }
+  if (credentialsValid === undefined) {
+    return `$(cloud) ${cloudName}`;
+  }
   const folderMode = dynamicFolders ? "Dynamic" : "Fixed";
   return `$(cloud) ${cloudName} $(folder) ${folderMode}`;
 }
 
-function getStatusBarTooltip(dynamicFolders: boolean): string {
+function getStatusBarTooltip(dynamicFolders: boolean, credentialsValid?: boolean): string {
+  if (credentialsValid === false) {
+    return "Cloudinary credentials are invalid or unauthorized.\n\nClick to switch environment, or update your config.";
+  }
+  if (credentialsValid === undefined) {
+    return "Click to switch Cloudinary environment";
+  }
   return dynamicFolders
     ? "Click to switch Cloudinary environment\n\nDynamic Folders: Assets can be organized independently of their public ID"
     : "Click to switch Cloudinary environment\n\nFixed Folders: Asset folder is determined by public ID path";
@@ -112,8 +128,8 @@ function registerSwitchEnv(
             api_secret: env.apiSecret,
           });
 
-          statusBar.text = getStatusBarText(selected, dynamicFolders);
-          statusBar.tooltip = getStatusBarTooltip(dynamicFolders);
+          statusBar.text = getStatusBarText(selected, dynamicFolders, credentialsValid);
+          statusBar.tooltip = getStatusBarTooltip(dynamicFolders, credentialsValid);
 
           vscode.window.showInformationMessage(
             `$(cloud) Switched to ${selected} environment.`

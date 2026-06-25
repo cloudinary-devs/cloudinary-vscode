@@ -31,7 +31,20 @@ let statusBar: vscode.StatusBarItem;
 /**
  * Returns the status bar text with cloud name and folder mode indicator.
  */
-function getStatusBarText(cloudName: string, dynamicFolders: boolean): string {
+function getStatusBarText(
+  cloudName: string,
+  dynamicFolders: boolean,
+  credentialsValid?: boolean
+): string {
+  // Rejected credentials: warn and drop the folder-mode chip (it isn't trustworthy).
+  if (credentialsValid === false) {
+    return `$(warning) ${cloudName}: credentials invalid`;
+  }
+  // Not yet validated (or unverifiable, e.g. offline): show the cloud without
+  // asserting a folder mode we haven't confirmed.
+  if (credentialsValid === undefined) {
+    return `$(cloud) ${cloudName}`;
+  }
   const folderMode = dynamicFolders ? "Dynamic" : "Fixed";
   return `$(cloud) ${cloudName} $(folder) ${folderMode}`;
 }
@@ -39,7 +52,13 @@ function getStatusBarText(cloudName: string, dynamicFolders: boolean): string {
 /**
  * Returns the status bar tooltip with folder mode explanation.
  */
-function getStatusBarTooltip(dynamicFolders: boolean): string {
+function getStatusBarTooltip(dynamicFolders: boolean, credentialsValid?: boolean): string {
+  if (credentialsValid === false) {
+    return "Cloudinary credentials are invalid or unauthorized.\n\nClick to switch environment, or update your config.";
+  }
+  if (credentialsValid === undefined) {
+    return "Click to switch Cloudinary environment";
+  }
   const modeDescription = dynamicFolders
     ? "Dynamic Folders: Assets can be organized independently of their public ID"
     : "Fixed Folders: Asset folder is determined by public ID path";
@@ -338,8 +357,8 @@ export async function activate(context: vscode.ExtensionContext) {
     updateCloudinaryConfig(newCloudName!, env.apiKey, env.apiSecret);
 
     // Update status bar with folder mode indicator
-    statusBar.text = getStatusBarText(newCloudName!, dynamicFolders);
-    statusBar.tooltip = getStatusBarTooltip(dynamicFolders);
+    statusBar.text = getStatusBarText(newCloudName!, dynamicFolders, credentialsValid);
+    statusBar.tooltip = getStatusBarTooltip(dynamicFolders, credentialsValid);
     statusBar.command = "cloudinary.switchEnvironment";
 
     await refreshEnvironmentViews();
@@ -368,6 +387,8 @@ export async function activate(context: vscode.ExtensionContext) {
         // network) failure as-is so we don't falsely mark working creds invalid.
         if (result.errorReason === "unauthorized") {
           cloudinaryService.credentialsValid = false;
+          statusBar.text = getStatusBarText(cloudName, cloudinaryService.dynamicFolders, false);
+          statusBar.tooltip = getStatusBarTooltip(cloudinaryService.dynamicFolders, false);
           await refreshEnvironmentViews();
         }
         vscode.window.showWarningMessage(
@@ -381,8 +402,8 @@ export async function activate(context: vscode.ExtensionContext) {
       cloudinaryService.dynamicFolders = dynamicFolders;
       cloudinaryService.credentialsValid = true;
 
-      statusBar.text = getStatusBarText(cloudName, dynamicFolders);
-      statusBar.tooltip = getStatusBarTooltip(dynamicFolders);
+      statusBar.text = getStatusBarText(cloudName, dynamicFolders, true);
+      statusBar.tooltip = getStatusBarTooltip(dynamicFolders, true);
 
       await refreshEnvironmentViews();
       vscode.window.showInformationMessage(
@@ -404,8 +425,15 @@ export async function activate(context: vscode.ExtensionContext) {
   }
 
   // Update status bar with folder mode indicator
-  statusBar.text = getStatusBarText(cloudinaryService.cloudName!, cloudinaryService.dynamicFolders);
-  statusBar.tooltip = getStatusBarTooltip(cloudinaryService.dynamicFolders);
+  statusBar.text = getStatusBarText(
+    cloudinaryService.cloudName!,
+    cloudinaryService.dynamicFolders,
+    cloudinaryService.credentialsValid
+  );
+  statusBar.tooltip = getStatusBarTooltip(
+    cloudinaryService.dynamicFolders,
+    cloudinaryService.credentialsValid
+  );
 
   await refreshEnvironmentViews();
 

@@ -8,16 +8,32 @@ export interface ConnectionStatusInput {
 }
 
 /**
- * Whether the homescreen should report "Connected".
- *
- * True only when all credential fields are present AND the credentials have not
- * been actively rejected. A pending/unknown validation (`undefined`) stays
- * optimistic: credentials are always validated on activation/save/switch, so
- * `undefined` is a brief, self-correcting state, and we must not flash a valid
- * cloud as "Setup needed" during the startup check or a transient network blip.
- * Only a definitive `false` (e.g. 401/403) downgrades to "Setup needed".
+ * - `connected`: credentials present and validated against the API.
+ * - `setupNeeded`: credentials missing, or actively rejected (e.g. 401/403).
+ * - `checking`: credentials present but not yet validated (or validation could
+ *   not complete, e.g. offline). Deliberately neither "Connected" nor "Setup
+ *   needed" so we never claim a valid cloud is broken, nor claim an unverified
+ *   (possibly invalid) cloud is connected.
  */
-export function isConnected(input: ConnectionStatusInput): boolean {
+export type ConnectionStatus = "connected" | "setupNeeded" | "checking";
+
+/**
+ * Decides the homescreen connection status from credentials + validation state.
+ *
+ * A folder-mode cache is keyed by cloud name, not by the API key/secret, so it
+ * must never be allowed to imply "connected"; only an explicit
+ * `credentialsValid === true` (a successful live validation) does that.
+ */
+export function getConnectionStatus(input: ConnectionStatusInput): ConnectionStatus {
   const hasCredentials = !!(input.cloudName && input.apiKey && input.apiSecret);
-  return hasCredentials && input.credentialsValid !== false;
+  if (!hasCredentials) {
+    return "setupNeeded";
+  }
+  if (input.credentialsValid === true) {
+    return "connected";
+  }
+  if (input.credentialsValid === false) {
+    return "setupNeeded";
+  }
+  return "checking";
 }
