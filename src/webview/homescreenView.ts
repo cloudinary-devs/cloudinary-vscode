@@ -10,6 +10,7 @@ import { createWebviewDocument, getScriptUri, getStyleUri } from "./webviewUtils
 import type { LibraryWebviewViewProvider } from "./libraryView";
 import { loadEnvironments } from "../config/configUtils";
 import { isConnected } from "../config/connectionStatus";
+import { buildAiToolsNextStepsMessage } from "../utils/aiToolsGuidance";
 import skillsConfig from "../utils/skills-config.json";
 import { actionIcons } from "./icons";
 import {
@@ -163,8 +164,14 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
             vscode.commands.executeCommand("cloudinary.switchEnvironment");
             break;
           case "aiToolsExpanded":
+            // First open: auto-detect the user's editor as the default platform.
             this._currentPlatform = detectEditorPlatform();
             this._currentScope = "project";
+            await this._handleAiToolsExpanded();
+            break;
+          case "aiToolsRefresh":
+            // Re-render after an install (or other in-place refresh) WITHOUT
+            // resetting the user's chosen platform/scope back to auto-detected.
             await this._handleAiToolsExpanded();
             break;
           case "changePlatform":
@@ -554,6 +561,8 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
     }
     const rootUri = workspaceFolders[0].uri;
     const errors: string[] = [];
+    let installedSkillsCount = 0;
+    const installedMcp: string[] = [];
     const cachedSkills = this._cachedSkills ?? [];
     const platform = getPlatformEntry(platformId);
 
@@ -582,20 +591,25 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
       } catch (err: any) {
         errors.push(`${dirName}: ${err.message}`);
       }
+      const skillOk = errors.length === errsBefore;
+      if (skillOk) { installedSkillsCount++; }
       this._safePost({
         command: "aiToolsProgress",
         item: dirName,
-        status: errors.length > errsBefore ? "error" : "done",
+        status: skillOk ? "done" : "error",
       });
     }
 
+    let mcpEditorLabel: string | undefined;
     if (mcpServers.length > 0) {
       const editor = detectEditor();
+      mcpEditorLabel = getEditorDisplayName(editor);
       const createdFiles: string[] = [];
       try {
         await installMcpServers(rootUri, editor, mcpServers, createdFiles);
         for (const key of mcpServers) {
           this._safePost({ command: "aiToolsProgress", item: key, status: "done" });
+          installedMcp.push(key);
         }
       } catch (err: any) {
         errors.push(`MCP: ${err.message}`);
@@ -606,5 +620,26 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
     }
 
     this._safePost({ command: "aiToolsResult", errors });
+    this._showAiToolsNextSteps(installedSkillsCount, installedMcp, mcpEditorLabel);
+  }
+
+  /**
+   * Surfaces post-install guidance. MCP servers in particular only take effect
+   * after the editor reloads, and users otherwise see them as "configured" but
+   * not connected, so we spell out the restart/verify step explicitly.
+   */
+  private _showAiToolsNextSteps(
+    installedSkillsCount: number,
+    installedMcp: string[],
+    mcpEditorLabel?: string
+  ): void {
+    const message = buildAiToolsNextStepsMessage(
+      installedSkillsCount,
+      installedMcp.length,
+      mcpEditorLabel
+    );
+    if (message) {
+      vscode.window.showInformationMessage(message);
+    }
   }
 }

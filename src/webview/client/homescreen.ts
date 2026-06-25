@@ -467,9 +467,12 @@ function handleAiToolsProgress(msg: AiToolsProgressMessage): void {
 }
 
 function handleAiToolsResult(_msg: AiToolsResultMessage): void {
+  // Reload to reflect newly-installed items, but via "aiToolsRefresh" (not
+  // "aiToolsExpanded") so the user's selected platform/scope are preserved
+  // instead of being reset to the auto-detected defaults.
   _cachedData = null;
   showPanelState("loading");
-  getVSCode()?.postMessage({ command: "aiToolsExpanded" });
+  getVSCode()?.postMessage({ command: "aiToolsRefresh" });
 }
 
 // ── Homescreen data ───────────────────────────────────────────────────────────
