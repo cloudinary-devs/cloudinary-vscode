@@ -45,6 +45,18 @@ suite("folderModeCache", () => {
     assert.strictEqual(readFolderModeCache(memento(storage), "demo"), undefined);
   });
 
+  test("readFolderModeCache ignores malformed timestamped entries", () => {
+    const missingValue = new FakeStorage({
+      [folderModeCacheKey("demo")]: { detectedAt: 1000 },
+    });
+    const nonFiniteTimestamp = new FakeStorage({
+      [folderModeCacheKey("demo")]: { value: true, detectedAt: Number.NaN },
+    });
+
+    assert.strictEqual(readFolderModeCache(memento(missingValue), "demo"), undefined);
+    assert.strictEqual(readFolderModeCache(memento(nonFiniteTimestamp), "demo"), undefined);
+  });
+
   test("readFolderModeCache returns undefined when absent", () => {
     assert.strictEqual(readFolderModeCache(memento(new FakeStorage()), "demo"), undefined);
   });
