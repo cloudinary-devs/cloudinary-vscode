@@ -1,13 +1,14 @@
 import * as vscode from "vscode";
 
 /**
- * How long a detected folder mode stays trusted before it is re-validated.
- * Cloudinary accounts can migrate from fixed to dynamic folders, so the cached
- * mode must expire rather than live forever.
+ * Timestamped folder-mode cache entry stored in globalState.
+ *
+ * The folder mode is re-detected on every activation/save/switch (detection also
+ * validates the live credentials), so this cache is only a fallback that keeps a
+ * last-known folder mode for UI continuity when a detection attempt fails for a
+ * non-credential reason (e.g. the network is down). `detectedAt` records when it
+ * was last confirmed.
  */
-export const FOLDER_MODE_TTL_MS = 12 * 60 * 60 * 1000; // 12 hours
-
-/** Timestamped folder-mode cache entry stored in globalState. */
 export interface CachedFolderMode {
   value: boolean;
   detectedAt: number;
@@ -44,11 +45,6 @@ export function readFolderModeCache(
     return cached;
   }
   return undefined;
-}
-
-/** Whether a cache entry is still within the TTL and can be used without re-validating. */
-export function isFolderModeFresh(entry: CachedFolderMode, now: number = Date.now()): boolean {
-  return now - entry.detectedAt < FOLDER_MODE_TTL_MS;
 }
 
 /** Persists a freshly detected folder mode with the current timestamp. */

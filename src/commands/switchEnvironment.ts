@@ -2,8 +2,8 @@ import * as vscode from "vscode";
 import { v2 as cloudinary } from "cloudinary";
 import { CloudinaryService, Credentials } from "../cloudinary/cloudinaryService";
 import { loadEnvironments, getGlobalConfigPath } from "../config/configUtils";
-import { detectFolderModeResult } from "../config/detectFolderMode";
-import { isFolderModeFresh, readFolderModeCache, writeFolderModeCache } from "../config/folderModeCache";
+import { detectFolderModeResult, resolveFolderModeState } from "../config/detectFolderMode";
+import { readFolderModeCache, writeFolderModeCache } from "../config/folderModeCache";
 import { generateUserAgent } from "../utils/userAgent";
 import { AnalyticsService } from "../analytics/analyticsService";
 import { trackConfigValidation } from "../analytics/trackConfigValidation";
@@ -16,7 +16,7 @@ interface CloudinaryEnvironment {
 
 type EnvironmentTarget = Pick<
   CloudinaryService,
-  "cloudName" | "apiKey" | "apiSecret" | "uploadPreset" | "dynamicFolders"
+  "cloudName" | "apiKey" | "apiSecret" | "uploadPreset" | "dynamicFolders" | "credentialsValid"
 > & {
   setCredentials?: (creds: Credentials) => void;
 };
@@ -79,29 +79,21 @@ function registerSwitchEnv(
         if (selected) {
           const env = environments[selected];
           const cached = readFolderModeCache(context.globalState, selected);
-          const freshCache = cached && isFolderModeFresh(cached) ? cached : undefined;
-          let dynamicFolders: boolean;
 
-          if (freshCache) {
-            dynamicFolders = freshCache.value;
-          } else {
-            // Fresh validation: exercise the credentials and report success/error once.
-            const result = await detectFolderModeResult(
-              selected,
-              env.apiKey,
-              env.apiSecret
-            );
-            trackConfigValidation(analytics, result, "switch");
-            dynamicFolders = result.dynamicFolders;
+          // Always validate the current credentials. The folder-mode cache is
+          // keyed only by cloud name, so it can provide a fallback mode but
+          // cannot prove that the current API key/secret are valid.
+          const result = await detectFolderModeResult(
+            selected,
+            env.apiKey,
+            env.apiSecret
+          );
+          trackConfigValidation(analytics, result, "switch");
 
-            if (result.outcome === "success") {
-              await writeFolderModeCache(context.globalState, selected, dynamicFolders);
-            } else if (cached) {
-              // Prefer a stale last-known value over flipping to fixed mode on a
-              // transient failure. The failed validation is still tracked above.
-              dynamicFolders = cached.value;
-            }
+          if (result.outcome === "success") {
+            await writeFolderModeCache(context.globalState, selected, result.dynamicFolders);
           }
+          const { dynamicFolders, credentialsValid } = resolveFolderModeState(result, cached);
 
           updateEnvironmentTarget(target, {
             cloudName: selected,
@@ -110,6 +102,7 @@ function registerSwitchEnv(
             uploadPreset: env.uploadPreset || null,
             dynamicFolders,
           });
+          target.credentialsValid = credentialsValid;
 
           (cloudinary.utils as any).userPlatform = generateUserAgent();
 

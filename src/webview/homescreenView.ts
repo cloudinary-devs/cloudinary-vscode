@@ -9,6 +9,7 @@ import { CloudinaryService } from "../cloudinary/cloudinaryService";
 import { createWebviewDocument, getScriptUri, getStyleUri } from "./webviewUtils";
 import type { LibraryWebviewViewProvider } from "./libraryView";
 import { loadEnvironments } from "../config/configUtils";
+import { isConnected } from "../config/connectionStatus";
 import skillsConfig from "../utils/skills-config.json";
 import { actionIcons } from "./icons";
 import {
@@ -236,7 +237,15 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
     const view = this._webviewView;
     if (!view) { return; }
 
-    const hasConfig = !!(this._service.cloudName && this._service.apiKey);
+    // "Connected" requires present credentials that have not been actively
+    // rejected. See isConnected() for why a pending/unknown validation stays
+    // optimistic rather than flashing "Setup needed" for a valid cloud.
+    const hasConfig = isConnected({
+      cloudName: this._service.cloudName,
+      apiKey: this._service.apiKey,
+      apiSecret: this._service.apiSecret,
+      credentialsValid: this._service.credentialsValid,
+    });
     const cloudName = this._service.cloudName || "";
     const folderMode = this._service.dynamicFolders ? "Dynamic folders" : "Fixed folders";
 

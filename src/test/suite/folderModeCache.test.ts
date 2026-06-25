@@ -1,9 +1,7 @@
 import * as assert from "assert";
 import * as vscode from "vscode";
 import {
-  FOLDER_MODE_TTL_MS,
   folderModeCacheKey,
-  isFolderModeFresh,
   readFolderModeCache,
   writeFolderModeCache,
 } from "../../config/folderModeCache";
@@ -61,20 +59,6 @@ suite("folderModeCache", () => {
     assert.strictEqual(readFolderModeCache(memento(new FakeStorage()), "demo"), undefined);
   });
 
-  test("isFolderModeFresh: within TTL is fresh, beyond TTL is stale", () => {
-    const now = 10_000_000;
-    assert.strictEqual(isFolderModeFresh({ value: true, detectedAt: now - 1 }, now), true);
-    assert.strictEqual(
-      isFolderModeFresh({ value: true, detectedAt: now - FOLDER_MODE_TTL_MS - 1 }, now),
-      false
-    );
-    // Exactly at the TTL boundary is considered stale (strict less-than).
-    assert.strictEqual(
-      isFolderModeFresh({ value: true, detectedAt: now - FOLDER_MODE_TTL_MS }, now),
-      false
-    );
-  });
-
   test("writeFolderModeCache persists a timestamped entry", async () => {
     const storage = new FakeStorage();
     await writeFolderModeCache(memento(storage), "demo", true, 4242);
@@ -84,13 +68,13 @@ suite("folderModeCache", () => {
     });
   });
 
-  test("write then read round-trips and is fresh at write time", async () => {
+  test("write then read round-trips", async () => {
     const storage = new FakeStorage();
     const now = 50_000;
     await writeFolderModeCache(memento(storage), "demo", false, now);
     const cached = readFolderModeCache(memento(storage), "demo");
     assert.ok(cached);
     assert.strictEqual(cached!.value, false);
-    assert.strictEqual(isFolderModeFresh(cached!, now), true);
+    assert.strictEqual(cached!.detectedAt, now);
   });
 });

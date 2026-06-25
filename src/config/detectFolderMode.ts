@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { generateUserAgent } from '../utils/userAgent';
 import { isPlaceholderConfig } from './configUtils';
+import type { CachedFolderMode } from './folderModeCache';
 
 export type FolderModeOutcome = 'success' | 'error' | 'skipped';
 
@@ -15,6 +16,37 @@ export interface FolderModeResult {
   outcome: FolderModeOutcome;
   status?: number;
   errorReason?: string;
+}
+
+export interface ResolvedFolderModeState {
+  dynamicFolders: boolean;
+  credentialsValid: boolean | undefined;
+}
+
+/**
+ * Converts a live detection result into extension state.
+ *
+ * A cached folder mode is only a fallback for UI folder-mode continuity. It is
+ * keyed by cloud name, not credentials, so it must never be treated as proof
+ * that the current API key and secret are valid.
+ */
+export function resolveFolderModeState(
+  result: FolderModeResult,
+  cached?: CachedFolderMode
+): ResolvedFolderModeState {
+  if (result.outcome === 'success') {
+    return { dynamicFolders: result.dynamicFolders, credentialsValid: true };
+  }
+
+  if (result.errorReason === 'unauthorized') {
+    return { dynamicFolders: result.dynamicFolders, credentialsValid: false };
+  }
+
+  if (cached) {
+    return { dynamicFolders: cached.value, credentialsValid: undefined };
+  }
+
+  return { dynamicFolders: result.dynamicFolders, credentialsValid: undefined };
 }
 
 /**

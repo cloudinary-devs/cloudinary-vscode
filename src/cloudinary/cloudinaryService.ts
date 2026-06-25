@@ -50,6 +50,13 @@ export class CloudinaryService {
   uploadPreset: string | null = null;
   dynamicFolders = false;
   uploadPresets: UploadPreset[] = [];
+  /**
+   * Whether the configured credentials have been confirmed valid against the API.
+   * `true` = validated OK, `false` = rejected (e.g. 401/403), `undefined` = not
+   * yet checked. Drives the "Connected" vs "Setup needed" status, so it must not
+   * read `true` purely because credential fields are non-empty.
+   */
+  credentialsValid: boolean | undefined = undefined;
 
   constructor(private readonly sdk: CloudinarySdkAdapter) {}
 

@@ -6,9 +6,8 @@ import {
   CloudinaryEnvironment,
   isPlaceholderConfig,
 } from "./config/configUtils";
-import { detectFolderModeResult } from "./config/detectFolderMode";
+import { detectFolderModeResult, resolveFolderModeState } from "./config/detectFolderMode";
 import {
-  isFolderModeFresh,
   readFolderModeCache,
   writeFolderModeCache,
 } from "./config/folderModeCache";
@@ -146,38 +145,27 @@ export async function activate(context: vscode.ExtensionContext) {
     apiSecret: string,
     entryPoint: string,
     options: { force?: boolean } = {}
-  ): Promise<boolean> => {
+  ): Promise<{ dynamicFolders: boolean; credentialsValid: boolean | undefined }> => {
     // Cached entry (any age). Legacy plain-boolean entries are ignored so
     // installs stuck on an outdated mode re-validate and self-heal.
     const cached = readFolderModeCache(context.globalState, cloudName);
 
-    // Cloudinary accounts can migrate from fixed to dynamic folders, so a cached
-    // mode must not live forever. Use the cache only when it is still within the
-    // TTL and the caller has not asked for a forced refresh.
-    if (!options.force && cached && isFolderModeFresh(cached)) {
-      return cached.value;
-    }
-
-    // Fresh validation: exercise the credentials and report success/error once.
+    // Fresh validation: exercise the current credentials and report success/error
+    // once. A folder-mode cache is keyed only by cloud name, so it can provide a
+    // last-known folder mode but must never certify that the current API key and
+    // secret are valid.
     const result = await detectFolderModeResult(cloudName, apiKey, apiSecret);
     trackConfigValidation(analytics, result, entryPoint);
 
     if (result.outcome === "success") {
       await writeFolderModeCache(context.globalState, cloudName, result.dynamicFolders);
-      return result.dynamicFolders;
     }
-
-    // Detection failed (network/credential error). Prefer a previously known-good
-    // value over flipping the account to fixed mode on a transient failure.
-    if (cached) {
-      return cached.value;
-    }
-    return result.dynamicFolders;
+    return resolveFolderModeState(result, cached);
   };
 
   const environmentTarget: Pick<
     CloudinaryService,
-    "cloudName" | "apiKey" | "apiSecret" | "uploadPreset" | "dynamicFolders"
+    "cloudName" | "apiKey" | "apiSecret" | "uploadPreset" | "dynamicFolders" | "credentialsValid"
   > & {
     setCredentials: (creds: Credentials) => void;
   } = {
@@ -210,6 +198,12 @@ export async function activate(context: vscode.ExtensionContext) {
     },
     set dynamicFolders(value: boolean) {
       cloudinaryService.dynamicFolders = value;
+    },
+    get credentialsValid() {
+      return cloudinaryService.credentialsValid;
+    },
+    set credentialsValid(value: boolean | undefined) {
+      cloudinaryService.credentialsValid = value;
     },
     setCredentials(creds: Credentials) {
       cloudinaryService.setCredentials(creds);
@@ -324,8 +318,9 @@ export async function activate(context: vscode.ExtensionContext) {
     }
 
     // The credentials file just changed; the keys (or the account's folder mode)
-    // may differ from what we cached, so force a fresh detection.
-    const dynamicFolders = await resolveDynamicFolders(
+    // may differ from what we cached, so force a fresh detection. This also
+    // re-validates the credentials so the status reflects whether they work.
+    const { dynamicFolders, credentialsValid } = await resolveDynamicFolders(
       newCloudName!,
       env.apiKey,
       env.apiSecret,
@@ -339,6 +334,7 @@ export async function activate(context: vscode.ExtensionContext) {
       uploadPreset: env.uploadPreset || null,
       dynamicFolders,
     });
+    cloudinaryService.credentialsValid = credentialsValid;
     updateCloudinaryConfig(newCloudName!, env.apiKey, env.apiSecret);
 
     // Update status bar with folder mode indicator
@@ -368,6 +364,12 @@ export async function activate(context: vscode.ExtensionContext) {
       trackConfigValidation(analytics, result, "manual_refresh");
 
       if (result.outcome !== "success") {
+        // Reflect rejected credentials in the status; leave a transient (e.g.
+        // network) failure as-is so we don't falsely mark working creds invalid.
+        if (result.errorReason === "unauthorized") {
+          cloudinaryService.credentialsValid = false;
+          await refreshEnvironmentViews();
+        }
         vscode.window.showWarningMessage(
           "Could not refresh the Cloudinary folder mode. Check your credentials or connection, then try again."
         );
@@ -377,6 +379,7 @@ export async function activate(context: vscode.ExtensionContext) {
       const dynamicFolders = result.dynamicFolders;
       await writeFolderModeCache(context.globalState, cloudName, dynamicFolders);
       cloudinaryService.dynamicFolders = dynamicFolders;
+      cloudinaryService.credentialsValid = true;
 
       statusBar.text = getStatusBarText(cloudName, dynamicFolders);
       statusBar.tooltip = getStatusBarTooltip(dynamicFolders);
@@ -388,13 +391,17 @@ export async function activate(context: vscode.ExtensionContext) {
     })
   );
 
-  // Detect and cache folder mode
-  cloudinaryService.dynamicFolders = await resolveDynamicFolders(
-    cloudinaryService.cloudName!,
-    cloudinaryService.apiKey!,
-    cloudinaryService.apiSecret!,
-    "activation"
-  );
+  // Detect and cache folder mode (also validates the credentials).
+  {
+    const activation = await resolveDynamicFolders(
+      cloudinaryService.cloudName!,
+      cloudinaryService.apiKey!,
+      cloudinaryService.apiSecret!,
+      "activation"
+    );
+    cloudinaryService.dynamicFolders = activation.dynamicFolders;
+    cloudinaryService.credentialsValid = activation.credentialsValid;
+  }
 
   // Update status bar with folder mode indicator
   statusBar.text = getStatusBarText(cloudinaryService.cloudName!, cloudinaryService.dynamicFolders);
