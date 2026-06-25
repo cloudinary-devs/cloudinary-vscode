@@ -529,6 +529,11 @@ function handleUploadMessage(message: UploadMessage): void {
             )
             .join("");
         }
+        // Folders have arrived (or failed back to root): drop the loading hint.
+        const loadingHint = document.getElementById("folderLoadingHint");
+        if (loadingHint) {
+          loadingHint.remove();
+        }
       }
       break;
 
@@ -555,6 +560,8 @@ function handleUploadMessage(message: UploadMessage): void {
 window.addEventListener("message", (event) => {
   handleUploadMessage(event.data);
 });
+
+getVSCode()?.postMessage({ command: "ready" });
 
 // Export to window for inline script access
 declare global {

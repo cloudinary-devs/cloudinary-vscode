@@ -371,6 +371,10 @@ async function createUploadPanel(
 
   const currentPreset = cloudinaryState.getCurrentUploadPreset() || "";
   const initialFolders: FolderOption[] = [{ path: "", label: "/ (root)" }];
+  let resolveClientReady: (() => void) | undefined;
+  const clientReady = new Promise<void>((resolve) => {
+    resolveClientReady = resolve;
+  });
 
   const uploadScriptUri = getScriptUri(
     panel.webview,
@@ -388,23 +392,14 @@ async function createUploadPanel(
     });
   `;
 
-  panel.webview.html = createWebviewDocument({
-    title: "Upload to Cloudinary",
-    webview: panel.webview,
-    extensionUri: context.extensionUri,
-    bodyContent: getUploadContent(
-      currentPreset,
-      cloudinaryState.uploadPresets,
-      currentFolderPath,
-      initialFolders
-    ),
-    bodyClass: "layout-centered",
-    additionalScripts: [uploadScriptUri],
-    inlineScript: initScript,
-  });
-
   // Handle messages from the webview
   panel.webview.onDidReceiveMessage(async (message: any) => {
+    if (message.command === "ready") {
+      resolveClientReady?.();
+      resolveClientReady = undefined;
+      return;
+    }
+
     if (message.command === "folderChanged" && message.folderPath !== undefined) {
       currentFolderPath = message.folderPath;
       return;
@@ -566,9 +561,26 @@ async function createUploadPanel(
     }
   });
 
+  panel.webview.html = createWebviewDocument({
+    title: "Upload to Cloudinary",
+    webview: panel.webview,
+    extensionUri: context.extensionUri,
+    bodyContent: getUploadContent(
+      currentPreset,
+      cloudinaryState.uploadPresets,
+      currentFolderPath,
+      initialFolders
+    ),
+    bodyClass: "layout-centered",
+    additionalScripts: [uploadScriptUri],
+    inlineScript: initScript,
+  });
+
   // Deferred load: fetch presets and folders in parallel without blocking the
   // initial render. Posts updates to the client when each completes.
   void (async () => {
+    await clientReady;
+
     const presetsTask = cloudinaryState
       .fetchUploadPresets()
       .then((presets) => {
@@ -584,6 +596,11 @@ async function createUploadPanel(
       })
       .catch((err) => {
         console.error("Failed to load folders:", err);
+        // Clear the loading state and keep root usable even if the fetch failed.
+        safePostToPanel(panel, {
+          command: "updateFolders",
+          folders: [{ path: "", label: "/ (root)" }],
+        });
       });
 
     await Promise.all([presetsTask, foldersTask]);
@@ -622,6 +639,7 @@ function getUploadContent(
           <div class="form-group">
             <label class="form-group__label" for="folderSelect">Destination Folder</label>
             <select id="folderSelect" class="select">${folderOptionsHtml}</select>
+            <div class="form-group__hint" id="folderLoadingHint">Loading folders…</div>
           </div>
         </div>
 
