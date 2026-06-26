@@ -5,7 +5,6 @@ suite("isCredentialError", () => {
   test("detects auth HTTP codes from SDK-shaped errors", () => {
     assert.strictEqual(isCredentialError({ error: { http_code: 401 } }), true);
     assert.strictEqual(isCredentialError({ error: { http_code: 403 } }), true);
-    assert.strictEqual(isCredentialError({ error: { http_code: 420 } }), true);
     assert.strictEqual(isCredentialError({ http_code: 401 }), true);
     assert.strictEqual(isCredentialError({ response: { status: 403 } }), true);
   });
@@ -18,6 +17,7 @@ suite("isCredentialError", () => {
 
   test("does not flag unrelated errors", () => {
     assert.strictEqual(isCredentialError({ error: { http_code: 404 } }), false);
+    assert.strictEqual(isCredentialError({ error: { http_code: 420 } }), false);
     assert.strictEqual(isCredentialError(new Error("Network timeout")), false);
     assert.strictEqual(isCredentialError({ message: "Resource not found" }), false);
     assert.strictEqual(isCredentialError(undefined), false);

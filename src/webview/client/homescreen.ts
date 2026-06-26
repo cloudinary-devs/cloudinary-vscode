@@ -483,6 +483,7 @@ function handleHomescreenData(msg: HomescreenDataMessage): void {
   const cloudNameEl = document.getElementById("hs-cloud-name");
   const folderModeEl = document.getElementById("hs-folder-mode");
   const setupBanner = document.getElementById("hs-setup-banner");
+  const setupBannerText = setupBanner?.querySelector<HTMLElement>(".hs-setup-banner-text");
   const searchEl = document.getElementById("hs-search");
   const switchEnvBtn = document.getElementById("hs-btn-switch-env");
   const envCountEl = document.getElementById("hs-env-count");
@@ -499,7 +500,7 @@ function handleHomescreenData(msg: HomescreenDataMessage): void {
   if (cloudNameEl) {
     // Show the cloud name whenever one is configured (even while checking or if
     // rejected); only fall back to the placeholder when nothing is set up.
-    const showName = !!msg.cloudName && !setupNeeded;
+    const showName = !!msg.cloudName;
     cloudNameEl.textContent = showName ? msg.cloudName : "Not configured";
     cloudNameEl.classList.toggle("hs-cloud-name--placeholder", !showName);
   }
@@ -510,6 +511,11 @@ function handleHomescreenData(msg: HomescreenDataMessage): void {
   }
   // Prompt setup only when credentials are missing or rejected — not while checking.
   setupBanner?.classList.toggle("hidden", !setupNeeded);
+  if (setupBannerText) {
+    setupBannerText.textContent = msg.cloudName
+      ? "Update your API credentials to connect"
+      : "Add your API credentials to connect";
+  }
   // Search needs working credentials; keep it hidden until connected.
   searchEl?.classList.toggle("hidden", !connected);
   switchEnvBtn?.classList.toggle("hidden", msg.envCount <= 1);

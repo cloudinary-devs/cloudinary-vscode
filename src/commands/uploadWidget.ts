@@ -61,6 +61,9 @@ const CHUNKED_UPLOAD_THRESHOLD = 20 * 1024 * 1024;
  * Chunk size for chunked uploads (6 MB).
  */
 const UPLOAD_CHUNK_SIZE = 6 * 1024 * 1024;
+const FOLDER_LOAD_FALLBACK_MS = 4000;
+const WEBVIEW_INIT_DELAY_MS = 250;
+const ROOT_FOLDER_OPTIONS: FolderOption[] = [{ path: "", label: "/ (root)" }];
 
 function getUploadAssetResourceType(asset: any): string {
   return asset.resource_type || "raw";
@@ -276,7 +279,7 @@ async function uploadWithProgress(
 async function collectFolderOptions(
   cloudinaryState: UploadWidgetCloudinaryState
 ): Promise<FolderOption[]> {
-  const folders: FolderOption[] = [{ path: "", label: "/ (root)" }];
+  const folders: FolderOption[] = [...ROOT_FOLDER_OPTIONS];
   const seenPaths = new Set<string>();
 
   try {
@@ -370,11 +373,7 @@ async function createUploadPanel(
   );
 
   const currentPreset = cloudinaryState.getCurrentUploadPreset() || "";
-  const initialFolders: FolderOption[] = [{ path: "", label: "/ (root)" }];
-  let resolveClientReady: (() => void) | undefined;
-  const clientReady = new Promise<void>((resolve) => {
-    resolveClientReady = resolve;
-  });
+  const initialFolders: FolderOption[] = [...ROOT_FOLDER_OPTIONS];
 
   const uploadScriptUri = getScriptUri(
     panel.webview,
@@ -395,8 +394,6 @@ async function createUploadPanel(
   // Handle messages from the webview
   panel.webview.onDidReceiveMessage(async (message: any) => {
     if (message.command === "ready") {
-      resolveClientReady?.();
-      resolveClientReady = undefined;
       return;
     }
 
@@ -531,7 +528,11 @@ async function createUploadPanel(
 
     if (message.command === "refreshFolders") {
       const updatedFolders = await collectFolderOptions(cloudinaryState);
-      safePostToPanel(panel, { command: "updateFolders", folders: updatedFolders });
+      safePostToPanel(panel, {
+        command: "updateFolders",
+        folderPath: currentFolderPath,
+        folders: updatedFolders,
+      });
     }
 
     if (message.command === "openAsset" && message.asset) {
@@ -579,28 +580,52 @@ async function createUploadPanel(
   // Deferred load: fetch presets and folders in parallel without blocking the
   // initial render. Posts updates to the client when each completes.
   void (async () => {
-    await clientReady;
+    await new Promise((resolve) => setTimeout(resolve, WEBVIEW_INIT_DELAY_MS));
 
     const presetsTask = cloudinaryState
       .fetchUploadPresets()
       .then((presets) => {
-        safePostToPanel(panel, { command: "updatePresets", presets });
+        safePostToPanel(panel, {
+          command: "updatePresets",
+          preset: cloudinaryState.getCurrentUploadPreset() || "",
+          presets,
+        });
       })
       .catch((err) => {
         console.error("Failed to fetch upload presets:", err);
       });
 
+    const postFolderOptions = (folders: FolderOption[]) => {
+      safePostToPanel(panel, {
+        command: "updateFolders",
+        folderPath: currentFolderPath,
+        folders,
+      });
+    };
+
+    let folderLoadSettled = false;
+    const folderLoadFallback = setTimeout(() => {
+      if (!folderLoadSettled) {
+        postFolderOptions(ROOT_FOLDER_OPTIONS);
+      }
+    }, FOLDER_LOAD_FALLBACK_MS);
+
     const foldersTask = collectFolderOptions(cloudinaryState)
       .then((folders) => {
-        safePostToPanel(panel, { command: "updateFolders", folders });
-      })
-      .catch((err) => {
-        console.error("Failed to load folders:", err);
-        // Clear the loading state and keep root usable even if the fetch failed.
+        folderLoadSettled = true;
+        clearTimeout(folderLoadFallback);
         safePostToPanel(panel, {
           command: "updateFolders",
-          folders: [{ path: "", label: "/ (root)" }],
+          folderPath: currentFolderPath,
+          folders,
         });
+      })
+      .catch((err) => {
+        folderLoadSettled = true;
+        clearTimeout(folderLoadFallback);
+        console.error("Failed to load folders:", err);
+        // Clear the loading state and keep root usable even if the fetch failed.
+        postFolderOptions(ROOT_FOLDER_OPTIONS);
       });
 
     await Promise.all([presetsTask, foldersTask]);

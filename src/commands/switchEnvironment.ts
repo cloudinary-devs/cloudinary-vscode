@@ -23,8 +23,11 @@ type EnvironmentTarget = Pick<
 
 function updateEnvironmentTarget(
   target: EnvironmentTarget,
-  credentials: Credentials
+  credentials: Credentials,
+  credentialsValid: boolean | undefined
 ) {
+  target.credentialsValid = credentialsValid;
+
   if (typeof target.setCredentials === "function") {
     target.setCredentials(credentials);
     return;
@@ -117,8 +120,7 @@ function registerSwitchEnv(
             apiSecret: env.apiSecret,
             uploadPreset: env.uploadPreset || null,
             dynamicFolders,
-          });
-          target.credentialsValid = credentialsValid;
+          }, credentialsValid);
 
           (cloudinary.utils as any).userPlatform = generateUserAgent();
 
@@ -131,9 +133,15 @@ function registerSwitchEnv(
           statusBar.text = getStatusBarText(selected, dynamicFolders, credentialsValid);
           statusBar.tooltip = getStatusBarTooltip(dynamicFolders, credentialsValid);
 
-          vscode.window.showInformationMessage(
-            `$(cloud) Switched to ${selected} environment.`
-          );
+          if (credentialsValid === false) {
+            vscode.window.showWarningMessage(
+              `Switched to ${selected}, but its Cloudinary credentials are invalid or unauthorized.`
+            );
+          } else {
+            vscode.window.showInformationMessage(
+              `$(cloud) Switched to ${selected} environment.`
+            );
+          }
         }
       }
     )

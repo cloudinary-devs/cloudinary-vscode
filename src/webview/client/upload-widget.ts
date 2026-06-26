@@ -37,6 +37,7 @@ interface UploadMessage {
   error?: string;
   folderPath?: string;
   folders?: Array<{ path: string; label: string }>;
+  preset?: string;
   presets?: UploadPreset[];
 }
 
@@ -44,10 +45,33 @@ interface UploadMessage {
 let cloudName = "";
 let presets: UploadPreset[] = [];
 
+function replaceSelectOptions(
+  select: HTMLSelectElement,
+  options: Array<{ value: string; label: string }>,
+  selectedValue: string
+): void {
+  const nextOptions = [...options];
+  if (selectedValue && !nextOptions.some((option) => option.value === selectedValue)) {
+    nextOptions.push({ value: selectedValue, label: selectedValue });
+  }
+
+  select.replaceChildren(
+    ...nextOptions.map((item) => {
+      const option = document.createElement("option");
+      option.value = item.value;
+      option.textContent = item.label;
+      option.selected = item.value === selectedValue;
+      return option;
+    })
+  );
+}
+
 /**
  * Initialize upload widget with configuration.
  */
 function initUploadWidget(config: UploadConfig): void {
+  initCommon();
+
   cloudName = config.cloudName || "";
   presets = config.presets || [];
 
@@ -56,6 +80,8 @@ function initUploadWidget(config: UploadConfig): void {
   initUrlUpload();
   initClearButton();
   initFolderChange();
+
+  getVSCode()?.postMessage({ command: "ready" });
 }
 
 /**
@@ -521,13 +547,12 @@ function handleUploadMessage(message: UploadMessage): void {
       if (message.folders) {
         const folderSelect = document.getElementById("folderSelect") as HTMLSelectElement | null;
         if (folderSelect) {
-          const currentValue = folderSelect.value;
-          folderSelect.innerHTML = message.folders
-            .map(
-              (f) =>
-                `<option value="${f.path}" ${f.path === currentValue ? "selected" : ""}>${f.label}</option>`
-            )
-            .join("");
+          const selectedValue = message.folderPath !== undefined ? message.folderPath : folderSelect.value;
+          replaceSelectOptions(
+            folderSelect,
+            message.folders.map((folder) => ({ value: folder.path, label: folder.label })),
+            selectedValue
+          );
         }
         // Folders have arrived (or failed back to root): drop the loading hint.
         const loadingHint = document.getElementById("folderLoadingHint");
@@ -542,13 +567,18 @@ function handleUploadMessage(message: UploadMessage): void {
         presets = message.presets;
         const presetSelect = document.getElementById("presetSelect") as HTMLSelectElement | null;
         if (presetSelect) {
-          const currentValue = presetSelect.value;
-          presetSelect.innerHTML = presets
-            .map(
-              (p) =>
-                `<option value="${p.name}" ${p.name === currentValue ? "selected" : ""}>${p.name} (${p.signed ? "Signed" : "Unsigned"})</option>`
-            )
-            .join("");
+          const selectedValue = message.preset !== undefined ? message.preset : presetSelect.value;
+          replaceSelectOptions(
+            presetSelect,
+            [
+              { value: "", label: "No preset (signed upload)" },
+              ...presets.map((preset) => ({
+                value: preset.name,
+                label: `${preset.name} (${preset.signed ? "Signed" : "Unsigned"})`,
+              })),
+            ],
+            selectedValue
+          );
           presetSelect.dispatchEvent(new Event("change"));
         }
       }
@@ -561,8 +591,6 @@ window.addEventListener("message", (event) => {
   handleUploadMessage(event.data);
 });
 
-getVSCode()?.postMessage({ command: "ready" });
-
 // Export to window for inline script access
 declare global {
   interface Window {
@@ -571,6 +599,3 @@ declare global {
 }
 
 window.initUploadWidget = initUploadWidget;
-
-// Also run initCommon when this script loads
-initCommon();

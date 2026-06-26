@@ -5,8 +5,12 @@ import {
   getScriptUri,
 } from "../webview/webviewUtils";
 import { escapeHtml } from "../webview/utils/helpers";
+import { getConnectionStatus } from "../config/connectionStatus";
 
-type WelcomeScreenCloudinaryState = Pick<CloudinaryService, "cloudName" | "apiKey">;
+type WelcomeScreenCloudinaryState = Pick<
+  CloudinaryService,
+  "cloudName" | "apiKey" | "apiSecret" | "credentialsValid"
+>;
 
 /**
  * Registers the welcome screen command.
@@ -92,8 +96,31 @@ function createWelcomePanel(
  * Generates the welcome screen body content.
  */
 function getWelcomeContent(cloudinaryState: WelcomeScreenCloudinaryState): string {
-  const hasConfig = !!(cloudinaryState.cloudName && cloudinaryState.apiKey);
+  const status = getConnectionStatus({
+    cloudName: cloudinaryState.cloudName,
+    apiKey: cloudinaryState.apiKey,
+    apiSecret: cloudinaryState.apiSecret,
+    credentialsValid: cloudinaryState.credentialsValid,
+  });
+  const isConnected = status === "connected";
+  const isChecking = status === "checking";
+  const hasCredentials = !!(cloudinaryState.cloudName && cloudinaryState.apiKey && cloudinaryState.apiSecret);
   const cloudName = escapeHtml(cloudinaryState.cloudName || "");
+  const statusClass = isConnected ? "ok" : isChecking ? "neutral" : "warn";
+  const statusLabel = isConnected
+    ? `Connected to ${cloudName}`
+    : isChecking
+      ? `Checking ${cloudName || "credentials"}`
+      : hasCredentials
+        ? "Credentials need attention"
+        : "No credentials configured";
+  const statusDetail = isConnected
+    ? "Your environment is ready. Open the dashboard to explore your media."
+    : isChecking
+      ? "Validating your Cloudinary credentials before opening the dashboard."
+      : hasCredentials
+        ? "Update your Cloudinary API credentials to connect."
+        : "Add your Cloudinary API credentials to get started.";
 
   return `
   <style>
@@ -156,11 +183,13 @@ function getWelcomeContent(cloudinaryState: WelcomeScreenCloudinaryState): strin
       animation: wg-in 0.3s ease both;
     }
     .wg-status--ok  { background: rgba(74,222,128,0.07);  border-color: rgba(74,222,128,0.22); }
+    .wg-status--neutral{ background: rgba(96,165,250,0.07); border-color: rgba(96,165,250,0.22); }
     .wg-status--warn{ background: rgba(251,191,36,0.07);  border-color: rgba(251,191,36,0.22); }
     .wg-status-dot {
       width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
     }
     .wg-status--ok   .wg-status-dot { background: #4ade80; box-shadow: 0 0 7px rgba(74,222,128,0.65); }
+    .wg-status--neutral .wg-status-dot { background: #60a5fa; box-shadow: 0 0 7px rgba(96,165,250,0.55); }
     .wg-status--warn .wg-status-dot { background: #fbbf24; box-shadow: 0 0 7px rgba(251,191,36,0.65); }
     .wg-status-body { flex: 1; }
     .wg-status-label  { font-size: 13px; font-weight: 600; }
@@ -342,13 +371,13 @@ function getWelcomeContent(cloudinaryState: WelcomeScreenCloudinaryState): strin
     <div class="wg-body">
 
       <!-- ── Connection status ── -->
-      <div class="wg-status wg-status--${hasConfig ? "ok" : "warn"}">
+      <div class="wg-status wg-status--${statusClass}">
         <div class="wg-status-dot"></div>
         <div class="wg-status-body">
-          <div class="wg-status-label">${hasConfig ? `Connected to ${cloudName}` : "No credentials configured"}</div>
-          <div class="wg-status-detail">${hasConfig ? "Your environment is ready. Open the dashboard to explore your media." : "Add your Cloudinary API credentials to get started."}</div>
+          <div class="wg-status-label">${statusLabel}</div>
+          <div class="wg-status-detail">${statusDetail}</div>
         </div>
-        ${hasConfig
+        ${isConnected
       ? `<button class="wg-btn wg-btn--ghost" data-welcome-action="focusDashboard">Open Dashboard →</button>`
       : `<button class="wg-btn wg-btn--primary" data-welcome-action="openGlobalConfig">Configure →</button>`
     }
@@ -359,11 +388,11 @@ function getWelcomeContent(cloudinaryState: WelcomeScreenCloudinaryState): strin
       <div class="wg-steps">
 
         <div class="wg-step">
-          <div class="wg-step-num ${hasConfig ? "wg-step-num--done" : ""}">${hasConfig ? "✓" : "1"}</div>
+          <div class="wg-step-num ${isConnected ? "wg-step-num--done" : ""}">${isConnected ? "✓" : "1"}</div>
           <div class="wg-step-body">
             <div class="wg-step-title">
               Connect your Cloudinary account
-              ${hasConfig ? '<span class="wg-badge">✓ Done</span>' : ""}
+              ${isConnected ? '<span class="wg-badge">✓ Done</span>' : ""}
             </div>
             <p class="wg-step-desc">
               Add your Cloud Name, API Key, and API Secret to
@@ -371,7 +400,7 @@ function getWelcomeContent(cloudinaryState: WelcomeScreenCloudinaryState): strin
               Credentials are never stored in VS Code settings — they stay in a local file you control.
             </p>
             <div class="wg-step-actions">
-              <button class="wg-btn wg-btn--primary" data-welcome-action="openGlobalConfig">${hasConfig ? "View Config File" : "Open Config File"}</button>
+              <button class="wg-btn wg-btn--primary" data-welcome-action="openGlobalConfig">${hasCredentials ? "View Config File" : "Open Config File"}</button>
               <button class="wg-btn wg-btn--ghost" data-welcome-action="openExternal" data-url="https://console.cloudinary.com/settings/api-keys">Get API Keys</button>
             </div>
           </div>
@@ -402,7 +431,7 @@ function getWelcomeContent(cloudinaryState: WelcomeScreenCloudinaryState): strin
       </div>
 
       <!-- ── Config format ── -->
-      <details class="wg-config"${!hasConfig ? " open" : ""}>
+      <details class="wg-config"${!hasCredentials ? " open" : ""}>
         <summary>Configuration file format</summary>
         <div class="wg-config-body">
           <p class="wg-config-note">

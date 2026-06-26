@@ -7,7 +7,7 @@ import { getGlobalConfigPath } from '../config/configUtils';
  */
 export function isCredentialError(error: any): boolean {
     const httpCode = error?.error?.http_code ?? error?.http_code ?? error?.response?.status;
-    if (httpCode === 401 || httpCode === 403 || httpCode === 420) {
+    if (httpCode === 401 || httpCode === 403) {
         return true;
     }
     const message =

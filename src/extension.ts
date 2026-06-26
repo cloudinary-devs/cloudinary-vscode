@@ -236,14 +236,13 @@ export async function activate(context: vscode.ExtensionContext) {
   // Check if this is the first run of the extension
   const isFirstRun = context.globalState.get('cloudinary.firstRun', true);
 
-
-  if (isFirstRun) {
-    // Mark as no longer first run
-    context.globalState.update('cloudinary.firstRun', false);
-
-    // Show welcome screen automatically on first install
-    vscode.commands.executeCommand("cloudinary.openWelcomeScreen");
-  }
+  const openWelcomeOnFirstRun = async (): Promise<void> => {
+    if (!isFirstRun) {
+      return;
+    }
+    await context.globalState.update('cloudinary.firstRun', false);
+    await vscode.commands.executeCommand("cloudinary.openWelcomeScreen");
+  };
 
   const environments = await loadEnvironments();
   const firstCloudName = Object.keys(environments)[0];
@@ -279,6 +278,7 @@ export async function activate(context: vscode.ExtensionContext) {
       docsAiProvider,
       analytics
     );
+    await openWelcomeOnFirstRun();
     return;
   }
 
@@ -329,9 +329,18 @@ export async function activate(context: vscode.ExtensionContext) {
 
     // Check if updated credentials are still placeholders
     if (isPlaceholderConfig(newCloudName!, env.apiKey, env.apiSecret)) {
+      cloudinaryService.setCredentials({
+        cloudName: null,
+        apiKey: null,
+        apiSecret: null,
+        uploadPreset: null,
+        dynamicFolders: false,
+      });
+      cloudinaryService.credentialsValid = undefined;
       statusBar.text = `$(warning) Cloudinary: Not Configured`;
       statusBar.tooltip = "Click to configure Cloudinary credentials";
       statusBar.command = "cloudinary.openGlobalConfig";
+      await refreshEnvironmentViews();
       // Don't show message - just update status bar silently
       return;
     }
@@ -447,6 +456,7 @@ export async function activate(context: vscode.ExtensionContext) {
     docsAiProvider,
     analytics
   );
+  await openWelcomeOnFirstRun();
 }
 
 /**
