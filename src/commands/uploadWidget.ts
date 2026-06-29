@@ -62,7 +62,10 @@ const CHUNKED_UPLOAD_THRESHOLD = 20 * 1024 * 1024;
  */
 const UPLOAD_CHUNK_SIZE = 6 * 1024 * 1024;
 const FOLDER_LOAD_FALLBACK_MS = 4000;
-const WEBVIEW_INIT_DELAY_MS = 250;
+// Safety cap on waiting for the client's "ready" handshake. The handshake
+// normally resolves in tens of ms (as soon as the webview script loads); this
+// only prevents an indefinite hang if the message is somehow never received.
+const READY_HANDSHAKE_TIMEOUT_MS = 5000;
 const ROOT_FOLDER_OPTIONS: FolderOption[] = [{ path: "", label: "/ (root)" }];
 
 function getUploadAssetResourceType(asset: any): string {
@@ -375,6 +378,15 @@ async function createUploadPanel(
   const currentPreset = cloudinaryState.getCurrentUploadPreset() || "";
   const initialFolders: FolderOption[] = [...ROOT_FOLDER_OPTIONS];
 
+  // The client posts "ready" once its message listener is attached. The deferred
+  // load below waits on this before posting folders/presets, so updates can't be
+  // dropped by landing before the listener exists (a fixed delay races the
+  // webview's load time and was the cause of the empty-dropdown bug).
+  let resolveClientReady: (() => void) | undefined;
+  const clientReady = new Promise<void>((resolve) => {
+    resolveClientReady = resolve;
+  });
+
   const uploadScriptUri = getScriptUri(
     panel.webview,
     context.extensionUri,
@@ -394,6 +406,8 @@ async function createUploadPanel(
   // Handle messages from the webview
   panel.webview.onDidReceiveMessage(async (message: any) => {
     if (message.command === "ready") {
+      resolveClientReady?.();
+      resolveClientReady = undefined;
       return;
     }
 
@@ -580,7 +594,12 @@ async function createUploadPanel(
   // Deferred load: fetch presets and folders in parallel without blocking the
   // initial render. Posts updates to the client when each completes.
   void (async () => {
-    await new Promise((resolve) => setTimeout(resolve, WEBVIEW_INIT_DELAY_MS));
+    // Wait for the client's "ready" handshake before posting, falling back to a
+    // short delay so a missed handshake can't hang the load indefinitely.
+    await Promise.race([
+      clientReady,
+      new Promise((resolve) => setTimeout(resolve, READY_HANDSHAKE_TIMEOUT_MS)),
+    ]);
 
     const presetsTask = cloudinaryState
       .fetchUploadPresets()
