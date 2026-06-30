@@ -13,16 +13,20 @@ import { initActionToolbar } from './actionToolbar';
 type Row =
   | { kind: 'folder'; folder: ClientFolder; depth: number; expanded: boolean }
   | { kind: 'asset'; asset: ClientAsset; depth: number }
-  | { kind: 'loading'; depth: number }
+  | { kind: 'loading'; depth: number; label?: string }
+  | { kind: 'searchLoading'; query: string; depth: number }
   | { kind: 'clearSearch'; label: string; depth: number };
 
 const ROW_HEIGHT = 22;
+const SEARCH_DEBOUNCE_MS = 300;
 
 let list: VirtualList<Row>;
 const flat: Row[] = [];
 const childrenByFolder = new Map<string, Row[]>();
 let selectedIdx = -1;
 let searchMode: { query: string } | null = null;
+let pendingSearchQuery: string | null = null;
+let searchDebounceTimer: ReturnType<typeof window.setTimeout> | null = null;
 
 initVSCode();
 
@@ -84,6 +88,8 @@ function getRowKey(row: Row | undefined): string | null {
       return 'clearSearch';
     case 'loading':
       return `loading:${row.depth}`;
+    case 'searchLoading':
+      return `searchLoading:${row.query}`;
     default:
       return null;
   }
@@ -265,8 +271,15 @@ function renderRow(el: HTMLElement, row: Row, index: number): void {
     return;
   }
 
+  if (row.kind === 'searchLoading') {
+    el.classList.add('lib-row--loading', 'lib-row--search-loading');
+    el.setAttribute('aria-live', 'polite');
+    el.innerHTML = `${indent}<span class="lib-twistie-spacer"></span><span class="lib-name">Searching "${escapeHtml(row.query)}"...</span>`;
+    return;
+  }
+
   el.classList.add('lib-row--loading');
-  el.innerHTML = `${indent}<span class="lib-twistie-spacer"></span><span class="lib-loader-dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="lib-name">Loading</span>`;
+  el.innerHTML = `${indent}<span class="lib-twistie-spacer"></span><span class="lib-loader-dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="lib-name">${escapeHtml(row.label || 'Loading')}</span>`;
 }
 
 function findFolderIdx(path: string): number {
@@ -347,6 +360,7 @@ function onRootData(folders: ClientFolder[], assets: ClientAsset[], hasMore: boo
   hideEmptyState();
   clearError();
   searchMode = null;
+  setSearchLoading(false);
   setSearchInputValue('');
   flat.length = 0;
   childrenByFolder.clear();
@@ -360,7 +374,7 @@ function onRootData(folders: ClientFolder[], assets: ClientAsset[], hasMore: boo
   }
 
   if (hasMore) {
-    flat.push({ kind: 'loading', depth: 0 });
+    flat.push({ kind: 'loading', label: 'Searching', depth: 0 });
   }
 
   if (flat.length > 0 && selectedIdx < 0) {
@@ -384,7 +398,7 @@ function onRootAssetsAppended(assets: ClientAsset[], hasMore: boolean): void {
   }
 
   if (hasMore) {
-    flat.push({ kind: 'loading', depth: 0 });
+    flat.push({ kind: 'loading', label: 'Searching', depth: 0 });
   }
 
   rebuild();
@@ -496,10 +510,16 @@ function onNestedAssetsAppended(
 }
 
 function onSearchData(query: string, assets: ClientAsset[], hasMore: boolean): void {
+  const currentQuery = getSearchInputQuery();
+  if (query !== currentQuery) {
+    return;
+  }
+
   const scrollSnapshot = snapshotScroll();
   hideEmptyState();
   clearError();
   searchMode = { query };
+  setSearchLoading(false);
   setSearchInputValue(query);
   flat.length = 0;
   childrenByFolder.clear();
@@ -516,7 +536,7 @@ function onSearchData(query: string, assets: ClientAsset[], hasMore: boolean): v
 }
 
 function onSearchAppended(assets: ClientAsset[], hasMore: boolean): void {
-  if (!searchMode) {
+  if (!searchMode || pendingSearchQuery) {
     return;
   }
 
@@ -533,11 +553,18 @@ function onSearchAppended(assets: ClientAsset[], hasMore: boolean): void {
   rebuild();
 }
 
+function onSearchPending(query: string): void {
+  setSearchInputValue(query);
+  showSearchPending(query);
+}
+
 function onEnvChanged(cloudName: string, hasConfig: boolean): void {
+  clearSearchDebounce();
   clearError();
   flat.length = 0;
   childrenByFolder.clear();
   searchMode = null;
+  setSearchLoading(false);
   selectedIdx = -1;
   rebuild();
 
@@ -589,6 +616,9 @@ window.addEventListener('message', (event: MessageEvent<InboundMessage>) => {
     case 'searchAppended':
       onSearchAppended(message.assets, message.hasMore);
       break;
+    case 'searchPending':
+      onSearchPending(message.query);
+      break;
     case 'envChanged':
       onEnvChanged(message.cloudName, message.hasConfig);
       break;
@@ -596,6 +626,7 @@ window.addEventListener('message', (event: MessageEvent<InboundMessage>) => {
       syncFilterUi(message.resourceTypeFilter, message.sortDirection);
       break;
     case 'error':
+      setSearchLoading(false);
       showError(message.message);
       break;
     default:
@@ -642,6 +673,83 @@ function setSearchInputValue(value: string): void {
   clearBtn?.classList.toggle('hidden', value.trim() === '');
 }
 
+function getSearchInputQuery(): string {
+  const input = document.getElementById('lib-search-input') as HTMLInputElement | null;
+  return input?.value.trim() || '';
+}
+
+function clearSearchDebounce(): void {
+  if (searchDebounceTimer) {
+    window.clearTimeout(searchDebounceTimer);
+    searchDebounceTimer = null;
+  }
+}
+
+function setSearchLoading(isLoading: boolean, query?: string): void {
+  pendingSearchQuery = isLoading ? query || null : null;
+
+  const searchEl = document.getElementById('lib-search');
+  const input = document.getElementById('lib-search-input') as HTMLInputElement | null;
+  const clearBtn = document.getElementById('lib-search-clear') as HTMLButtonElement | null;
+  const loadingEl = document.getElementById('lib-search-loading');
+
+  searchEl?.classList.toggle('lib-search--loading', isLoading);
+  searchEl?.setAttribute('aria-busy', String(isLoading));
+  input?.setAttribute('aria-busy', String(isLoading));
+  loadingEl?.classList.toggle('hidden', !isLoading);
+
+  if (clearBtn) {
+    clearBtn.classList.toggle('hidden', isLoading || input?.value.trim() === '');
+  }
+}
+
+function showSearchPending(query: string): void {
+  hideEmptyState();
+  clearError();
+  searchMode = { query };
+  setSearchLoading(true, query);
+  flat.length = 0;
+  childrenByFolder.clear();
+  flat.push({ kind: 'searchLoading', query, depth: 0 });
+  selectedIdx = -1;
+  rebuild();
+}
+
+function submitSearch(query: string): void {
+  const trimmed = query.trim();
+  if (!trimmed) {
+    clearSearchDebounce();
+    setSearchLoading(false);
+    if (searchMode || pendingSearchQuery) {
+      getVSCode()?.postMessage({ command: 'clearSearch' });
+    }
+    return;
+  }
+
+  clearSearchDebounce();
+  showSearchPending(trimmed);
+  requestSearch(trimmed);
+}
+
+function requestSearch(query: string): void {
+  getVSCode()?.postMessage({ command: 'searchAssets', query });
+}
+
+function scheduleSearch(query: string): void {
+  clearSearchDebounce();
+  const trimmed = query.trim();
+  if (!trimmed) {
+    submitSearch('');
+    return;
+  }
+
+  showSearchPending(trimmed);
+  searchDebounceTimer = window.setTimeout(() => {
+    searchDebounceTimer = null;
+    requestSearch(trimmed);
+  }, SEARCH_DEBOUNCE_MS);
+}
+
 function initSearchBar(): void {
   const input = document.getElementById('lib-search-input') as HTMLInputElement | null;
   const clearBtn = document.getElementById('lib-search-clear') as HTMLButtonElement | null;
@@ -650,21 +758,24 @@ function initSearchBar(): void {
   }
 
   input.addEventListener('input', () => {
+    if (pendingSearchQuery && input.value.trim() !== pendingSearchQuery) {
+      setSearchLoading(false);
+    }
     clearBtn?.classList.toggle('hidden', input.value.trim() === '');
+    scheduleSearch(input.value);
   });
 
   input.addEventListener('keydown', (event) => {
     if (event.key === 'Enter') {
       event.preventDefault();
-      const query = input.value.trim();
-      if (query) {
-        getVSCode()?.postMessage({ command: 'searchAssets', query });
-      }
+      submitSearch(input.value);
       return;
     }
     if (event.key === 'Escape') {
       event.preventDefault();
       if (input.value !== '') {
+        clearSearchDebounce();
+        setSearchLoading(false);
         setSearchInputValue('');
         getVSCode()?.postMessage({ command: 'clearSearch' });
         return;
@@ -674,6 +785,8 @@ function initSearchBar(): void {
   });
 
   clearBtn?.addEventListener('click', () => {
+    clearSearchDebounce();
+    setSearchLoading(false);
     setSearchInputValue('');
     input.focus();
     getVSCode()?.postMessage({ command: 'clearSearch' });

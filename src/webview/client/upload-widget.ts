@@ -9,6 +9,7 @@ import {
   truncateString,
   copyToClipboard,
 } from "./common";
+import { buildUploadPresetOptions } from "./uploadPresetOptions";
 
 interface UploadPreset {
   name: string;
@@ -570,13 +571,7 @@ function handleUploadMessage(message: UploadMessage): void {
           const selectedValue = message.preset !== undefined ? message.preset : presetSelect.value;
           replaceSelectOptions(
             presetSelect,
-            [
-              { value: "", label: "No preset (signed upload)" },
-              ...presets.map((preset) => ({
-                value: preset.name,
-                label: `${preset.name} (${preset.signed ? "Signed" : "Unsigned"})`,
-              })),
-            ],
+            buildUploadPresetOptions(presets),
             selectedValue
           );
           presetSelect.dispatchEvent(new Event("change"));

@@ -67,6 +67,36 @@ const FOLDER_LOAD_FALLBACK_MS = 4000;
 // only prevents an indefinite hang if the message is somehow never received.
 const READY_HANDSHAKE_TIMEOUT_MS = 5000;
 const ROOT_FOLDER_OPTIONS: FolderOption[] = [{ path: "", label: "/ (root)" }];
+const folderOptionsCache = new Map<string, FolderOption[]>();
+
+function cloneFolderOptions(folders: FolderOption[]): FolderOption[] {
+  return folders.map((folder) => ({ ...folder }));
+}
+
+function getCachedFolderOptions(cloudName: string | null | undefined): FolderOption[] | undefined {
+  if (!cloudName) {
+    return undefined;
+  }
+
+  const cached = folderOptionsCache.get(cloudName);
+  return cached ? cloneFolderOptions(cached) : undefined;
+}
+
+function setCachedFolderOptions(cloudName: string | null | undefined, folders: FolderOption[]): void {
+  if (!cloudName) {
+    return;
+  }
+
+  folderOptionsCache.set(cloudName, cloneFolderOptions(folders));
+}
+
+function getInitialFolderOptions(cloudName: string | null | undefined): FolderOption[] {
+  return getCachedFolderOptions(cloudName) ?? cloneFolderOptions(ROOT_FOLDER_OPTIONS);
+}
+
+function clearFolderOptionsCache(): void {
+  folderOptionsCache.clear();
+}
 
 function getUploadAssetResourceType(asset: any): string {
   return asset.resource_type || "raw";
@@ -284,6 +314,7 @@ async function collectFolderOptions(
 ): Promise<FolderOption[]> {
   const folders: FolderOption[] = [...ROOT_FOLDER_OPTIONS];
   const seenPaths = new Set<string>();
+  const cachedFolders = getCachedFolderOptions(cloudinaryState.cloudName);
 
   try {
     for (const folder of await cloudinaryState.listAllFolders()) {
@@ -295,11 +326,21 @@ async function collectFolderOptions(
       folders.push({ path: folder.path, label: folder.path });
     }
   } catch {
-    return folders;
+    return cachedFolders ?? folders;
   }
 
+  setCachedFolderOptions(cloudinaryState.cloudName, folders);
   return folders;
 }
+
+// Exported for the extension test harness; not part of the command surface.
+export const uploadWidgetTestApi = {
+  clearFolderOptionsCache,
+  collectFolderOptions,
+  getUploadOptions,
+  getInitialFolderOptions,
+  getUploadContent,
+};
 
 /**
  * Creates upload options for the Cloudinary API.
@@ -376,7 +417,7 @@ async function createUploadPanel(
   );
 
   const currentPreset = cloudinaryState.getCurrentUploadPreset() || "";
-  const initialFolders: FolderOption[] = [...ROOT_FOLDER_OPTIONS];
+  const initialFolders = getInitialFolderOptions(cloudName);
 
   // The client posts "ready" once its message listener is attached. The deferred
   // load below waits on this before posting folders/presets, so updates can't be
@@ -625,7 +666,7 @@ async function createUploadPanel(
     let folderLoadSettled = false;
     const folderLoadFallback = setTimeout(() => {
       if (!folderLoadSettled) {
-        postFolderOptions(ROOT_FOLDER_OPTIONS);
+        postFolderOptions(getInitialFolderOptions(cloudName));
       }
     }, FOLDER_LOAD_FALLBACK_MS);
 

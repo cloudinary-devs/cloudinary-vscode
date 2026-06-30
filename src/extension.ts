@@ -25,6 +25,7 @@ import { DocsAiViewProvider } from "./webview/docsAiView";
 import { resetUploadPanel } from "./commands/uploadWidget";
 import { resetAllPreviewPanels } from "./commands/previewAsset";
 import { detectEditorPlatform } from "./aiToolsService";
+import { refreshWelcomePanel } from "./commands/welcomeScreen";
 
 let statusBar: vscode.StatusBarItem;
 
@@ -140,6 +141,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
   const refreshEnvironmentViews = async (): Promise<void> => {
     homescreenProvider.refresh();
+    refreshWelcomePanel();
     resetUploadPanel();
     resetAllPreviewPanels();
     await libraryWebviewProvider.envChanged();

@@ -12,6 +12,10 @@ type WelcomeScreenCloudinaryState = Pick<
   "cloudName" | "apiKey" | "apiSecret" | "credentialsValid"
 >;
 
+let welcomePanel: vscode.WebviewPanel | undefined;
+let welcomeContext: vscode.ExtensionContext | undefined;
+let welcomeCloudinaryState: WelcomeScreenCloudinaryState | undefined;
+
 /**
  * Registers the welcome screen command.
  */
@@ -19,11 +23,22 @@ function registerWelcomeScreen(
   context: vscode.ExtensionContext,
   cloudinaryState: WelcomeScreenCloudinaryState
 ) {
+  welcomeContext = context;
+  welcomeCloudinaryState = cloudinaryState;
+
   context.subscriptions.push(
     vscode.commands.registerCommand("cloudinary.openWelcomeScreen", () => {
       createWelcomePanel(context, cloudinaryState);
     })
   );
+}
+
+export function refreshWelcomePanel(): void {
+  if (!welcomePanel || !welcomeContext || !welcomeCloudinaryState) {
+    return;
+  }
+
+  renderWelcomePanel(welcomePanel, welcomeContext, welcomeCloudinaryState);
 }
 
 /**
@@ -33,6 +48,12 @@ function createWelcomePanel(
   context: vscode.ExtensionContext,
   cloudinaryState: WelcomeScreenCloudinaryState
 ): vscode.WebviewPanel {
+  if (welcomePanel) {
+    welcomePanel.reveal(vscode.ViewColumn.One);
+    renderWelcomePanel(welcomePanel, context, cloudinaryState);
+    return welcomePanel;
+  }
+
   const panel = vscode.window.createWebviewPanel(
     "cloudinaryWelcome",
     "Welcome to Cloudinary",
@@ -45,6 +66,7 @@ function createWelcomePanel(
       ],
     }
   );
+  welcomePanel = panel;
 
   panel.iconPath = vscode.Uri.joinPath(
     context.extensionUri,
@@ -52,18 +74,10 @@ function createWelcomePanel(
     "cloudinary_icon_blue.png"
   );
 
-  const welcomeScriptUri = getScriptUri(
-    panel.webview,
-    context.extensionUri,
-    "welcome.js"
-  );
+  renderWelcomePanel(panel, context, cloudinaryState);
 
-  panel.webview.html = createWebviewDocument({
-    title: "Welcome to Cloudinary",
-    webview: panel.webview,
-    extensionUri: context.extensionUri,
-    bodyContent: getWelcomeContent(cloudinaryState),
-    additionalScripts: [welcomeScriptUri],
+  panel.onDidDispose(() => {
+    welcomePanel = undefined;
   });
 
   panel.webview.onDidReceiveMessage((message: { command: string; data?: string; text?: string }) => {
@@ -90,6 +104,26 @@ function createWelcomePanel(
   });
 
   return panel;
+}
+
+function renderWelcomePanel(
+  panel: vscode.WebviewPanel,
+  context: vscode.ExtensionContext,
+  cloudinaryState: WelcomeScreenCloudinaryState
+): void {
+  const welcomeScriptUri = getScriptUri(
+    panel.webview,
+    context.extensionUri,
+    "welcome.js"
+  );
+
+  panel.webview.html = createWebviewDocument({
+    title: "Welcome to Cloudinary",
+    webview: panel.webview,
+    extensionUri: context.extensionUri,
+    bodyContent: getWelcomeContent(cloudinaryState),
+    additionalScripts: [welcomeScriptUri],
+  });
 }
 
 /**

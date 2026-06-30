@@ -30,6 +30,7 @@ export type InboundMessage =
   | { command: 'assetsAppended'; path: string; assets: ClientAsset[]; hasMore: boolean }
   | { command: 'searchData'; query: string; assets: ClientAsset[]; hasMore: boolean }
   | { command: 'searchAppended'; assets: ClientAsset[]; hasMore: boolean }
+  | { command: 'searchPending'; query: string }
   | { command: 'envChanged'; cloudName: string; folderMode: 'dynamic' | 'fixed'; hasConfig: boolean }
   | {
       command: 'viewStateChanged';

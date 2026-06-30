@@ -1,6 +1,6 @@
-# Cloudinary VS Code Extension — v0.1.6
+# Cloudinary VS Code Extension — v1.0.0
 
-> Test build for the doc team. Not yet published to the marketplace.
+> General availability release.
 
 ## What's new
 
@@ -29,9 +29,9 @@
 
 ## Install
 
-1. Save the `cloudinary-0.1.6.vsix` file somewhere on your machine.
+1. Save the `cloudinary-1.0.0.vsix` file somewhere on your machine.
 2. In VS Code: `Cmd+Shift+P` → **Extensions: Install from VSIX…** → pick the file.
-   Or from a terminal: `code --install-extension cloudinary-0.1.6.vsix --force`
+   Or from a terminal: `code --install-extension cloudinary-1.0.0.vsix --force`
 3. Reload the window: `Cmd+Shift+P` → **Developer: Reload Window**.
 
 The Cloudinary icon should appear in the Activity Bar.

@@ -548,6 +548,33 @@ function initScopeToggle(): void {
 
 // ── Search ────────────────────────────────────────────────────────────────────
 
+let searchLoadingTimer: ReturnType<typeof window.setTimeout> | null = null;
+
+function setSearchLoading(isLoading: boolean): void {
+  const searchEl = document.getElementById("hs-search");
+  const input = document.getElementById("hs-search-input") as HTMLInputElement | null;
+  const clearBtn = document.getElementById("hs-search-clear") as HTMLButtonElement | null;
+  const loadingEl = document.getElementById("hs-search-loading");
+
+  if (searchLoadingTimer) {
+    window.clearTimeout(searchLoadingTimer);
+    searchLoadingTimer = null;
+  }
+
+  searchEl?.classList.toggle("hs-search--loading", isLoading);
+  searchEl?.setAttribute("aria-busy", String(isLoading));
+  input?.setAttribute("aria-busy", String(isLoading));
+  loadingEl?.classList.toggle("hidden", !isLoading);
+
+  if (clearBtn) {
+    clearBtn.classList.toggle("hidden", isLoading || input?.value.trim() === "");
+  }
+
+  if (isLoading) {
+    searchLoadingTimer = window.setTimeout(() => setSearchLoading(false), 8000);
+  }
+}
+
 function initSearch(): void {
   const input = document.getElementById("hs-search-input") as HTMLInputElement | null;
   const clearBtn = document.getElementById("hs-search-clear") as HTMLButtonElement | null;
@@ -555,6 +582,7 @@ function initSearch(): void {
   if (!input) { return; }
 
   input.addEventListener("input", () => {
+    setSearchLoading(false);
     if (clearBtn) {
       clearBtn.classList.toggle("hidden", input.value.trim() === "");
     }
@@ -564,10 +592,12 @@ function initSearch(): void {
     if (e.key === "Enter") {
       const query = input.value.trim();
       if (query) {
+        setSearchLoading(true);
         getVSCode()?.postMessage({ command: "searchAssets", data: query });
       }
     }
     if (e.key === "Escape") {
+      setSearchLoading(false);
       input.value = "";
       clearBtn?.classList.add("hidden");
       getVSCode()?.postMessage({ command: "clearSearch" });
@@ -575,6 +605,7 @@ function initSearch(): void {
   });
 
   clearBtn?.addEventListener("click", () => {
+    setSearchLoading(false);
     input.value = "";
     clearBtn.classList.add("hidden");
     input.focus();

@@ -44,8 +44,14 @@ function registerAllCommands(
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand("cloudinary.showLibrary", () => {
-      analytics?.track("library_opened", { entry_point: "command" });
+    vscode.commands.registerCommand("cloudinary.showLibrary", (initialSearchQuery?: string) => {
+      const query = typeof initialSearchQuery === "string" && initialSearchQuery.trim()
+        ? initialSearchQuery.trim()
+        : null;
+      analytics?.track("library_opened", { entry_point: query ? "search" : "command" });
+      if (query) {
+        void libraryWebview.setSearch(query);
+      }
       vscode.commands.executeCommand("setContext", "cloudinary.activeView", "library");
       vscode.commands.executeCommand("workbench.view.extension.cloudinary");
     })

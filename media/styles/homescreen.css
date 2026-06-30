@@ -306,6 +306,39 @@ body {
   outline: 1px solid var(--vscode-focusBorder);
 }
 
+.hs-search-loading {
+  color: var(--vscode-progressBar-background, var(--vscode-focusBorder));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.hs-search-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(127, 127, 127, 0.35);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: hs-search-spin 720ms linear infinite;
+}
+
+.hs-search--loading .hs-search-clear {
+  display: none;
+}
+
+@keyframes hs-search-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hs-search-spinner {
+    animation: none;
+  }
+}
+
 /* ── Actions ── */
 .hs-actions {
   padding: 8px;

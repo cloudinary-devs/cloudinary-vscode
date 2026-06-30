@@ -153,8 +153,7 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
                 entry_point: "homescreen",
                 query_length: query.length,
               });
-              await this._libraryWebview?.setSearch(query);
-              vscode.commands.executeCommand("cloudinary.showLibrary");
+              await vscode.commands.executeCommand("cloudinary.showLibrary", query);
             }
             break;
           case "clearSearch":
@@ -323,6 +322,9 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
               spellcheck="false"
               aria-label="Search media library"
             />
+            <span id="hs-search-loading" class="hs-search-loading hidden" role="status" aria-label="Searching library">
+              <span class="hs-search-spinner" aria-hidden="true"></span>
+            </span>
             <button id="hs-search-clear" class="hs-search-clear hidden" title="Clear search" aria-label="Clear search">✕</button>
           </div>
         </div>

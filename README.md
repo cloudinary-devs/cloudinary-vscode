@@ -1,8 +1,8 @@
-# Cloudinary VS Code Extension (Beta)
+# Cloudinary VS Code Extension
 
 Easily explore, search, preview, and upload Cloudinary assets directly inside Visual Studio Code or supported IDE.
 
-**Note**: This is a beta version of the extension. Some features are subject to change. Please report any problems or feedback by opening an issue.
+**General availability release**: Please report any problems or feedback by opening an issue.
 
 ---
 

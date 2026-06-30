@@ -14,6 +14,7 @@ import {
   getScriptUri,
   getStyleUri,
 } from './webviewUtils';
+import { escapeHtml } from './utils/helpers';
 import { renderActionToolbar } from './components/actionToolbar';
 
 export class LibraryWebviewViewProvider implements vscode.WebviewViewProvider {
@@ -57,6 +58,7 @@ export class LibraryWebviewViewProvider implements vscode.WebviewViewProvider {
       current === value ? ' selected' : '';
     const rt = this._viewState.resourceTypeFilter;
     const sd = this._viewState.sortDirection;
+    const searchValue = this._viewState.searchQuery || '';
 
     view.webview.html = createWebviewDocument({
       title: 'Cloudinary Media Library',
@@ -93,10 +95,14 @@ export class LibraryWebviewViewProvider implements vscode.WebviewViewProvider {
                 class="lib-search__input"
                 type="text"
                 placeholder="Search library…"
+                value="${escapeHtml(searchValue)}"
                 autocomplete="off"
                 spellcheck="false"
                 aria-label="Search media library"
               />
+              <span id="lib-search-loading" class="lib-search__loading hidden" role="status" aria-label="Searching library">
+                <span class="lib-search__spinner" aria-hidden="true"></span>
+              </span>
               <button id="lib-search-clear" class="lib-search__clear hidden" title="Clear search" aria-label="Clear search">✕</button>
             </div>
           </div>
@@ -122,6 +128,14 @@ export class LibraryWebviewViewProvider implements vscode.WebviewViewProvider {
           folderMode: this._service.dynamicFolders ? 'dynamic' : 'fixed',
           hasConfig: this.hasCredentials(),
         });
+        this.post({
+          command: 'viewStateChanged',
+          resourceTypeFilter: this._viewState.resourceTypeFilter,
+          sortDirection: this._viewState.sortDirection,
+        });
+        if (this._viewState.searchQuery) {
+          this.post({ command: 'searchPending', query: this._viewState.searchQuery });
+        }
         await this.refreshCurrentView();
         return;
       case 'expandFolder':
@@ -212,6 +226,14 @@ export class LibraryWebviewViewProvider implements vscode.WebviewViewProvider {
         query_length: this._viewState.searchQuery.length,
         resource_type: this._viewState.resourceTypeFilter,
       });
+    }
+
+    if (!this._view) {
+      return;
+    }
+
+    if (this._viewState.searchQuery) {
+      this.post({ command: 'searchPending', query: this._viewState.searchQuery });
     }
     try {
       await this.refreshCurrentView();

@@ -1,6 +1,6 @@
-# Testing guide: Cloudinary VS Code extension v0.1.6
+# Testing guide: Cloudinary VS Code extension v1.0.0
 
-Hey team, this build is for you to kick the tires on before we finalize this release of the VS Code extension. Below is what's new and what to poke at.
+Hey team, this build is for the v1.0.0 GA release of the VS Code extension. Below is what's new and what to poke at.
 
 > 💬 **Feedback:** Please share your feedback about the extension in the shared Google Doc. Bugs welcome, copy nits welcome, "this UX is confusing" welcome.
 > For comments about the AI responses, please use the thumbs up/down feature on each message to leave feedback tied to conversations.
@@ -9,7 +9,7 @@ Hey team, this build is for you to kick the tires on before we finalize this rel
 
 ## 1. Install
 
-1. Save `[june4]-cloudinary-0.1.6.vsix` somewhere on your Mac.
+1. Save `cloudinary-1.0.0.vsix` somewhere on your Mac.
 2. In VS Code:
    - `Cmd+Shift+P` → **Extensions: Install from VSIX…** → pick the file
    - **or** open your extensions pane, then drag and drop the VSIX file into it
