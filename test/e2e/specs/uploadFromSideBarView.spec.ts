@@ -1,12 +1,14 @@
 import path from "path";
 import { CloudinarySDK } from "../src/sdks/cloudinarySDK.js";
 import { pathUtils } from "../src/utils/pathUtils.js";
-import { SideBarViewActions, sideBarViewUtils } from "../src/vscodeComponentsUtils/SideBarViewUtils.js";
+import { sideBarViewUtils } from "../src/vscodeComponentsUtils/SideBarViewUtils.js";
 import { activityBarUtils } from "../src/vscodeComponentsUtils/ActivityBarUtils.js";
 import { uploadToCloudinaryTab } from "../src/webViewTabs/UploadToCloudinaryTab.js";
 import * as fs from 'node:fs';
 import { expect } from "@wdio/globals";
 import allureReporter from '@wdio/allure-reporter'
+import { createHookError } from "../src/utils/errorUtils.js";
+import { libraryViewPage } from "../src/webViewTabs/LibraryViewPage.js";
 
 describe('Upload asset from side bar Upload button', () => {
 
@@ -23,7 +25,7 @@ describe('Upload asset from side bar Upload button', () => {
             // Copy with a unique name so the sidebar shows the display name (not the public ID) in dynamic folder environments
             fs.copyFileSync(assetPath, newFilePath);
         } catch (error) {
-            throw new Error('Error copying asset:', error);
+            throw createHookError('Error copying asset', error);
         }
     });
 
@@ -31,7 +33,7 @@ describe('Upload asset from side bar Upload button', () => {
         try {
             await cloudinarySDK.V2.api.delete_resources([firstAssetPublicID]);
         } catch (error) {
-            throw new Error('Error deleting assets:', error);
+            throw createHookError('Error deleting assets', error);
         }
     });
 
@@ -39,7 +41,8 @@ describe('Upload asset from side bar Upload button', () => {
         await activityBarUtils.openView('Cloudinary');
         await sideBarViewUtils.homeScreenViewPage.clickBrowseLibraryButton();
 
-        await sideBarViewUtils.clickAction(SideBarViewActions.UPLOAD);
+        await libraryViewPage.waitForLoaded();
+        await libraryViewPage.clickToolbarAction('openUploadWidget');
 
         await uploadToCloudinaryTab.switchTo();
         await uploadToCloudinaryTab.openAdvancedOptions();
@@ -53,9 +56,9 @@ describe('Upload asset from side bar Upload button', () => {
 
         await cloudinarySDK.waitUntilAssetIsUploaded(firstAssetPublicID);
 
-        await sideBarViewUtils.clickAction(SideBarViewActions.REFRESH);
+        await libraryViewPage.clickToolbarAction('refresh');
 
-        await sideBarViewUtils.validateContentItemsExist([newFileName.replace('.png', '')]);
+        await libraryViewPage.validateAssetsExist([firstAssetPublicID]);
 
         await allureReporter.addStep('Validate that the asset was uploaded with the correct display name');
         const byPublicId = await cloudinarySDK.V2.api.resource(firstAssetPublicID);

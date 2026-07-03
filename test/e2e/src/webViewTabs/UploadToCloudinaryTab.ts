@@ -33,6 +33,8 @@ class UploadToCloudinaryTab extends WebViewTabBase {
      * Waits for all uploads to complete.
      */
     public async waitForAllUploadsToComplete() {
+        await allureReporter.addStep('Wait for all uploads to complete');
+        let uploadError: string | undefined;
         await browser.waitUntil(async () => {
             const statuses = await browser.$$('.queue-item__status');
             const count = await statuses.length;
@@ -42,8 +44,16 @@ class UploadToCloudinaryTab extends WebViewTabBase {
 
             const textPromises = await statuses.map(el => el.getText());
             const texts = await Promise.all(textPromises);
+            uploadError = texts.find(text => text !== 'Complete' && !text.endsWith('%') && text !== 'Pending...');
+            if (uploadError) {
+                return true;
+            }
             return texts.every(text => text === 'Complete');
         }, { timeoutMsg: 'Not all uploads completed in time' });
+
+        if (uploadError) {
+            throw new Error(`Upload failed: ${uploadError}`);
+        }
     }
 
     /**

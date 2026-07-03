@@ -2,8 +2,10 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { CloudinarySDK } from '../src/sdks/cloudinarySDK.js';
 import { activityBarUtils } from '../src/vscodeComponentsUtils/ActivityBarUtils.js';
-import { SideBarViewActions, sideBarViewUtils } from '../src/vscodeComponentsUtils/SideBarViewUtils.js';
+import { sideBarViewUtils } from '../src/vscodeComponentsUtils/SideBarViewUtils.js';
 import { pathUtils } from '../src/utils/pathUtils.js';
+import { createHookError } from '../src/utils/errorUtils.js';
+import { libraryViewPage } from '../src/webViewTabs/LibraryViewPage.js';
 
 describe('Search asset from side bar', () => {
 
@@ -17,7 +19,7 @@ describe('Search asset from side bar', () => {
                 { public_id: assetPublicID }
             );
         } catch (error) {
-            throw new Error('Error uploading asset:', error);
+            throw createHookError('Error uploading asset', error);
         }
     });
 
@@ -25,20 +27,18 @@ describe('Search asset from side bar', () => {
         try {
             await cloudinarySDK.V2.api.delete_resources([assetPublicID]);
         } catch (error) {
-            throw new Error('Error deleting asset:', error);
+            throw createHookError('Error deleting asset', error);
         }
     });
 
     it('should find the uploaded asset via sidebar search', async () => {
         await activityBarUtils.openView('Cloudinary');
         await sideBarViewUtils.homeScreenViewPage.clickBrowseLibraryButton();
-        await sideBarViewUtils.waitContentToLoad();
 
-        await sideBarViewUtils.clickAction(SideBarViewActions.SEARCH);
+        await libraryViewPage.waitForLoaded();
+        await libraryViewPage.fillSearchInput(assetPublicID);
 
-        await sideBarViewUtils.homeScreenViewPage.fillSearchInput(assetPublicID);
-
-        await sideBarViewUtils.validateContentItemsExist(['Clear Search', assetPublicID]);
-        await sideBarViewUtils.validateContentItemsNumber(2);
+        await libraryViewPage.validateAssetsExist([assetPublicID]);
+        await libraryViewPage.validateVisibleAssetCount(1);
     });
 });

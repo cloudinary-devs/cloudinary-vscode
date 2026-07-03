@@ -11,7 +11,7 @@ pnpm install
 
 ## Environment variables
 
-End-to-end runs require Cloudinary credentials in `process.env`. The `onPrepare` hook in `wdio.conf.ts` reads `E2E_CLOUD`, `E2E_API_KEY`, and `E2E_API_SECRET`, then writes `~/.cloudinary/environments.json` in the shape the extension expects (cloud name as the top-level key, with `apiKey` and `apiSecret`).
+End-to-end runs require Cloudinary credentials in `process.env`. The `onPrepare` hook in `wdio.conf.ts` reads `E2E_CLOUD`, `E2E_API_KEY`, and `E2E_API_SECRET`, then writes a workspace-local `.cloudinary/environments.json` inside a temporary e2e workspace. This keeps test runs from overwriting the user's `~/.cloudinary/environments.json`.
 
 | Variable | Description |
 |----------|-------------|
@@ -20,6 +20,12 @@ End-to-end runs require Cloudinary credentials in `process.env`. The `onPrepare`
 | `E2E_API_SECRET` | API secret |
 
 **Local:** add a `test/e2e/.env` file (gitignored) such as:
+
+```bash
+E2E_CLOUD=your_cloud_name
+E2E_API_KEY=your_api_key
+E2E_API_SECRET=your_api_secret
+```
 
 ## Running Tests
 
