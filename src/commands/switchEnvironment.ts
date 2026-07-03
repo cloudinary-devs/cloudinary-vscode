@@ -139,7 +139,7 @@ function registerSwitchEnv(
             );
           } else {
             vscode.window.showInformationMessage(
-              `$(cloud) Switched to ${selected} environment.`
+              `Switched to ${selected} environment.`
             );
           }
         }

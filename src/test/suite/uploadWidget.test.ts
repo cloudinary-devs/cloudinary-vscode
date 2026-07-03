@@ -134,4 +134,41 @@ suite('Upload widget upload options', () => {
 
     assert.strictEqual(options.upload_preset, 'cld-docs');
   });
+
+  test('uses folder for fixed-folder environments', () => {
+    const options = uploadWidgetTestApi.getUploadOptions(
+      uploadState({ dynamicFolders: false }),
+      null,
+      'docs/mediaflows',
+    );
+
+    assert.strictEqual(options.folder, 'docs/mediaflows');
+    assert.strictEqual(Object.prototype.hasOwnProperty.call(options, 'asset_folder'), false);
+    assert.strictEqual(Object.prototype.hasOwnProperty.call(options, 'use_asset_folder_as_public_id_prefix'), false);
+  });
+
+  test('uses asset_folder for dynamic-folder environments without changing the public ID path', () => {
+    const options = uploadWidgetTestApi.getUploadOptions(
+      uploadState({ dynamicFolders: true }),
+      null,
+      'docs/mediaflows',
+    );
+
+    assert.strictEqual(options.asset_folder, 'docs/mediaflows');
+    assert.strictEqual(Object.prototype.hasOwnProperty.call(options, 'folder'), false);
+    assert.strictEqual(Object.prototype.hasOwnProperty.call(options, 'use_asset_folder_as_public_id_prefix'), false);
+  });
+
+  test('preserves explicit public IDs in dynamic-folder environments', () => {
+    const options = uploadWidgetTestApi.getUploadOptions(
+      uploadState({ dynamicFolders: true }),
+      null,
+      'docs/mediaflows',
+      'docs/mediaflows/custom-id',
+    );
+
+    assert.strictEqual(options.asset_folder, 'docs/mediaflows');
+    assert.strictEqual(options.public_id, 'docs/mediaflows/custom-id');
+    assert.strictEqual(Object.prototype.hasOwnProperty.call(options, 'use_asset_folder_as_public_id_prefix'), false);
+  });
 });

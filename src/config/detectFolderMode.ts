@@ -50,7 +50,7 @@ export function resolveFolderModeState(
 }
 
 /**
- * Detects if the cloud supports dynamic folders by making a request to the root folder API.
+ * Detects whether the product environment uses dynamic or fixed folders.
  * The returned result also reflects whether the configured credentials are valid, so callers
  * can report configuration success/error analytics.
  * @param cloudName - The cloud name.
@@ -74,7 +74,7 @@ export async function detectFolderModeResult(
   }
 
   const authHeader = `Basic ${Buffer.from(`${apiKey}:${apiSecret}`).toString('base64')}`;
-  const url = `https://api.cloudinary.com/v1_1/${cloudName}/folders`;
+  const url = `https://api.cloudinary.com/v1_1/${cloudName}/config?settings=true`;
 
   try {
     const response = await fetch(url, {
@@ -85,11 +85,18 @@ export async function detectFolderModeResult(
     });
 
     if (response.status === 200) {
-      // Dynamic folders are supported
-      return { dynamicFolders: true, outcome: 'success', status: 200 };
-    } else if (response.status === 420) {
-      // Dynamic folders are not supported (fixed folder mode)
-      return { dynamicFolders: false, outcome: 'success', status: 420 };
+      const body = await response.json().catch(() => null);
+      const folderMode = body?.settings?.folder_mode;
+      if (folderMode === 'dynamic' || folderMode === 'fixed') {
+        return { dynamicFolders: folderMode === 'dynamic', outcome: 'success', status: 200 };
+      }
+
+      return {
+        dynamicFolders: false,
+        outcome: 'error',
+        status: response.status,
+        errorReason: 'unexpected_response',
+      };
     } else if (response.status === 401 || response.status === 403) {
       // Credentials were rejected
       return {

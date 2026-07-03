@@ -8,8 +8,8 @@ suite("getConnectionStatus", () => {
     assert.strictEqual(getConnectionStatus({ ...base, credentialsValid: true }), "connected");
   });
 
-  test("present + rejected → setupNeeded (never 'connected' for bad creds)", () => {
-    assert.strictEqual(getConnectionStatus({ ...base, credentialsValid: false }), "setupNeeded");
+  test("present + rejected → invalidCredentials (never 'connected' for bad creds)", () => {
+    assert.strictEqual(getConnectionStatus({ ...base, credentialsValid: false }), "invalidCredentials");
   });
 
   test("present + unknown (pending/offline) → checking (not connected, not broken)", () => {
@@ -34,6 +34,6 @@ suite("getConnectionStatus", () => {
   test("the cached-invalid-credentials repro: a stale cache cannot make rejected creds 'connected'", () => {
     // Simulates DOC-11110 repro: folder mode was cached (so dynamicFolders is
     // known) but the current secret is now rejected → credentialsValid=false.
-    assert.strictEqual(getConnectionStatus({ ...base, credentialsValid: false }), "setupNeeded");
+    assert.strictEqual(getConnectionStatus({ ...base, credentialsValid: false }), "invalidCredentials");
   });
 });

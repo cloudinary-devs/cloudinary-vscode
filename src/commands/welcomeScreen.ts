@@ -138,6 +138,7 @@ function getWelcomeContent(cloudinaryState: WelcomeScreenCloudinaryState): strin
   });
   const isConnected = status === "connected";
   const isChecking = status === "checking";
+  const isInvalidCredentials = status === "invalidCredentials";
   const hasCredentials = !!(cloudinaryState.cloudName && cloudinaryState.apiKey && cloudinaryState.apiSecret);
   const cloudName = escapeHtml(cloudinaryState.cloudName || "");
   const statusClass = isConnected ? "ok" : isChecking ? "neutral" : "warn";
@@ -145,6 +146,8 @@ function getWelcomeContent(cloudinaryState: WelcomeScreenCloudinaryState): strin
     ? `Connected to ${cloudName}`
     : isChecking
       ? `Checking ${cloudName || "credentials"}`
+      : isInvalidCredentials
+        ? "Cloudinary credentials are invalid"
       : hasCredentials
         ? "Credentials need attention"
         : "No credentials configured";
@@ -152,6 +155,8 @@ function getWelcomeContent(cloudinaryState: WelcomeScreenCloudinaryState): strin
     ? "Your environment is ready. Open the dashboard to explore your media."
     : isChecking
       ? "Validating your Cloudinary credentials before opening the dashboard."
+      : isInvalidCredentials
+        ? "Check that the cloud name, API key, and API secret belong to the same product environment."
       : hasCredentials
         ? "Update your Cloudinary API credentials to connect."
         : "Add your Cloudinary API credentials to get started.";

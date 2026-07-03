@@ -1,7 +1,9 @@
 import * as vscode from "vscode";
 import * as path from "path";
+import * as fs from "fs";
 import {
   getGlobalConfigPath,
+  hasCompleteEnvironment,
   loadEnvironments,
   CloudinaryEnvironment,
   isPlaceholderConfig,
@@ -246,136 +248,149 @@ export async function activate(context: vscode.ExtensionContext) {
     await vscode.commands.executeCommand("cloudinary.openWelcomeScreen");
   };
 
-  const environments = await loadEnvironments();
-  const firstCloudName = Object.keys(environments)[0];
-  const selectedEnv: CloudinaryEnvironment = environments[firstCloudName];
-
-  if (!selectedEnv) {
-    vscode.window.showErrorMessage(
-      "No Cloudinary environment found in config."
-    );
-    return;
-  }
-
-  // Check if credentials are placeholder values
-  if (isPlaceholderConfig(firstCloudName, selectedEnv.apiKey, selectedEnv.apiSecret)) {
-    // Initialize status bar with placeholder indicator (no popup message to avoid scaring new users)
-    statusBar = vscode.window.createStatusBarItem(
-      vscode.StatusBarAlignment.Right,
-      500
-    );
-    statusBar.text = `$(warning) Cloudinary: Not Configured`;
-    statusBar.tooltip = "Click to configure Cloudinary credentials";
-    statusBar.command = "cloudinary.openGlobalConfig";
-    statusBar.show();
-    context.subscriptions.push(statusBar);
-
-    registerAllCommands(
-      context,
-      cloudinaryService,
-      environmentTarget,
-      statusBar,
-      homescreenProvider,
-      libraryWebviewProvider,
-      docsAiProvider,
-      analytics
-    );
-    await openWelcomeOnFirstRun();
-    return;
-  }
-
-  cloudinaryService.setCredentials({
-    cloudName: firstCloudName,
-    apiKey: selectedEnv.apiKey,
-    apiSecret: selectedEnv.apiSecret,
-    uploadPreset: selectedEnv.uploadPreset || null,
-  });
-  updateCloudinaryConfig(firstCloudName, selectedEnv.apiKey, selectedEnv.apiSecret);
-
   statusBar = vscode.window.createStatusBarItem(
     vscode.StatusBarAlignment.Right,
     500
   );
-  // Status bar text will be updated after folder mode detection
-  statusBar.text = `$(cloud) ${cloudinaryService.cloudName}`;
-  statusBar.tooltip = "Click to switch Cloudinary environment";
-  statusBar.command = "cloudinary.switchEnvironment";
+  statusBar.text = `$(warning) Cloudinary: Not Configured`;
+  statusBar.tooltip = "Click to configure Cloudinary credentials";
+  statusBar.command = "cloudinary.openGlobalConfig";
   statusBar.show();
   context.subscriptions.push(statusBar);
 
-  // Reload config if file changes
-  const globalConfigPath = getGlobalConfigPath();
-  const watcher = vscode.workspace.createFileSystemWatcher(
-    new vscode.RelativePattern(
-      path.dirname(globalConfigPath),
-      path.basename(globalConfigPath)
-    )
-  );
+  const markNotConfigured = async (): Promise<void> => {
+    cloudinaryService.setCredentials({
+      cloudName: null,
+      apiKey: null,
+      apiSecret: null,
+      uploadPreset: null,
+      dynamicFolders: false,
+    });
+    cloudinaryService.credentialsValid = undefined;
+    statusBar.text = `$(warning) Cloudinary: Not Configured`;
+    statusBar.tooltip = "Click to configure Cloudinary credentials";
+    statusBar.command = "cloudinary.openGlobalConfig";
+    await refreshEnvironmentViews();
+  };
 
-  watcher.onDidChange(async () => {
-    const updatedEnvs = await loadEnvironments();
-    const cloudNames = Object.keys(updatedEnvs);
-
-    if (cloudNames.length === 0) {
-      vscode.window.showErrorMessage("No Cloudinary environments found in updated config.");
-      return;
-    }
-
-    // Try to keep the previously active cloud name
-    const preferredCloud = cloudinaryService.cloudName;
-    const newCloudName = cloudNames.includes(preferredCloud || '')
-      ? preferredCloud
-      : cloudNames[0];
-
-    const env = updatedEnvs[newCloudName!];
-
-    // Check if updated credentials are still placeholders
-    if (isPlaceholderConfig(newCloudName!, env.apiKey, env.apiSecret)) {
-      cloudinaryService.setCredentials({
-        cloudName: null,
-        apiKey: null,
-        apiSecret: null,
-        uploadPreset: null,
-        dynamicFolders: false,
-      });
-      cloudinaryService.credentialsValid = undefined;
-      statusBar.text = `$(warning) Cloudinary: Not Configured`;
-      statusBar.tooltip = "Click to configure Cloudinary credentials";
-      statusBar.command = "cloudinary.openGlobalConfig";
-      await refreshEnvironmentViews();
-      // Don't show message - just update status bar silently
-      return;
-    }
-
-    // The credentials file just changed; the keys (or the account's folder mode)
-    // may differ from what we cached, so force a fresh detection. This also
-    // re-validates the credentials so the status reflects whether they work.
+  const applyEnvironment = async (
+    cloudName: string,
+    env: CloudinaryEnvironment,
+    entryPoint: string
+  ): Promise<void> => {
     const { dynamicFolders, credentialsValid } = await resolveDynamicFolders(
-      newCloudName!,
+      cloudName,
       env.apiKey,
       env.apiSecret,
-      "config_change",
-      { force: true }
+      entryPoint
     );
     cloudinaryService.setCredentials({
-      cloudName: newCloudName!,
+      cloudName,
       apiKey: env.apiKey,
       apiSecret: env.apiSecret,
       uploadPreset: env.uploadPreset || null,
       dynamicFolders,
     });
     cloudinaryService.credentialsValid = credentialsValid;
-    updateCloudinaryConfig(newCloudName!, env.apiKey, env.apiSecret);
+    updateCloudinaryConfig(cloudName, env.apiKey, env.apiSecret);
 
-    // Update status bar with folder mode indicator
-    statusBar.text = getStatusBarText(newCloudName!, dynamicFolders, credentialsValid);
+    statusBar.text = getStatusBarText(cloudName, dynamicFolders, credentialsValid);
     statusBar.tooltip = getStatusBarTooltip(dynamicFolders, credentialsValid);
     statusBar.command = "cloudinary.switchEnvironment";
 
     await refreshEnvironmentViews();
+  };
+
+  registerAllCommands(
+    context,
+    cloudinaryService,
+    environmentTarget,
+    statusBar,
+    homescreenProvider,
+    libraryWebviewProvider,
+    docsAiProvider,
+    analytics
+  );
+
+  const refreshFromConfigFile = async (): Promise<void> => {
+    const updatedEnvs = await loadEnvironments();
+    const cloudNames = Object.keys(updatedEnvs);
+
+    if (cloudNames.length === 0) {
+      await markNotConfigured();
+      return;
+    }
+
+    // Try to keep the previously active cloud name
+    const preferredCloud = cloudinaryService.cloudName;
+    const newCloudName = preferredCloud && cloudNames.includes(preferredCloud)
+      ? preferredCloud
+      : cloudNames[0];
+
+    const env = updatedEnvs[newCloudName];
+
+    if (
+      !hasCompleteEnvironment(newCloudName, env) ||
+      isPlaceholderConfig(newCloudName, env.apiKey, env.apiSecret)
+    ) {
+      await markNotConfigured();
+      return;
+    }
+
+    // The credentials file just changed; the keys (or the account's folder mode)
+    // may differ from what we cached, so force a fresh detection. This also
+    // re-validates the credentials so the status reflects whether they work.
+    await applyEnvironment(newCloudName, env, "config_change");
+  };
+
+  let configReloadTimer: ReturnType<typeof setTimeout> | undefined;
+  const scheduleConfigReload = (): void => {
+    if (configReloadTimer) {
+      clearTimeout(configReloadTimer);
+    }
+    configReloadTimer = setTimeout(() => {
+      configReloadTimer = undefined;
+      void refreshFromConfigFile();
+    }, 250);
+  };
+  context.subscriptions.push({
+    dispose: () => {
+      if (configReloadTimer) {
+        clearTimeout(configReloadTimer);
+        configReloadTimer = undefined;
+      }
+    },
   });
 
+  // Reload config if the global file changes. VS Code's watcher can report
+  // editor saves as create/delete events, so all event types feed the same
+  // debounced refresh.
+  const globalConfigPath = getGlobalConfigPath();
+  const globalConfigDir = path.dirname(globalConfigPath);
+  const globalConfigFileName = path.basename(globalConfigPath);
+  const watcher = vscode.workspace.createFileSystemWatcher(
+    new vscode.RelativePattern(
+      globalConfigDir,
+      globalConfigFileName
+    )
+  );
+
+  watcher.onDidChange(scheduleConfigReload);
+  watcher.onDidCreate(scheduleConfigReload);
+  watcher.onDidDelete(scheduleConfigReload);
+
   context.subscriptions.push(watcher);
+
+  try {
+    const nodeWatcher = fs.watch(globalConfigDir, (_eventType, fileName) => {
+      if (fileName && fileName.toString() === globalConfigFileName) {
+        scheduleConfigReload();
+      }
+    });
+    context.subscriptions.push({ dispose: () => nodeWatcher.close() });
+  } catch {
+    // The VS Code watcher above is the primary path; this is only a fallback.
+  }
 
   // Manual escape hatch: force a fresh folder-mode detection. Useful after an
   // account is migrated between fixed and dynamic folders, or to recover an
@@ -423,41 +438,20 @@ export async function activate(context: vscode.ExtensionContext) {
     })
   );
 
-  // Detect and cache folder mode (also validates the credentials).
-  {
-    const activation = await resolveDynamicFolders(
-      cloudinaryService.cloudName!,
-      cloudinaryService.apiKey!,
-      cloudinaryService.apiSecret!,
-      "activation"
-    );
-    cloudinaryService.dynamicFolders = activation.dynamicFolders;
-    cloudinaryService.credentialsValid = activation.credentialsValid;
+  const environments = await loadEnvironments();
+  const firstCloudName = Object.keys(environments)[0];
+  const selectedEnv = environments[firstCloudName];
+
+  if (
+    !hasCompleteEnvironment(firstCloudName, selectedEnv) ||
+    isPlaceholderConfig(firstCloudName, selectedEnv.apiKey, selectedEnv.apiSecret)
+  ) {
+    await markNotConfigured();
+    await openWelcomeOnFirstRun();
+    return;
   }
 
-  // Update status bar with folder mode indicator
-  statusBar.text = getStatusBarText(
-    cloudinaryService.cloudName!,
-    cloudinaryService.dynamicFolders,
-    cloudinaryService.credentialsValid
-  );
-  statusBar.tooltip = getStatusBarTooltip(
-    cloudinaryService.dynamicFolders,
-    cloudinaryService.credentialsValid
-  );
-
-  await refreshEnvironmentViews();
-
-  registerAllCommands(
-    context,
-    cloudinaryService,
-    environmentTarget,
-    statusBar,
-    homescreenProvider,
-    libraryWebviewProvider,
-    docsAiProvider,
-    analytics
-  );
+  await applyEnvironment(firstCloudName, selectedEnv, "activation");
   await openWelcomeOnFirstRun();
 }
 

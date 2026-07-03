@@ -9,13 +9,14 @@ export interface ConnectionStatusInput {
 
 /**
  * - `connected`: credentials present and validated against the API.
- * - `setupNeeded`: credentials missing, or actively rejected (e.g. 401/403).
+ * - `setupNeeded`: credentials missing or incomplete.
+ * - `invalidCredentials`: credentials are present but actively rejected (e.g. 401/403).
  * - `checking`: credentials present but not yet validated (or validation could
  *   not complete, e.g. offline). Deliberately neither "Connected" nor "Setup
  *   needed" so we never claim a valid cloud is broken, nor claim an unverified
  *   (possibly invalid) cloud is connected.
  */
-export type ConnectionStatus = "connected" | "setupNeeded" | "checking";
+export type ConnectionStatus = "connected" | "setupNeeded" | "invalidCredentials" | "checking";
 
 /**
  * Decides the homescreen connection status from credentials + validation state.
@@ -33,7 +34,7 @@ export function getConnectionStatus(input: ConnectionStatusInput): ConnectionSta
     return "connected";
   }
   if (input.credentialsValid === false) {
-    return "setupNeeded";
+    return "invalidCredentials";
   }
   return "checking";
 }

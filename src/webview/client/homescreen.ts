@@ -32,7 +32,7 @@ interface AiToolsDataMessage {
 
 interface HomescreenDataMessage {
   command: "homescreenData";
-  status: "connected" | "setupNeeded" | "checking";
+  status: "connected" | "setupNeeded" | "invalidCredentials" | "checking";
   cloudName: string;
   folderMode: string;
   envCount: number;
@@ -490,12 +490,20 @@ function handleHomescreenData(msg: HomescreenDataMessage): void {
 
   const connected = msg.status === "connected";
   const setupNeeded = msg.status === "setupNeeded";
+  const invalidCredentials = msg.status === "invalidCredentials";
   const checking = msg.status === "checking";
+  const needsAttention = setupNeeded || invalidCredentials;
 
-  // Only "Setup needed" is an alarming (warn) state. "Checking…" is neutral.
-  statusDot?.classList.toggle("hs-status-dot--warn", setupNeeded);
+  // Missing or rejected credentials are alarming. "Checking…" is neutral.
+  statusDot?.classList.toggle("hs-status-dot--warn", needsAttention);
   if (statusText) {
-    statusText.textContent = connected ? "Connected" : checking ? "Checking…" : "Setup needed";
+    statusText.textContent = connected
+      ? "Connected"
+      : checking
+        ? "Checking…"
+        : invalidCredentials
+          ? "Credentials invalid"
+          : "Setup needed";
   }
   if (cloudNameEl) {
     // Show the cloud name whenever one is configured (even while checking or if
@@ -509,10 +517,12 @@ function handleHomescreenData(msg: HomescreenDataMessage): void {
     folderModeEl.textContent = msg.folderMode;
     folderModeEl.classList.toggle("hidden", !connected);
   }
-  // Prompt setup only when credentials are missing or rejected — not while checking.
-  setupBanner?.classList.toggle("hidden", !setupNeeded);
+  // Prompt setup only when credentials need attention — not while checking.
+  setupBanner?.classList.toggle("hidden", !needsAttention);
   if (setupBannerText) {
-    setupBannerText.textContent = msg.cloudName
+    setupBannerText.textContent = invalidCredentials
+      ? "Cloudinary credentials are invalid"
+      : msg.cloudName
       ? "Update your API credentials to connect"
       : "Add your API credentials to connect";
   }

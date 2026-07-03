@@ -9,6 +9,13 @@ export interface CloudinaryEnvironment {
   uploadPreset?: string;  // Optional: Default upload preset to use (signed uploads work without it)
 }
 
+export function hasCompleteEnvironment(
+  cloudName: string | null | undefined,
+  env: Partial<CloudinaryEnvironment> | null | undefined
+): env is CloudinaryEnvironment {
+  return !!cloudName?.trim() && !!env?.apiKey?.trim() && !!env?.apiSecret?.trim();
+}
+
 /**
  * Checks if the provided credentials are placeholder values.
  * @param cloudName - The cloud name to check.
@@ -68,7 +75,7 @@ export function getGlobalConfigPath(): string {
     fs.writeFileSync(envPath, templateContent, 'utf-8');
 
     vscode.window.showInformationMessage(
-      '$(new-file) Created global Cloudinary config at ~/.cloudinary/environments.json'
+      'Created global Cloudinary config at ~/.cloudinary/environments.json'
     );
   }
 
