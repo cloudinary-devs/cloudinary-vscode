@@ -316,6 +316,7 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
             <input
               id="hs-search-input"
               class="hs-search-input"
+              data-testid="hs-search-input-selector"
               type="text"
               placeholder="Search library…"
               autocomplete="off"
