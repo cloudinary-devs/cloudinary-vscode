@@ -1,5 +1,6 @@
 import { WebView } from "wdio-vscode-service";
 import { webViewUtils } from "../vscodeComponentsUtils/WebViewUtils.js";
+import allureReporter from '@wdio/allure-reporter';
 
 
 /**
@@ -21,6 +22,7 @@ export abstract class WebViewTabBase {
      * Switches to the webview tab.
      */
     public async switchTo() {
+        await allureReporter.addStep(`Switch to "${this.title}" webview`);
         this.webview = await webViewUtils.getWebView(this.title);
         await this.webview.open();
     }
@@ -29,6 +31,7 @@ export abstract class WebViewTabBase {
      * Switches back to the main view.
      */
     public async switchBack() {
+        await allureReporter.addStep('Switch back from webview');
         if (!this.webview) {
             throw new Error('WebView not opened. Call switchTo() first.');
         }
