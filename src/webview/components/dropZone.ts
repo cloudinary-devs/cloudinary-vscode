@@ -327,7 +327,7 @@ export const fileIcon = `
  * @example
  * ```typescript
  * createDropZone({
- *   text: 'Drag & drop files here',
+ *   text: 'Hold Shift, then drag & drop files here',
  *   hint: '— or —',
  *   buttonText: 'Browse Files',
  *   inputId: 'fileInput',
@@ -337,7 +337,7 @@ export const fileIcon = `
  */
 export function createDropZone(options: DropZoneOptions = {}): string {
   const {
-    text = "Drag & drop files here",
+    text = "Hold Shift, then drag & drop files here",
     hint = "— or —",
     buttonText = "Browse Files",
     inputId = "fileInput",

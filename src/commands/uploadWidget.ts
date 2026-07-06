@@ -776,7 +776,7 @@ function getUploadContent(
                 <path d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z"/>
               </svg>
             </div>
-            <p class="drop-zone__text">Drag & drop files here</p>
+            <p class="drop-zone__text">Hold Shift, then drag & drop files here</p>
             <p class="drop-zone__hint">— or —</p>
             <button class="btn btn--primary drop-zone__button" id="browseBtn">Browse Files</button>
             <input type="file" id="fileInput" class="drop-zone__input" multiple />

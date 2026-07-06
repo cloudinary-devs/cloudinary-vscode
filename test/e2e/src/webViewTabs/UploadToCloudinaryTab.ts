@@ -47,6 +47,7 @@ class UploadToCloudinaryTab extends WebViewTabBase {
 
         const dropZone = await browser.$('#dropZone');
         await dropZone.waitForDisplayed();
+        expect(await dropZone.getText()).toContain('Hold Shift, then drag & drop files here');
 
         const browseButton = await browser.$('#browseBtn');
         await browseButton.waitForClickable();
