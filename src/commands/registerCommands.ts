@@ -8,54 +8,102 @@ import registerSwitchEnv from "./switchEnvironment";
 import registerClearSearch from "./clearSearch";
 import registerWelcomeScreen from "./welcomeScreen";
 import registerConfigureAiTools from "./configureAiTools";
-import { CloudinaryTreeDataProvider } from "../tree/treeDataProvider";
+import { CloudinaryService } from "../cloudinary/cloudinaryService";
 import { HomescreenViewProvider } from "../webview/homescreenView";
+import { LibraryWebviewViewProvider } from "../webview/libraryView";
+import { DocsAiViewProvider } from "../webview/docsAiView";
+import { AnalyticsService } from "../analytics/analyticsService";
 
 /**
  * Registers all Cloudinary-related commands with the VS Code command registry.
  * @param context - The extension context.
- * @param provider - The Cloudinary tree data provider.
+ * @param cloudinaryService - The shared Cloudinary service.
  * @param statusBar - Status bar item to show current environment.
  * @param homescreenProvider - The homescreen webview view provider.
  */
 function registerAllCommands(
   context: vscode.ExtensionContext,
-  provider: CloudinaryTreeDataProvider,
+  cloudinaryService: CloudinaryService,
+  environmentTarget: Parameters<typeof registerSwitchEnv>[1],
   statusBar: vscode.StatusBarItem,
-  homescreenProvider: HomescreenViewProvider
+  homescreenProvider: HomescreenViewProvider,
+  libraryWebview: LibraryWebviewViewProvider,
+  docsAiProvider: DocsAiViewProvider,
+  analytics?: AnalyticsService
 ) {
   context.subscriptions.push(
     vscode.commands.registerCommand("cloudinary.showHomescreen", () => {
+      analytics?.track("home_opened", { entry_point: "command" });
+      docsAiProvider.requestRecentConversations();
       vscode.commands.executeCommand("setContext", "cloudinary.activeView", "homescreen");
+      vscode.commands.executeCommand("workbench.view.extension.cloudinary");
+      setTimeout(() => {
+        void homescreenProvider.refresh();
+      }, 150);
     })
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand("cloudinary.showLibrary", () => {
+    vscode.commands.registerCommand("cloudinary.showLibrary", (initialSearchQuery?: string) => {
+      const query = typeof initialSearchQuery === "string" && initialSearchQuery.trim()
+        ? initialSearchQuery.trim()
+        : null;
+      analytics?.track("library_opened", { entry_point: query ? "search" : "command" });
+      if (query) {
+        void libraryWebview.setSearch(query);
+      }
       vscode.commands.executeCommand("setContext", "cloudinary.activeView", "library");
       vscode.commands.executeCommand("workbench.view.extension.cloudinary");
     })
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand("cloudinary.refresh", () =>
-      provider.refresh({
-        folderPath: '',
-        nextCursor: null,
-        searchQuery: null,
-        resourceTypeFilter: 'all'
-      })
-    )
+    vscode.commands.registerCommand("cloudinary.showDocsAI", (initialPrompt?: string) => {
+      analytics?.track("docs_ai_opened", {
+        entry_point: "command",
+        has_initial_prompt: !!initialPrompt,
+      });
+      docsAiProvider.queuePrompt(initialPrompt);
+      vscode.commands.executeCommand("setContext", "cloudinary.activeView", "docsAi");
+      vscode.commands.executeCommand("workbench.view.extension.cloudinary");
+      setTimeout(() => {
+        vscode.commands.executeCommand("cloudinaryDocsAI.focus");
+        docsAiProvider.flushPendingPrompt(250);
+      }, 150);
+    })
   );
 
-  registerSearch(context, provider, homescreenProvider);
-  registerClearSearch(context, provider);
-  registerViewOptions(context, provider);
-  registerPreview(context);
-  registerUpload(context, provider);
-  registerClipboard(context);
-  registerSwitchEnv(context, provider, statusBar);
-  registerWelcomeScreen(context, provider);
+  context.subscriptions.push(
+    vscode.commands.registerCommand("cloudinary.showDocsAIConversation", (conversationId?: string) => {
+      analytics?.track("docs_ai_opened", {
+        entry_point: "command",
+        has_initial_conversation: !!conversationId,
+      });
+      docsAiProvider.queueConversation(conversationId);
+      vscode.commands.executeCommand("setContext", "cloudinary.activeView", "docsAi");
+      vscode.commands.executeCommand("workbench.view.extension.cloudinary");
+      setTimeout(() => {
+        vscode.commands.executeCommand("cloudinaryDocsAI.focus");
+        docsAiProvider.flushPendingConversation(250);
+      }, 150);
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand("cloudinary.refresh", async () => {
+      analytics?.track("library_refreshed", { entry_point: "command" });
+      await libraryWebview.refresh();
+    })
+  );
+
+  registerSearch(context, homescreenProvider);
+  registerClearSearch(context, libraryWebview);
+  registerViewOptions(context, libraryWebview);
+  registerPreview(context, analytics);
+  registerUpload(context, cloudinaryService, analytics);
+  registerClipboard(context, analytics);
+  registerSwitchEnv(context, environmentTarget, statusBar, analytics);
+  registerWelcomeScreen(context, cloudinaryService);
   registerConfigureAiTools(context);
 }
 

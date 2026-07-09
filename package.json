@@ -3,7 +3,7 @@
   "publisher": "Cloudinary",
   "displayName": "Cloudinary",
   "description": "Easily find and manage your Cloudinary assets directly from Visual Studio Code.",
-  "version": "0.1.4",
+  "version": "1.0.0",
   "icon": "resources/cloudinary_icon_blue.png",
   "repository": {
     "type": "git",
@@ -53,14 +53,34 @@
           "id": "cloudinaryHomescreen",
           "name": "Cloudinary",
           "type": "webview",
-          "when": "cloudinary.activeView != 'library'"
+          "when": "cloudinary.activeView != 'library' && cloudinary.activeView != 'docsAi'"
         },
         {
           "id": "cloudinaryMediaLibrary",
-          "name": "",
+          "name": "Library",
+          "type": "webview",
+          "contextualTitle": "Cloudinary Library",
           "when": "cloudinary.activeView == 'library'"
+        },
+        {
+          "id": "cloudinaryDocsAI",
+          "name": "Docs AI",
+          "type": "webview",
+          "contextualTitle": "Cloudinary Docs AI",
+          "when": "cloudinary.activeView == 'docsAi'"
         }
       ]
+    },
+    "configuration": {
+      "title": "Cloudinary",
+      "properties": {
+        "cloudinary.docsAi.apiBase": {
+          "type": "string",
+          "default": "https://cld-docs-ai-delta.vercel.app",
+          "scope": "machine-overridable",
+          "markdownDescription": "Base URL for the Cloudinary Docs AI backend. Override this for local development, for example `http://127.0.0.1:5173`."
+        }
+      }
     },
     "commands": [
       {
@@ -132,64 +152,28 @@
         "category": "Cloudinary"
       },
       {
+        "command": "cloudinary.showDocsAI",
+        "title": "Open Docs AI",
+        "category": "Cloudinary"
+      },
+      {
         "command": "cloudinary.configureAiTools",
         "title": "Configure AI Tools",
         "category": "Cloudinary"
+      },
+      {
+        "command": "cloudinary.docsAi.refresh",
+        "title": "Refresh Docs AI",
+        "icon": "$(refresh)",
+        "category": "Cloudinary"
+      },
+      {
+        "command": "cloudinary.refreshFolderMode",
+        "title": "Refresh Folder Mode",
+        "icon": "$(refresh)",
+        "category": "Cloudinary"
       }
-    ],
-    "menus": {
-      "view/title": [
-        {
-          "command": "cloudinary.showHomescreen",
-          "when": "view == cloudinaryMediaLibrary",
-          "group": "navigation@0"
-        },
-        {
-          "command": "cloudinary.refresh",
-          "when": "view == cloudinaryMediaLibrary",
-          "group": "navigation@1"
-        },
-        {
-          "command": "cloudinary.openUploadWidget",
-          "when": "view == cloudinaryMediaLibrary",
-          "group": "navigation@2"
-        },
-        {
-          "command": "cloudinary.searchAssets",
-          "when": "view == cloudinaryMediaLibrary",
-          "group": "navigation@3"
-        },
-        {
-          "command": "cloudinary.viewOptions",
-          "when": "view == cloudinaryMediaLibrary",
-          "group": "navigation@4"
-        },
-        {
-          "command": "cloudinary.openGlobalConfig",
-          "when": "view == cloudinaryMediaLibrary",
-          "group": "navigation@5"
-        }
-      ],
-      "view/item/context": [
-        {
-          "command": "cloudinary.copyUrl",
-          "when": "view == cloudinaryMediaLibrary && viewItem == 'asset'"
-        },
-        {
-          "command": "cloudinary.copyPublicId",
-          "when": "view == cloudinaryMediaLibrary && viewItem == 'asset'"
-        },
-        {
-          "command": "cloudinary.copyOptimizedUrl",
-          "when": "view == cloudinaryMediaLibrary && viewItem == 'asset'"
-        },
-        {
-          "command": "cloudinary.uploadToFolder",
-          "when": "view == cloudinaryMediaLibrary && viewItem == 'folder'",
-          "group": "inline"
-        }
-      ]
-    }
+    ]
   },
   "scripts": {
     "compile": "npm run check-types && node esbuild.js",
@@ -215,6 +199,8 @@
     "esbuild": "^0.25.9",
     "eslint": "^8.52.0",
     "glob": "^10.3.10",
+    "highlight.js": "^11.11.1",
+    "marked": "^17.0.3",
     "mocha": "^10.2.0",
     "npm-run-all": "^4.1.5",
     "typescript": "^5.2.2"

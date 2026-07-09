@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { AnalyticsService } from "../analytics/analyticsService";
 import { createWebviewDocument, getScriptUri } from "../webview/webviewUtils";
 import { escapeHtml, formatFileSize } from "../webview/utils/helpers";
 import { assetIcons, actionIcons } from "../webview/icons";
@@ -14,6 +15,7 @@ type AssetData = {
   filename: string;
   format?: string;
   resource_type?: string;
+  type?: string;
   tags?: string[];
   context?: Record<string, any>;
   metadata?: Record<string, any>;
@@ -38,12 +40,17 @@ function getAssetIcon(type: string): string {
   }
 }
 
-function registerPreview(context: vscode.ExtensionContext) {
+function registerPreview(context: vscode.ExtensionContext, analytics?: AnalyticsService) {
   context.subscriptions.push(
     vscode.commands.registerCommand(
       "cloudinary.openAsset",
       (asset: AssetData) => {
         const publicId = asset.public_id;
+        analytics?.track("asset_opened", {
+          resource_type: asset.resource_type || asset.displayType,
+          asset_type: asset.type,
+          entry_point: "preview_command",
+        });
 
         // Check if panel for this asset already exists
         const existingPanel = openPanels.get(publicId);
@@ -112,6 +119,7 @@ function registerPreview(context: vscode.ExtensionContext) {
         panel.webview.onDidReceiveMessage(async (message) => {
           if (message.command === "copyToClipboard" && message.text) {
             await vscode.env.clipboard.writeText(message.text);
+            analytics?.track("copy_asset_url", { copy_type: "preview" });
           }
         });
       }
@@ -133,6 +141,17 @@ export function resetAllPreviewPanels(): void {
  */
 function getAssetTypeIcon(type: string): string {
   return getAssetIcon(type);
+}
+
+function isAuthenticatedAsset(asset: AssetData): boolean {
+  return asset.type === "authenticated";
+}
+
+function buildAuthenticatedBadgeHtml(asset: AssetData): string {
+  if (!isAuthenticatedAsset(asset)) {
+    return "";
+  }
+  return `<span class="badge badge--auth">${actionIcons.lock("sm")} Authenticated</span>`;
 }
 
 /**
@@ -219,6 +238,30 @@ function buildMetadataHtml(data: Record<string, any> | undefined, emptyText: str
     .join("");
 }
 
+function buildUrlItem(label: string, url: string): string {
+  return `
+    <div class="url-item">
+      <div class="url-item__label">${escapeHtml(label)}</div>
+      <div class="url-item__value">
+        <a href="${escapeHtml(url)}" target="_blank" class="url-item__link">${escapeHtml(url)}</a>
+        <button class="btn btn--secondary btn--sm btn--copy" data-copy="${escapeHtml(url)}">Copy</button>
+      </div>
+    </div>
+  `;
+}
+
+function buildUrlsHtml(asset: AssetData): string {
+  if (isAuthenticatedAsset(asset)) {
+    const signedUrl = asset.secure_url || asset.optimized_url;
+    const extraOptimized = asset.optimized_url && asset.optimized_url !== signedUrl
+      ? buildUrlItem("Optimized URL", asset.optimized_url)
+      : "";
+    return `${buildUrlItem("Signed authenticated URL", signedUrl)}${extraOptimized}`;
+  }
+
+  return `${buildUrlItem("Original URL", asset.secure_url)}${buildUrlItem("Optimized URL", asset.optimized_url)}`;
+}
+
 /**
  * Build the lightbox HTML.
  */
@@ -250,6 +293,8 @@ function getPreviewContent(asset: AssetData): string {
   const contextHtml = buildMetadataHtml(asset.context, "No context metadata");
   const metadataHtml = buildMetadataHtml(asset.metadata, "No structured metadata");
   const lightboxHtml = hasEnlarge ? buildLightboxHtml(asset) : "";
+  const authenticatedBadgeHtml = buildAuthenticatedBadgeHtml(asset);
+  const urlsHtml = buildUrlsHtml(asset);
 
   return `
     <div class="card card--elevated" style="max-width: 600px; width: 100%;">
@@ -261,6 +306,7 @@ function getPreviewContent(asset: AssetData): string {
             <h2 class="asset-header__title" title="${escapeHtml(asset.public_id)}">${escapeHtml(displayName || "")}</h2>
             <div class="asset-header__subtitle">
               <span class="badge">${escapeHtml((asset.format || asset.displayType || "unknown").toUpperCase())}</span>
+              ${authenticatedBadgeHtml}
               ${asset.width && asset.height ? `${asset.width} × ${asset.height}` : ""}
               ${asset.bytes ? ` • ${formatFileSize(asset.bytes)}` : ""}
             </div>
@@ -301,6 +347,10 @@ function getPreviewContent(asset: AssetData): string {
               <span class="info-row__label">Type</span>
               <span class="info-row__value">${escapeHtml(asset.displayType || "unknown")}</span>
             </div>
+            <div class="info-row">
+              <span class="info-row__label">Delivery</span>
+              <span class="info-row__value">${escapeHtml(asset.type || "upload")}${authenticatedBadgeHtml}</span>
+            </div>
           </div>
 
           <div class="tabs__content" id="tab-meta" role="tabpanel">
@@ -319,20 +369,7 @@ function getPreviewContent(asset: AssetData): string {
           </div>
 
           <div class="tabs__content" id="tab-urls" role="tabpanel">
-            <div class="url-item">
-              <div class="url-item__label">Original URL</div>
-              <div class="url-item__value">
-                <a href="${escapeHtml(asset.secure_url)}" target="_blank" class="url-item__link">${escapeHtml(asset.secure_url)}</a>
-                <button class="btn btn--secondary btn--sm btn--copy" data-copy="${escapeHtml(asset.secure_url)}">Copy</button>
-              </div>
-            </div>
-            <div class="url-item">
-              <div class="url-item__label">Optimized URL</div>
-              <div class="url-item__value">
-                <a href="${escapeHtml(asset.optimized_url)}" target="_blank" class="url-item__link">${escapeHtml(asset.optimized_url)}</a>
-                <button class="btn btn--secondary btn--sm btn--copy" data-copy="${escapeHtml(asset.optimized_url)}">Copy</button>
-              </div>
-            </div>
+            ${urlsHtml}
           </div>
         </div>
       </div>

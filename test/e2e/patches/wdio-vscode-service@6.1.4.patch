@@ -1,0 +1,21 @@
+diff --git a/dist/service.js b/dist/service.js
+index 221673f49ba513910b707dcc4993f313811e705e..5e83d247eae041ef4eefabdccce66b184b386293 100644
+--- a/dist/service.js
++++ b/dist/service.js
+@@ -115,7 +115,15 @@ export default class VSCodeWorkerService {
+             customArgs.verbose = true;
+             customArgs.logExtensionHostCommunication = true;
+         }
+-        const binary = path.join(__dirname, 'chromium', `index.${process.platform === 'win32' ? 'exe' : 'js'}`);
++        const wrapperBinary = path.join(__dirname, 'chromium', `index.${process.platform === 'win32' ? 'exe' : 'js'}`);
++        let binary = wrapperBinary;
++        if (process.platform !== 'win32') {
++            binary = path.join(storagePath, 'wdio-vscode-chromium-shim.sh');
++            const escapeShellArg = (value) => `'${value.replace(/'/g, `'\\''`)}'`;
++            const shim = `#!/bin/sh\nexec ${escapeShellArg(process.execPath)} ${escapeShellArg(wrapperBinary)} "$@"\n`;
++            await fs.writeFile(binary, shim, 'utf-8');
++            await fs.chmod(binary, 0o755);
++        }
+         const args = Object.entries({ ...customArgs, ...this._vscodeOptions.vscodeArgs }).reduce((prev, [key, value]) => {
+             const decamelizedKey = decamelize(key, { separator: '-' });
+             if (Array.isArray(value)) {

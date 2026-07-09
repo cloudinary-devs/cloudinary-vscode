@@ -327,7 +327,7 @@ export const fileIcon = `
  * @example
  * ```typescript
  * createDropZone({
- *   text: 'Drag & drop files here',
+ *   text: 'Hold Shift, then drag & drop files here',
  *   hint: '— or —',
  *   buttonText: 'Browse Files',
  *   inputId: 'fileInput',
@@ -337,7 +337,7 @@ export const fileIcon = `
  */
 export function createDropZone(options: DropZoneOptions = {}): string {
   const {
-    text = "Drag & drop files here",
+    text = "Hold Shift, then drag & drop files here",
     hint = "— or —",
     buttonText = "Browse Files",
     inputId = "fileInput",
@@ -428,7 +428,7 @@ export function createUploadedAssetsSection(
   return `
     <div id="uploaded-assets" class="uploaded-assets hidden">
       <div class="uploaded-assets__header">
-        <h3 class="uploaded-assets__title">✅ ${escapeHtml(title)}</h3>
+        <h3 class="uploaded-assets__title">${escapeHtml(title)}</h3>
         ${clearButtonHtml}
       </div>
       <div id="asset-grid" class="asset-grid">
@@ -437,4 +437,3 @@ export function createUploadedAssetsSection(
     </div>
   `;
 }
-

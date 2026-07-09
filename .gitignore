@@ -19,6 +19,8 @@ node_modules/
 # Internal development files
 internal/
 docs/superpowers/
+agents.md
+.agents/
 
 # Logs
 *.log

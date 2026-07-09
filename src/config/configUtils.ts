@@ -9,6 +9,13 @@ export interface CloudinaryEnvironment {
   uploadPreset?: string;  // Optional: Default upload preset to use (signed uploads work without it)
 }
 
+export function hasCompleteEnvironment(
+  cloudName: string | null | undefined,
+  env: Partial<CloudinaryEnvironment> | null | undefined
+): env is CloudinaryEnvironment {
+  return !!cloudName?.trim() && !!env?.apiKey?.trim() && !!env?.apiSecret?.trim();
+}
+
 /**
  * Checks if the provided credentials are placeholder values.
  * @param cloudName - The cloud name to check.
@@ -68,7 +75,7 @@ export function getGlobalConfigPath(): string {
     fs.writeFileSync(envPath, templateContent, 'utf-8');
 
     vscode.window.showInformationMessage(
-      '✅ Created global Cloudinary config at ~/.cloudinary/environments.json'
+      'Created global Cloudinary config at ~/.cloudinary/environments.json'
     );
   }
 
@@ -88,7 +95,7 @@ export async function loadEnvironments(): Promise<Record<string, CloudinaryEnvir
     globalEnvs = JSON.parse(raw);
   } catch (err: any) {
     vscode.window.showErrorMessage(
-      `❌ Failed to read global Cloudinary config: ${err.message}`
+      `Failed to read global Cloudinary config: ${err.message}`
     );
   }
 
@@ -105,7 +112,7 @@ export async function loadEnvironments(): Promise<Record<string, CloudinaryEnvir
     }
   } catch (err: any) {
     vscode.window.showErrorMessage(
-      `❌ Failed to read workspace Cloudinary config: ${err.message}`
+      `Failed to read workspace Cloudinary config: ${err.message}`
     );
   }
 

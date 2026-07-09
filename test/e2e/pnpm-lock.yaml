@@ -4,6 +4,11 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  wdio-vscode-service@6.1.4:
+    hash: 5f09392689eab93e7e286de3e82ca5d26ad35c8856421f3a3a82c39f85a6350a
+    path: patches/wdio-vscode-service@6.1.4.patch
+
 importers:
 
   .:
@@ -43,7 +48,7 @@ importers:
         version: 6.2.0(expect-webdriverio@5.6.5)(webdriverio@9.27.0)
       wdio-vscode-service:
         specifier: ^6.1.4
-        version: 6.1.4(webdriverio@9.27.0)
+        version: 6.1.4(patch_hash=5f09392689eab93e7e286de3e82ca5d26ad35c8856421f3a3a82c39f85a6350a)(webdriverio@9.27.0)
       webdriverio:
         specifier: ^9.27.0
         version: 9.27.0
@@ -5146,7 +5151,7 @@ snapshots:
       - expect-webdriverio
       - webdriverio
 
-  wdio-vscode-service@6.1.4(webdriverio@9.27.0):
+  wdio-vscode-service@6.1.4(patch_hash=5f09392689eab93e7e286de3e82ca5d26ad35c8856421f3a3a82c39f85a6350a)(webdriverio@9.27.0):
     dependencies:
       '@fastify/cors': 9.0.1
       '@fastify/static': 7.0.4

@@ -1,23 +1,44 @@
 import * as vscode from "vscode";
-import { CloudinaryTreeDataProvider } from "../tree/treeDataProvider";
+import { CloudinaryService } from "../cloudinary/cloudinaryService";
 import {
   createWebviewDocument,
   getScriptUri,
 } from "../webview/webviewUtils";
 import { escapeHtml } from "../webview/utils/helpers";
+import { getConnectionStatus } from "../config/connectionStatus";
+
+type WelcomeScreenCloudinaryState = Pick<
+  CloudinaryService,
+  "cloudName" | "apiKey" | "apiSecret" | "credentialsValid"
+>;
+
+let welcomePanel: vscode.WebviewPanel | undefined;
+let welcomeContext: vscode.ExtensionContext | undefined;
+let welcomeCloudinaryState: WelcomeScreenCloudinaryState | undefined;
 
 /**
  * Registers the welcome screen command.
  */
 function registerWelcomeScreen(
   context: vscode.ExtensionContext,
-  provider: CloudinaryTreeDataProvider
+  cloudinaryState: WelcomeScreenCloudinaryState
 ) {
+  welcomeContext = context;
+  welcomeCloudinaryState = cloudinaryState;
+
   context.subscriptions.push(
     vscode.commands.registerCommand("cloudinary.openWelcomeScreen", () => {
-      createWelcomePanel(context, provider);
+      createWelcomePanel(context, cloudinaryState);
     })
   );
+}
+
+export function refreshWelcomePanel(): void {
+  if (!welcomePanel || !welcomeContext || !welcomeCloudinaryState) {
+    return;
+  }
+
+  renderWelcomePanel(welcomePanel, welcomeContext, welcomeCloudinaryState);
 }
 
 /**
@@ -25,8 +46,14 @@ function registerWelcomeScreen(
  */
 function createWelcomePanel(
   context: vscode.ExtensionContext,
-  provider: CloudinaryTreeDataProvider
+  cloudinaryState: WelcomeScreenCloudinaryState
 ): vscode.WebviewPanel {
+  if (welcomePanel) {
+    welcomePanel.reveal(vscode.ViewColumn.One);
+    renderWelcomePanel(welcomePanel, context, cloudinaryState);
+    return welcomePanel;
+  }
+
   const panel = vscode.window.createWebviewPanel(
     "cloudinaryWelcome",
     "Welcome to Cloudinary",
@@ -39,6 +66,7 @@ function createWelcomePanel(
       ],
     }
   );
+  welcomePanel = panel;
 
   panel.iconPath = vscode.Uri.joinPath(
     context.extensionUri,
@@ -46,18 +74,10 @@ function createWelcomePanel(
     "cloudinary_icon_blue.png"
   );
 
-  const welcomeScriptUri = getScriptUri(
-    panel.webview,
-    context.extensionUri,
-    "welcome.js"
-  );
+  renderWelcomePanel(panel, context, cloudinaryState);
 
-  panel.webview.html = createWebviewDocument({
-    title: "Welcome to Cloudinary",
-    webview: panel.webview,
-    extensionUri: context.extensionUri,
-    bodyContent: getWelcomeContent(provider),
-    additionalScripts: [welcomeScriptUri],
+  panel.onDidDispose(() => {
+    welcomePanel = undefined;
   });
 
   panel.webview.onDidReceiveMessage((message: { command: string; data?: string; text?: string }) => {
@@ -77,8 +97,8 @@ function createWelcomePanel(
           vscode.env.openExternal(vscode.Uri.parse(message.data));
         }
         break;
-      case "focusTreeView":
-        vscode.commands.executeCommand("workbench.view.extension.cloudinary");
+      case "focusDashboard":
+        vscode.commands.executeCommand("cloudinary.showHomescreen");
         break;
     }
   });
@@ -86,12 +106,60 @@ function createWelcomePanel(
   return panel;
 }
 
+function renderWelcomePanel(
+  panel: vscode.WebviewPanel,
+  context: vscode.ExtensionContext,
+  cloudinaryState: WelcomeScreenCloudinaryState
+): void {
+  const welcomeScriptUri = getScriptUri(
+    panel.webview,
+    context.extensionUri,
+    "welcome.js"
+  );
+
+  panel.webview.html = createWebviewDocument({
+    title: "Welcome to Cloudinary",
+    webview: panel.webview,
+    extensionUri: context.extensionUri,
+    bodyContent: getWelcomeContent(cloudinaryState),
+    additionalScripts: [welcomeScriptUri],
+  });
+}
+
 /**
  * Generates the welcome screen body content.
  */
-function getWelcomeContent(provider: CloudinaryTreeDataProvider): string {
-  const hasConfig = !!(provider.cloudName && provider.apiKey);
-  const cloudName = escapeHtml(provider.cloudName || "");
+function getWelcomeContent(cloudinaryState: WelcomeScreenCloudinaryState): string {
+  const status = getConnectionStatus({
+    cloudName: cloudinaryState.cloudName,
+    apiKey: cloudinaryState.apiKey,
+    apiSecret: cloudinaryState.apiSecret,
+    credentialsValid: cloudinaryState.credentialsValid,
+  });
+  const isConnected = status === "connected";
+  const isChecking = status === "checking";
+  const isInvalidCredentials = status === "invalidCredentials";
+  const hasCredentials = !!(cloudinaryState.cloudName && cloudinaryState.apiKey && cloudinaryState.apiSecret);
+  const cloudName = escapeHtml(cloudinaryState.cloudName || "");
+  const statusClass = isConnected ? "ok" : isChecking ? "neutral" : "warn";
+  const statusLabel = isConnected
+    ? `Connected to ${cloudName}`
+    : isChecking
+      ? `Checking ${cloudName || "credentials"}`
+      : isInvalidCredentials
+        ? "Cloudinary credentials are invalid"
+      : hasCredentials
+        ? "Credentials need attention"
+        : "No credentials configured";
+  const statusDetail = isConnected
+    ? "Your environment is ready. Open the dashboard to explore your media."
+    : isChecking
+      ? "Validating your Cloudinary credentials before opening the dashboard."
+      : isInvalidCredentials
+        ? "Check that the cloud name, API key, and API secret belong to the same product environment."
+      : hasCredentials
+        ? "Update your Cloudinary API credentials to connect."
+        : "Add your Cloudinary API credentials to get started.";
 
   return `
   <style>
@@ -154,11 +222,13 @@ function getWelcomeContent(provider: CloudinaryTreeDataProvider): string {
       animation: wg-in 0.3s ease both;
     }
     .wg-status--ok  { background: rgba(74,222,128,0.07);  border-color: rgba(74,222,128,0.22); }
+    .wg-status--neutral{ background: rgba(96,165,250,0.07); border-color: rgba(96,165,250,0.22); }
     .wg-status--warn{ background: rgba(251,191,36,0.07);  border-color: rgba(251,191,36,0.22); }
     .wg-status-dot {
       width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
     }
     .wg-status--ok   .wg-status-dot { background: #4ade80; box-shadow: 0 0 7px rgba(74,222,128,0.65); }
+    .wg-status--neutral .wg-status-dot { background: #60a5fa; box-shadow: 0 0 7px rgba(96,165,250,0.55); }
     .wg-status--warn .wg-status-dot { background: #fbbf24; box-shadow: 0 0 7px rgba(251,191,36,0.65); }
     .wg-status-body { flex: 1; }
     .wg-status-label  { font-size: 13px; font-weight: 600; }
@@ -340,16 +410,16 @@ function getWelcomeContent(provider: CloudinaryTreeDataProvider): string {
     <div class="wg-body">
 
       <!-- ── Connection status ── -->
-      <div class="wg-status wg-status--${hasConfig ? "ok" : "warn"}">
+      <div class="wg-status wg-status--${statusClass}">
         <div class="wg-status-dot"></div>
         <div class="wg-status-body">
-          <div class="wg-status-label">${hasConfig ? `Connected to ${cloudName}` : "No credentials configured"}</div>
-          <div class="wg-status-detail">${hasConfig ? "Your environment is ready. Open the dashboard to explore your media." : "Add your Cloudinary API credentials to get started."}</div>
+          <div class="wg-status-label">${statusLabel}</div>
+          <div class="wg-status-detail">${statusDetail}</div>
         </div>
-        ${hasConfig
-          ? `<button class="wg-btn wg-btn--ghost" onclick="focusTreeView()">Open Dashboard →</button>`
-          : `<button class="wg-btn wg-btn--primary" onclick="openGlobalConfig()">Configure →</button>`
-        }
+        ${isConnected
+      ? `<button class="wg-btn wg-btn--ghost" data-welcome-action="focusDashboard">Open Dashboard →</button>`
+      : `<button class="wg-btn wg-btn--primary" data-welcome-action="openGlobalConfig">Configure →</button>`
+    }
       </div>
 
       <!-- ── Setup steps ── -->
@@ -357,11 +427,11 @@ function getWelcomeContent(provider: CloudinaryTreeDataProvider): string {
       <div class="wg-steps">
 
         <div class="wg-step">
-          <div class="wg-step-num ${hasConfig ? "wg-step-num--done" : ""}">${hasConfig ? "✓" : "1"}</div>
+          <div class="wg-step-num ${isConnected ? "wg-step-num--done" : ""}">${isConnected ? "✓" : "1"}</div>
           <div class="wg-step-body">
             <div class="wg-step-title">
               Connect your Cloudinary account
-              ${hasConfig ? '<span class="wg-badge">✓ Done</span>' : ""}
+              ${isConnected ? '<span class="wg-badge">✓ Done</span>' : ""}
             </div>
             <p class="wg-step-desc">
               Add your Cloud Name, API Key, and API Secret to
@@ -369,8 +439,8 @@ function getWelcomeContent(provider: CloudinaryTreeDataProvider): string {
               Credentials are never stored in VS Code settings — they stay in a local file you control.
             </p>
             <div class="wg-step-actions">
-              <button class="wg-btn wg-btn--primary" onclick="openGlobalConfig()">${hasConfig ? "View Config File" : "Open Config File"}</button>
-              <button class="wg-btn wg-btn--ghost" onclick="openExternal('https://console.cloudinary.com/settings/api-keys')">Get API Keys</button>
+              <button class="wg-btn wg-btn--primary" data-welcome-action="openGlobalConfig">${hasCredentials ? "View Config File" : "Open Config File"}</button>
+              <button class="wg-btn wg-btn--ghost" data-welcome-action="openExternal" data-url="https://console.cloudinary.com/settings/api-keys">Get API Keys</button>
             </div>
           </div>
         </div>
@@ -381,7 +451,7 @@ function getWelcomeContent(provider: CloudinaryTreeDataProvider): string {
             <div class="wg-step-title">Explore the Dashboard</div>
             <p class="wg-step-desc">The Cloudinary sidebar gives you instant access to your media library, upload tools, and AI integrations — all without leaving your editor. Open it from the activity bar on the left.</p>
             <div class="wg-step-actions">
-              <button class="wg-btn wg-btn--primary" onclick="focusTreeView()">Open Dashboard</button>
+              <button class="wg-btn wg-btn--primary" data-welcome-action="focusDashboard">Open Dashboard</button>
             </div>
           </div>
         </div>
@@ -390,9 +460,9 @@ function getWelcomeContent(provider: CloudinaryTreeDataProvider): string {
           <div class="wg-step-num">3</div>
           <div class="wg-step-body">
             <div class="wg-step-title">Browse &amp; manage your media</div>
-            <p class="wg-step-desc">Search and explore assets in the tree view. Preview images and videos, copy delivery URLs, upload new files with drag-and-drop, and manage transformations — all from VS Code.</p>
+            <p class="wg-step-desc">Search and explore assets in the media library. Preview images and videos, copy delivery URLs, upload new files with drag-and-drop, and manage transformations — all from VS Code.</p>
             <div class="wg-step-actions">
-              <button class="wg-btn wg-btn--ghost" onclick="openExternal('https://cloudinary.com/documentation/how_to_integrate_cloudinary')">View Documentation</button>
+              <button class="wg-btn wg-btn--ghost" data-welcome-action="openExternal" data-url="https://cloudinary.com/documentation/how_to_integrate_cloudinary">View Documentation</button>
             </div>
           </div>
         </div>
@@ -400,7 +470,7 @@ function getWelcomeContent(provider: CloudinaryTreeDataProvider): string {
       </div>
 
       <!-- ── Config format ── -->
-      <details class="wg-config"${!hasConfig ? " open" : ""}>
+      <details class="wg-config"${!hasCredentials ? " open" : ""}>
         <summary>Configuration file format</summary>
         <div class="wg-config-body">
           <p class="wg-config-note">
@@ -408,7 +478,7 @@ function getWelcomeContent(provider: CloudinaryTreeDataProvider): string {
             The cloud name is the key. You can define multiple environments.
           </p>
           <div class="wg-code">
-            <button class="wg-btn wg-btn--ghost wg-btn--sm wg-code-copy" onclick="copyToClipboard(getConfigExample(), this)">Copy</button>
+            <button class="wg-btn wg-btn--ghost wg-btn--sm wg-code-copy" data-welcome-action="copyConfigExample">Copy</button>
             <pre>{
   "your-cloud-name": {
     "apiKey": "your-api-key",
@@ -418,7 +488,7 @@ function getWelcomeContent(provider: CloudinaryTreeDataProvider): string {
           </div>
           <p class="wg-config-note" style="margin-top:12px;margin-bottom:0;">
             Find your credentials at
-            <span class="wg-link" onclick="openExternal('https://console.cloudinary.com/settings/api-keys')">Console → Settings → API Keys</span>.
+            <span class="wg-link" data-welcome-action="openExternal" data-url="https://console.cloudinary.com/settings/api-keys">Console → Settings → API Keys</span>.
             You can optionally include <span class="wg-mono">uploadPreset</span> for upload configuration.
           </p>
         </div>
@@ -430,32 +500,32 @@ function getWelcomeContent(provider: CloudinaryTreeDataProvider): string {
       <div class="wg-resources">
         <div class="wg-section-label">Resources</div>
         <div class="wg-res-grid">
-          <div class="wg-res-card" onclick="openExternal('https://cloudinary.com/documentation')">
+          <div class="wg-res-card" data-welcome-action="openExternal" data-url="https://cloudinary.com/documentation">
             <div class="wg-res-icon">📖</div>
             <div class="wg-res-title">Documentation</div>
             <div class="wg-res-desc">Guides, API reference &amp; tutorials</div>
           </div>
-          <div class="wg-res-card" onclick="openExternal('https://console.cloudinary.com')">
+          <div class="wg-res-card" data-welcome-action="openExternal" data-url="https://console.cloudinary.com">
             <div class="wg-res-icon">🖥</div>
             <div class="wg-res-title">Console</div>
             <div class="wg-res-desc">Manage your media &amp; settings online</div>
           </div>
-          <div class="wg-res-card" onclick="openExternal('https://cloudinary.com/documentation/upload_images')">
+          <div class="wg-res-card" data-welcome-action="openExternal" data-url="https://cloudinary.com/documentation/upload_images">
             <div class="wg-res-icon">⬆</div>
             <div class="wg-res-title">Upload Guide</div>
             <div class="wg-res-desc">Learn to upload &amp; organize assets</div>
           </div>
-          <div class="wg-res-card" onclick="openExternal('https://cloudinary.com/documentation/image_transformations')">
+          <div class="wg-res-card" data-welcome-action="openExternal" data-url="https://cloudinary.com/documentation/image_transformations">
             <div class="wg-res-icon">✨</div>
             <div class="wg-res-title">Transformations</div>
             <div class="wg-res-desc">Resize, crop &amp; optimize media</div>
           </div>
-          <div class="wg-res-card" onclick="openExternal('https://support.cloudinary.com')">
+          <div class="wg-res-card" data-welcome-action="openExternal" data-url="https://support.cloudinary.com">
             <div class="wg-res-icon">💬</div>
             <div class="wg-res-title">Support</div>
             <div class="wg-res-desc">Get help from the Cloudinary team</div>
           </div>
-          <div class="wg-res-card" onclick="openExternal('https://cloudinary.com/users/register_free')">
+          <div class="wg-res-card" data-welcome-action="openExternal" data-url="https://cloudinary.com/users/register_free">
             <div class="wg-res-icon">🌱</div>
             <div class="wg-res-title">Free Account</div>
             <div class="wg-res-desc">New to Cloudinary? Sign up free</div>

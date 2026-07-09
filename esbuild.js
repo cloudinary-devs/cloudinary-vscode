@@ -26,6 +26,8 @@ async function main() {
       "src/webview/client/upload-widget.ts",
       "src/webview/client/welcome.ts",
       "src/webview/client/homescreen.ts",
+      "src/webview/client/library.ts",
+      "src/webview/client/docs-ai.ts",
     ],
     bundle: true,
     format: "iife",
@@ -60,7 +62,7 @@ const esbuildProblemMatcherPlugin = {
         console.error(`✘ [ERROR] ${text}`);
         if (location == null) return;
         console.error(
-          `    ${location.file}:${location.line}:${location.column}:`
+          `    ${location.file}:${location.line}:${location.column}:`,
         );
       });
       console.log("[watch] build finished");

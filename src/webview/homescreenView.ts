@@ -4,16 +4,23 @@
  */
 
 import * as vscode from "vscode";
-import { CloudinaryTreeDataProvider } from "../tree/treeDataProvider";
+import { AnalyticsService } from "../analytics/analyticsService";
+import { CloudinaryService } from "../cloudinary/cloudinaryService";
 import { createWebviewDocument, getScriptUri, getStyleUri } from "./webviewUtils";
+import type { LibraryWebviewViewProvider } from "./libraryView";
 import { loadEnvironments } from "../config/configUtils";
+import { getConnectionStatus } from "../config/connectionStatus";
+import { buildAiToolsNextStepsMessage } from "../utils/aiToolsGuidance";
 import skillsConfig from "../utils/skills-config.json";
+import { actionIcons } from "./icons";
 import {
   PlatformEntry,
   Scope,
   SkillInfo,
   MCP_SERVERS,
   detectEditor,
+  getMcpRootKey,
+  getEditorDisplayName,
   getMcpFilePath,
   fetchSkillList,
   fetchSkillContent,
@@ -26,18 +33,32 @@ import {
   getPlatformCovers,
 } from "../aiToolsService";
 
+export interface DocsAiRecentConversation {
+  id: string;
+  title: string;
+  createdAt?: number;
+  updatedAt?: number;
+}
+
+const DOCS_AI_RECENT_CONVERSATIONS_STORAGE_KEY = "cloudinary.docsAiRecentConversations";
+
 export class HomescreenViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = "cloudinaryHomescreen";
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
-    private readonly _provider: CloudinaryTreeDataProvider
-  ) {}
+    private readonly _service: CloudinaryService,
+    private readonly _globalState: vscode.Memento,
+    private readonly _libraryWebview?: LibraryWebviewViewProvider,
+    private readonly _analytics?: AnalyticsService
+  ) { }
 
   private _webviewView: vscode.WebviewView | undefined;
   private _cachedSkills: SkillInfo[] | undefined;
   private _currentPlatform: string = "claude-code";
   private _currentScope: Scope = "project";
+  private _docsAiRecentConversations: DocsAiRecentConversation[] = [];
+  private _requestDocsAiRecentConversations: (() => void) | undefined;
 
   async resolveWebviewView(
     webviewView: vscode.WebviewView,
@@ -52,7 +73,10 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
 
     webviewView.webview.options = {
       enableScripts: true,
-      localResourceRoots: [vscode.Uri.joinPath(this._extensionUri, "media")],
+      localResourceRoots: [
+        vscode.Uri.joinPath(this._extensionUri, "media"),
+        vscode.Uri.joinPath(this._extensionUri, "resources"),
+      ],
     };
 
     const scriptUri = getScriptUri(
@@ -65,12 +89,15 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
       this._extensionUri,
       "homescreen.css"
     );
+    const logoUri = webviewView.webview.asWebviewUri(
+      vscode.Uri.joinPath(this._extensionUri, "resources", "cloudinary_icon_blue.png")
+    );
 
     webviewView.webview.html = createWebviewDocument({
       title: "Cloudinary",
       webview: webviewView.webview,
       extensionUri: this._extensionUri,
-      bodyContent: this._getBodyContent(),
+      bodyContent: this._getBodyContent(logoUri),
       additionalStyles: [homescreenCssUri],
       additionalScripts: [scriptUri],
     });
@@ -86,13 +113,32 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
       }) => {
         switch (message.command) {
           case "ready":
+            this._analytics?.track("home_opened", { entry_point: "webview_ready" });
             await this._sendHomescreenData();
             break;
+          case "refreshDocsAiRecentConversations":
+            this._requestDocsAiRecentConversations?.();
+            if (this._docsAiRecentConversations.length > 0) {
+              this._sendDocsAiRecentConversations();
+            }
+            break;
+          case "clearDocsAiConversations":
+            this._docsAiRecentConversations = [];
+            await this._globalState.update(DOCS_AI_RECENT_CONVERSATIONS_STORAGE_KEY, []);
+            this._sendDocsAiRecentConversations();
+            break;
           case "openGlobalConfig":
+            this._analytics?.track("config_opened", { entry_point: "homescreen" });
             vscode.commands.executeCommand("cloudinary.openGlobalConfig");
             break;
           case "showLibrary":
             vscode.commands.executeCommand("cloudinary.showLibrary");
+            break;
+          case "showDocsAI":
+            vscode.commands.executeCommand("cloudinary.showDocsAI", message.data);
+            break;
+          case "showDocsAIConversation":
+            vscode.commands.executeCommand("cloudinary.showDocsAIConversation", message.data);
             break;
           case "openUploadWidget":
             vscode.commands.executeCommand("cloudinary.openUploadWidget");
@@ -102,19 +148,29 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
             break;
           case "searchAssets":
             if (message.data?.trim()) {
-              this._provider.refresh({ searchQuery: message.data.trim() });
-              vscode.commands.executeCommand("cloudinary.showLibrary");
+              const query = message.data.trim();
+              this._analytics?.track("asset_search", {
+                entry_point: "homescreen",
+                query_length: query.length,
+              });
+              await vscode.commands.executeCommand("cloudinary.showLibrary", query);
             }
             break;
           case "clearSearch":
-            this._provider.refresh({ searchQuery: null });
+            await this._libraryWebview?.setSearch(null);
             break;
           case "switchEnvironment":
             vscode.commands.executeCommand("cloudinary.switchEnvironment");
             break;
           case "aiToolsExpanded":
+            // First open: auto-detect the user's editor as the default platform.
             this._currentPlatform = detectEditorPlatform();
             this._currentScope = "project";
+            await this._handleAiToolsExpanded();
+            break;
+          case "aiToolsRefresh":
+            // Re-render after an install (or other in-place refresh) WITHOUT
+            // resetting the user's chosen platform/scope back to auto-detected.
             await this._handleAiToolsExpanded();
             break;
           case "changePlatform":
@@ -152,41 +208,82 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
     vscode.commands.executeCommand("workbench.view.extension.cloudinary");
     // Post focusSearch after the view has had time to become visible
     setTimeout(() => {
-      this._webviewView?.webview.postMessage({ command: "focusSearch" });
+      this._safePost({ command: "focusSearch" });
     }, 250);
+  }
+
+  private _safePost(message: unknown): void {
+    const targetView = this._webviewView;
+    if (!targetView) {
+      return;
+    }
+    try {
+      targetView.webview.postMessage(message);
+    } catch {
+      // Webview disposed between checks; safe to drop.
+    }
   }
 
   async refresh(): Promise<void> {
     await this._sendHomescreenData();
   }
 
+  setDocsAiRecentConversations(conversations: DocsAiRecentConversation[]): void {
+    this._docsAiRecentConversations = conversations
+      .filter((conversation) => conversation.id && conversation.title)
+      .sort((a, b) => (b.updatedAt ?? b.createdAt ?? 0) - (a.updatedAt ?? a.createdAt ?? 0));
+    this._sendDocsAiRecentConversations();
+  }
+
+  setDocsAiRecentConversationsRefresh(handler: () => void): void {
+    this._requestDocsAiRecentConversations = handler;
+  }
+
   private async _sendHomescreenData(): Promise<void> {
     const view = this._webviewView;
     if (!view) { return; }
 
-    const hasConfig = !!(this._provider.cloudName && this._provider.apiKey);
-    const cloudName = this._provider.cloudName || "";
-    const folderMode = this._provider.dynamicFolders ? "Dynamic folders" : "Fixed folders";
-
-    let envCount = hasConfig ? 1 : 0;
+    let envCount = 0;
     try {
       const envs = await loadEnvironments();
       envCount = Object.keys(envs).length;
     } catch { /* use default */ }
 
-    view.webview.postMessage({ command: "homescreenData", hasConfig, cloudName, folderMode, envCount });
+    // Compute the status AFTER the await above and read it right before posting,
+    // so a send that started while validation was still in flight reflects the
+    // latest credentialsValid (avoids a stale "checking"/"connected" post racing
+    // ahead of the post-validation refresh). See getConnectionStatus().
+    const status = getConnectionStatus({
+      cloudName: this._service.cloudName,
+      apiKey: this._service.apiKey,
+      apiSecret: this._service.apiSecret,
+      credentialsValid: this._service.credentialsValid,
+    });
+    const cloudName = this._service.cloudName || "";
+    const folderMode = this._service.dynamicFolders ? "Dynamic folders" : "Fixed folders";
+
+    this._safePost({ command: "homescreenData", status, cloudName, folderMode, envCount });
+    this._sendDocsAiRecentConversations();
+    this._requestDocsAiRecentConversations?.();
   }
 
-  private _getBodyContent(): string {
+  private _sendDocsAiRecentConversations(): void {
+    this._safePost({
+      command: "docsAiRecentConversations",
+      conversations: this._docsAiRecentConversations,
+    });
+  }
+
+  private _getBodyContent(logoUri: vscode.Uri): string {
     return `
 
       <div class="hs-root">
         <div class="hs-header">
           <div class="hs-brand">
             <div class="hs-brand-left">
-              <svg class="hs-brand-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                <path d="M19.5 9.5a6.5 6.5 0 0 0-12.47-2A5 5 0 0 0 7 17.5h12a4.5 4.5 0 0 0 .5-8.97z" fill="rgba(255,255,255,0.9)" stroke="rgba(255,255,255,0.2)" stroke-width="0.5"/>
-              </svg>
+              <span class="hs-brand-logo-wrap" aria-hidden="true">
+                <img class="hs-brand-logo" src="${logoUri}" alt="" />
+              </span>
               <span class="hs-brand-name">Cloudinary</span>
             </div>
             <span class="hs-status-pill">
@@ -206,7 +303,7 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
         </div>
 
         <div id="hs-setup-banner" class="hs-setup-banner hidden">
-          <span class="hs-setup-banner-icon">⚠</span>
+          <span class="hs-setup-banner-icon" aria-hidden="true">${actionIcons.warning("sm")}</span>
           <span class="hs-setup-banner-text">Add your API credentials to connect</span>
           <button id="hs-btn-configure" class="hs-setup-banner-btn" data-command="openGlobalConfig">Configure</button>
         </div>
@@ -226,6 +323,9 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
               spellcheck="false"
               aria-label="Search media library"
             />
+            <span id="hs-search-loading" class="hs-search-loading hidden" role="status" aria-label="Searching library">
+              <span class="hs-search-spinner" aria-hidden="true"></span>
+            </span>
             <button id="hs-search-clear" class="hs-search-clear hidden" title="Clear search" aria-label="Clear search">✕</button>
           </div>
         </div>
@@ -336,6 +436,43 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
             </div>
 
           </div><!-- /hs-ai-panel -->
+
+          <section class="hs-docs-ai-home" aria-labelledby="hs-docs-ai-heading">
+            <div class="hs-docs-ai-empty">
+              <h2 id="hs-docs-ai-heading" class="hs-docs-ai-empty-heading">Ask Cloudinary AI</h2>
+              <p class="hs-docs-ai-empty-sub">Ask me anything about our products and documentation.</p>
+              <div class="hs-docs-ai-empty-input-row">
+                <textarea
+                  id="hs-docs-ai-input"
+                  class="hs-docs-ai-empty-input"
+                  rows="1"
+                  placeholder="Send a message..."
+                  autocomplete="off"
+                  dir="auto"
+                  spellcheck="true"
+                  aria-label="Ask Cloudinary AI"
+                ></textarea>
+                <button id="hs-docs-ai-submit" class="hs-docs-ai-empty-send-btn" type="button" title="Send message" aria-label="Send message" disabled>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                </button>
+              </div>
+              <div class="hs-docs-ai-chips" aria-label="Suggested documentation questions">
+                <button class="hs-docs-ai-chip" type="button" data-question="What's new in Cloudinary?">What's new in Cloudinary?</button>
+                <button class="hs-docs-ai-chip" type="button" data-question="How do I upload images?">How do I upload images?</button>
+                <button class="hs-docs-ai-chip" type="button" data-question="Explain image transformations">Explain image transformations</button>
+                <button class="hs-docs-ai-chip" type="button" data-question="What SDKs does Cloudinary support?">What SDKs does Cloudinary support?</button>
+              </div>
+              <div class="hs-docs-ai-history-toggle-wrap">
+                <button id="hs-docs-ai-history-toggle" class="hs-docs-ai-history-toggle hidden" type="button" title="View recent conversations" aria-label="View recent conversations" aria-expanded="false">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                  <span class="hs-docs-ai-history-toggle-label">View recent conversations</span>
+                </button>
+              </div>
+              <div id="hs-docs-ai-recent" class="hs-docs-ai-history-panel hidden" aria-label="Conversation history">
+                <div id="hs-docs-ai-recent-list" class="hs-docs-ai-recent-list"></div>
+              </div>
+            </div>
+          </section>
         </div>
 
         <div class="hs-footer">
@@ -354,7 +491,7 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
 
     const workspaceFolders = vscode.workspace.workspaceFolders;
     if (!workspaceFolders || workspaceFolders.length === 0) {
-      view.webview.postMessage({ command: "aiToolsData", error: "Please open a workspace folder first." });
+      this._safePost({ command: "aiToolsData", error: "Please open a workspace folder first." });
       return;
     }
     const rootUri = workspaceFolders[0].uri;
@@ -367,27 +504,25 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
 
       const platform = getPlatformEntry(this._currentPlatform);
       if (!platform) {
-        view.webview.postMessage({ command: "aiToolsData", error: `Unknown platform: ${this._currentPlatform}` });
+        this._safePost({ command: "aiToolsData", error: `Unknown platform: ${this._currentPlatform}` });
         return;
       }
-
-      const { project, global: globalSet } = await readInstalledSkillDirNames(rootUri, platform, skills);
-      const inScope = this._currentScope === "project" ? project   : globalSet;
-      const inOther = this._currentScope === "project" ? globalSet : project;
 
       const covers = getPlatformCovers(platform, this._currentScope);
 
       const editor = detectEditor();
       const mcpFilePath = getMcpFilePath(editor);
-      const rootKey = editor === "vscode" ? "servers" : "mcpServers";
-      const configuredMcpSet = await readConfiguredMcpServerKeys(rootUri, mcpFilePath, rootKey);
 
-      const editorLabels: Record<string, string> = {
-        vscode: "VS Code", cursor: "Cursor", windsurf: "Windsurf", antigravity: "Antigravity",
-      };
-      const mcpEditorLabel = editorLabels[editor];
+      const [{ project, global: globalSet }, configuredMcpSet] = await Promise.all([
+        readInstalledSkillDirNames(rootUri, platform, skills),
+        readConfiguredMcpServerKeys(rootUri, mcpFilePath, getMcpRootKey(editor)),
+      ]);
+      const inScope = this._currentScope === "project" ? project : globalSet;
+      const inOther = this._currentScope === "project" ? globalSet : project;
 
-      view.webview.postMessage({
+      const mcpEditorLabel = getEditorDisplayName(editor);
+
+      this._safePost({
         command: "aiToolsData",
         platform: this._currentPlatform,
         scope: this._currentScope,
@@ -410,7 +545,7 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
         mcpEditorLabel,
       });
     } catch (err: any) {
-      view.webview.postMessage({ command: "aiToolsData", error: err.message ?? String(err) });
+      this._safePost({ command: "aiToolsData", error: err.message ?? String(err) });
     }
   }
 
@@ -425,16 +560,18 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
 
     const workspaceFolders = vscode.workspace.workspaceFolders;
     if (!workspaceFolders || workspaceFolders.length === 0) {
-      view.webview.postMessage({ command: "aiToolsResult", errors: ["No workspace folder open."] });
+      this._safePost({ command: "aiToolsResult", errors: ["No workspace folder open."] });
       return;
     }
     const rootUri = workspaceFolders[0].uri;
     const errors: string[] = [];
+    let installedSkillsCount = 0;
+    const installedMcp: string[] = [];
     const cachedSkills = this._cachedSkills ?? [];
     const platform = getPlatformEntry(platformId);
 
     if (!platform) {
-      view.webview.postMessage({ command: "aiToolsResult", errors: [`Unknown platform: ${platformId}`] });
+      this._safePost({ command: "aiToolsResult", errors: [`Unknown platform: ${platformId}`] });
       return;
     }
 
@@ -447,7 +584,7 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
         content = await fetchSkillContent(dirName);
       } catch (err: any) {
         errors.push(`${dirName}: ${err.message}`);
-        view.webview.postMessage({ command: "aiToolsProgress", item: dirName, status: "error" });
+        this._safePost({ command: "aiToolsProgress", item: dirName, status: "error" });
         continue;
       }
 
@@ -458,31 +595,55 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
       } catch (err: any) {
         errors.push(`${dirName}: ${err.message}`);
       }
-      view.webview.postMessage({
+      const skillOk = errors.length === errsBefore;
+      if (skillOk) { installedSkillsCount++; }
+      this._safePost({
         command: "aiToolsProgress",
         item: dirName,
-        status: errors.length > errsBefore ? "error" : "done",
+        status: skillOk ? "done" : "error",
       });
     }
 
+    let mcpEditorLabel: string | undefined;
     if (mcpServers.length > 0) {
       const editor = detectEditor();
+      mcpEditorLabel = getEditorDisplayName(editor);
       const createdFiles: string[] = [];
       try {
         await installMcpServers(rootUri, editor, mcpServers, createdFiles);
         for (const key of mcpServers) {
-          view.webview.postMessage({ command: "aiToolsProgress", item: key, status: "done" });
+          this._safePost({ command: "aiToolsProgress", item: key, status: "done" });
+          installedMcp.push(key);
         }
       } catch (err: any) {
         errors.push(`MCP: ${err.message}`);
         for (const key of mcpServers) {
-          view.webview.postMessage({ command: "aiToolsProgress", item: key, status: "error" });
+          this._safePost({ command: "aiToolsProgress", item: key, status: "error" });
         }
       }
     }
 
-    this._cachedSkills = undefined;
-    view.webview.postMessage({ command: "aiToolsResult", errors });
+    this._safePost({ command: "aiToolsResult", errors });
+    this._showAiToolsNextSteps(installedSkillsCount, installedMcp, mcpEditorLabel);
+  }
+
+  /**
+   * Surfaces post-install guidance. MCP servers in particular only take effect
+   * after the editor reloads, and users otherwise see them as "configured" but
+   * not connected, so we spell out the restart/verify step explicitly.
+   */
+  private _showAiToolsNextSteps(
+    installedSkillsCount: number,
+    installedMcp: string[],
+    mcpEditorLabel?: string
+  ): void {
+    const message = buildAiToolsNextStepsMessage(
+      installedSkillsCount,
+      installedMcp.length,
+      mcpEditorLabel
+    );
+    if (message) {
+      vscode.window.showInformationMessage(message);
+    }
   }
 }
-

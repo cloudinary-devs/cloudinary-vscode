@@ -1,23 +1,24 @@
 # Project Structure
 
-This document explains the organization of the Cloudinary VS Code Extension codebase.
+This document describes the current organization of the Cloudinary VS Code extension after the move to webview-based sidebar views.
 
 ## Directory Overview
 
-```
+```text
 cloudinary-vscode/
 ├── src/                        # TypeScript source code
 │   ├── extension.ts            # Extension entry point
-│   ├── commands/               # Command implementations
-│   ├── tree/                   # Tree view (sidebar)
+│   ├── cloudinary/             # Service layer and SDK adapter
+│   ├── commands/               # Command registrations and handlers
 │   ├── config/                 # Configuration utilities
 │   ├── utils/                  # Shared utilities
-│   ├── webview/                # Webview design system
+│   ├── webview/                # Webview hosts, client code, and design system
 │   └── test/                   # Test files
-├── dist/                       # Bundled output (esbuild)
-├── out/                        # TypeScript output (for tests)
+├── media/                      # Built webview CSS and JS assets
+├── dist/                       # Bundled extension output
+├── out/                        # TypeScript output for tests
 ├── docs/                       # Documentation
-├── resources/                  # Static assets (icons)
+├── resources/                  # Static assets and icons
 ├── package.json                # Extension manifest
 ├── tsconfig.json               # TypeScript configuration
 ├── esbuild.js                  # Build script
@@ -28,193 +29,173 @@ cloudinary-vscode/
 
 ### Entry Point
 
-**`extension.ts`** - Extension lifecycle management
+**`extension.ts`** initializes the shared runtime:
 
-- `activate()` - Called when extension starts
-- Creates `CloudinaryTreeDataProvider`
-- Loads configuration
-- Registers commands and tree view
+- creates `CloudinaryService`
+- loads Cloudinary environment credentials
+- detects folder mode
+- registers `HomescreenViewProvider`
+- registers `LibraryWebviewViewProvider`
+- registers commands against the shared service and providers
 
-### Commands (`src/commands/`)
-
-Each file exports a registration function:
-
-| File | Commands | Purpose |
-|------|----------|---------|
-| `registerCommands.ts` | - | Central registration, imports all commands |
-| `previewAsset.ts` | `cloudinary.openAsset` | Asset preview panel |
-| `uploadWidget.ts` | `cloudinary.openUploadWidget`, `cloudinary.uploadToFolder` | Upload panel |
-| `welcomeScreen.ts` | `cloudinary.showWelcome` | Welcome/onboarding screen |
-| `searchAssets.ts` | `cloudinary.searchAssets` | Search by public ID |
-| `copyCommands.ts` | `cloudinary.copyPublicId`, `cloudinary.copySecureUrl` | Clipboard operations |
-| `switchEnvironment.ts` | `cloudinary.switchEnvironment` | Environment switching |
-| `clearSearch.ts` | `cloudinary.clearSearch` | Clear search filter |
-| `viewOptions.ts` | `cloudinary.setResourceFilter` | Filter by type |
-
-### Tree View (`src/tree/`)
+### Cloudinary Layer (`src/cloudinary/`)
 
 | File | Purpose |
 |------|---------|
-| `treeDataProvider.ts` | `TreeDataProvider` implementation, state management, API calls |
-| `cloudinaryItem.ts` | `TreeItem` subclass for assets, folders, and UI elements |
+| `cloudinaryService.ts` | Shared Cloudinary state and high-level operations |
+| `cloudinarySdkAdapter.ts` | Adapter that wraps the Cloudinary SDK |
+| `types.ts` | Shared Cloudinary-facing types |
 
-**CloudinaryTreeDataProvider** holds:
-- Credentials (`cloudName`, `apiKey`, `apiSecret`)
-- View state (current folder, search query, filter)
-- Asset cache (`assetMap`)
-- Upload presets
+### Commands (`src/commands/`)
+
+Each file exports a registration function.
+
+| File | Commands | Purpose |
+|------|----------|---------|
+| `registerCommands.ts` | - | Central registration entry point |
+| `previewAsset.ts` | `cloudinary.openAsset` | Asset preview panel |
+| `uploadWidget.ts` | `cloudinary.openUploadWidget`, `cloudinary.uploadToFolder` | Upload panel |
+| `welcomeScreen.ts` | `cloudinary.openWelcomeScreen` | Welcome/onboarding panel |
+| `searchAssets.ts` | `cloudinary.searchAssets` | Focus homescreen search |
+| `copyCommands.ts` | `cloudinary.copyPublicId`, `cloudinary.copyUrl`, `cloudinary.copyOptimizedUrl` | Clipboard operations |
+| `switchEnvironment.ts` | `cloudinary.switchEnvironment` | Environment switching |
+| `clearSearch.ts` | `cloudinary.clearSearch` | Clear library search |
+| `viewOptions.ts` | `cloudinary.viewOptions` | Filter and sort library contents |
+| `configureAiTools.ts` | `cloudinary.configureAiTools` | AI tools setup flow |
+
+Command handlers now generally accept `CloudinaryService`, a narrow environment target, or a webview provider rather than a tree provider.
 
 ### Configuration (`src/config/`)
 
 | File | Purpose |
 |------|---------|
-| `configUtils.ts` | Load/validate configuration files |
-| `detectFolderMode.ts` | Detect dynamic vs fixed folder mode |
+| `configUtils.ts` | Load and validate Cloudinary environment files |
+| `detectFolderMode.ts` | Detect dynamic versus fixed folder mode |
 
 ### Utilities (`src/utils/`)
 
 | File | Purpose |
 |------|---------|
-| `cloudinaryErrorHandler.ts` | Consistent error display with VS Code UI |
-| `userAgent.ts` | Generate user agent for API calls |
+| `cloudinaryErrorHandler.ts` | Consistent Cloudinary error handling |
+| `userAgent.ts` | Extension user-agent generation |
 
 ### Webview System (`src/webview/`)
 
-The webview module provides a design system for building consistent UIs:
+The webview module now contains both sidebar views and the reusable UI system used by panels.
 
-```
+```text
 src/webview/
-├── index.ts                    # Public exports
-├── tokens.ts                   # Design tokens (colors, spacing)
-├── baseStyles.ts               # CSS reset, typography
-├── icons.ts                    # Centralized SVG icons
+├── homescreenView.ts           # Sidebar homescreen host
+├── libraryView.ts              # Sidebar media library host
 ├── webviewUtils.ts             # HTML generation helpers
-├── components/                 # UI components
-│   ├── index.ts                # Component exports
-│   ├── button.ts               # Button styles
-│   ├── card.ts                 # Card/panel styles
-│   ├── tabs.ts                 # Tab navigation
-│   ├── input.ts                # Form inputs
-│   ├── dropZone.ts             # File upload drop zone
-│   ├── progressBar.ts          # Progress indicators
-│   ├── badge.ts                # Tags and badges
-│   ├── infoRow.ts              # Key-value display
-│   ├── lightbox.ts             # Image lightbox
-│   └── layout.ts               # Layout components
-├── utils/                      # Webview utilities
-│   ├── index.ts                # Utility exports
-│   ├── helpers.ts              # escapeHtml, formatFileSize, etc.
-│   ├── clipboard.ts            # Clipboard functionality
-│   └── messaging.ts            # VS Code API wrappers
-├── scripts/                    # TypeScript for client-side JS
-│   ├── index.ts
-│   ├── uploadWidget.ts
-│   ├── previewAsset.ts
-│   └── welcomeScreen.ts
-└── media/                      # External CSS/JS files
-    ├── styles/
-    │   ├── tokens.css          # CSS custom properties
-    │   ├── base.css            # Base styles
-    │   └── components.css      # Component styles
-    └── scripts/
-        ├── common.js           # Shared client-side utilities
-        ├── upload-widget.js    # Upload panel functionality
-        └── welcome.js          # Welcome screen functionality
+├── client/                     # Browser-side TypeScript
+│   ├── homescreen.ts
+│   ├── library.ts              # Library main client
+│   ├── libraryIcons.ts         # SVG glyphs (duplicate of host icons.ts subset)
+│   ├── libraryTypes.ts         # Duplicated message-protocol types
+│   ├── libraryVirtualList.ts   # Virtualization math (22px row height)
+│   ├── libraryRowSplice.ts     # Depth-aware splice helper
+│   ├── libraryMenu.ts          # Context menu
+│   ├── libraryHoverPreview.ts  # Hover thumbnail card with metadata
+│   ├── preview.ts
+│   ├── upload-widget.ts
+│   └── welcome.ts
+├── components/                 # Shared styles/helpers for webviews
+├── utils/                      # Webview-side utilities
+├── scripts/                    # Host-side script entry definitions
+├── baseStyles.ts
+├── icons.ts
+├── index.ts
+└── tokens.ts
 ```
 
-See [Webview System](./webview-system.md) for detailed documentation.
+`src/webview/client/` is bundled into `media/scripts/` by `esbuild.js`.
 
 ## Configuration Files
 
 ### `package.json`
 
-Extension manifest defining:
-- Extension metadata (name, version, publisher)
-- Activation events
-- Contributed commands, views, and menus
-- Dependencies
+Defines:
+
+- extension metadata
+- sidebar view contributions
+- command contributions
+- build and test scripts
+
+The sidebar now contributes two webview views: `cloudinaryHomescreen` and `cloudinaryMediaLibrary`.
 
 ### `tsconfig.json`
 
-TypeScript configuration:
-- Strict mode enabled
-- ES2022 target
-- CommonJS modules (for VS Code)
+TypeScript configuration for type checking and test compilation.
 
 ### `esbuild.js`
 
-Build configuration:
-- Entry: `src/extension.ts`
-- Output: `dist/extension.js`
-- Externals: `vscode` module
-- Source maps enabled
+Bundles the extension entry point into `dist/extension.js` and builds the webview client assets into `media/`.
 
 ## Output Directories
 
 ### `dist/`
 
-Production bundle created by esbuild:
-- `extension.js` - Bundled extension code
-- `extension.js.map` - Source map
+Bundled extension output used by VS Code.
 
 ### `out/`
 
-TypeScript compilation output (for tests):
-- Mirrors `src/` structure
-- Used by test runner
+Compiled test output used by the extension-host test runner.
+
+### `media/`
+
+Built JS and CSS consumed by webviews.
 
 ## Resources
 
 ### `resources/`
 
-Static assets:
-- `cloudinary_icon_blue.png` - Extension icon
-- `icon-image.svg`, `icon-video.svg`, `icon-file.svg` - Tree item icons
+Static extension assets such as the Cloudinary icon.
 
 ## Key Patterns
 
 ### Command Registration
 
 ```typescript
-// src/commands/myCommand.ts
 function registerMyCommand(
   context: vscode.ExtensionContext,
-  provider: CloudinaryTreeDataProvider
+  cloudinaryService: CloudinaryService
 ) {
   context.subscriptions.push(
     vscode.commands.registerCommand("cloudinary.myCommand", async () => {
+      if (!cloudinaryService.cloudName) {
+        return;
+      }
+
       // Implementation
     })
   );
 }
-export default registerMyCommand;
-```
-
-### Tree Item Creation
-
-```typescript
-new CloudinaryItem(
-  'Label',
-  vscode.TreeItemCollapsibleState.Collapsed,
-  'folder',  // type
-  { path: '/products' },  // data
-  cloudName,
-  dynamicFolders
-);
 ```
 
 ### Webview HTML Generation
 
 ```typescript
-import { createWebviewDocument, getScriptUri } from "../webview/webviewUtils";
+import {
+  createWebviewDocument,
+  getScriptUri,
+  getStyleUri,
+} from "../webview/webviewUtils";
 
-panel.webview.html = createWebviewDocument({
-  title: "My Panel",
-  webview: panel.webview,
+view.webview.html = createWebviewDocument({
+  title: "My View",
+  webview: view.webview,
   extensionUri: context.extensionUri,
-  bodyContent: getHtmlContent(),
-  additionalScripts: [getScriptUri(webview, extensionUri, "my-script.js")],
-  inlineScript: "initCommon(); initMyPanel();",
+  bodyContent: `<div id="root"></div>`,
+  additionalStyles: [getStyleUri(view.webview, context.extensionUri, "my-view.css")],
+  additionalScripts: [getScriptUri(view.webview, context.extensionUri, "my-view.js")],
 });
 ```
 
+### Library Refresh
+
+```typescript
+await libraryWebview?.refresh();
+```
+
+Use provider methods instead of relying on removed tree-provider APIs.

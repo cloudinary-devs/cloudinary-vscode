@@ -8,6 +8,38 @@ import video from 'wdio-video-reporter'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+function normalizeEnvValue(value: string): string {
+    const trimmed = value.trim();
+    const quote = trimmed[0];
+    if ((quote === '"' || quote === "'") && trimmed.endsWith(quote)) {
+        return trimmed.slice(1, -1);
+    }
+    return trimmed;
+}
+
+function loadLocalEnvFile() {
+    const envPath = path.join(__dirname, '.env');
+    if (!fs.existsSync(envPath)) {
+        return;
+    }
+
+    const lines = fs.readFileSync(envPath, 'utf-8').split(/\r?\n/);
+    for (const line of lines) {
+        const match = line.match(/^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)?\s*$/);
+        if (!match) {
+            continue;
+        }
+
+        const [, key, rawValue = ''] = match;
+        process.env[key] ??= normalizeEnvValue(rawValue);
+    }
+}
+
+loadLocalEnvFile();
+
+const vscodeBrowserVersion = process.env.E2E_VSCODE_VERSION ?? '1.126.0';
+const e2eWorkspacePath = process.env.E2E_WORKSPACE_PATH ?? path.join(os.tmpdir(), 'cloudinary-vscode-e2e-workspace');
+
 export const config: WebdriverIO.Config = {
     //
     // ====================
@@ -61,10 +93,11 @@ export const config: WebdriverIO.Config = {
     //
     capabilities: [{
         browserName: 'vscode',
-        browserVersion: 'stable', // also possible: "insiders" or a specific version e.g. "1.80.0"
+        browserVersion: vscodeBrowserVersion, // also possible: "stable", "insiders", or a specific version
         'wdio:enforceWebDriverClassic': true,
         'wdio:vscodeOptions': {
             extensionPath: path.resolve(__dirname, '../../'),
+            workspacePath: e2eWorkspacePath,
             
             ...(process.env.CI && {
                 vscodeArgs: {
@@ -184,8 +217,8 @@ export const config: WebdriverIO.Config = {
      */
     onPrepare: function () {
         /**
-         * Write the Cloudinary credentials to the global config file.
-         * the file location is ~/.cloudinary/environments.json
+         * Write the Cloudinary credentials to a workspace-local config file so
+         * e2e runs do not overwrite the user's ~/.cloudinary/environments.json.
          */
         const cloudName = process.env.E2E_CLOUD;
         const apiKey = process.env.E2E_API_KEY;
@@ -196,7 +229,7 @@ export const config: WebdriverIO.Config = {
             );
         }
         
-        const cloudinaryDir = path.join(os.homedir(), '.cloudinary');
+        const cloudinaryDir = path.join(e2eWorkspacePath, '.cloudinary');
         fs.mkdirSync(cloudinaryDir, { recursive: true });
         const outPath = path.join(cloudinaryDir, 'environments.json');
         const environments = {
@@ -283,7 +316,7 @@ export const config: WebdriverIO.Config = {
      * @param {boolean} result.passed    true if test has passed, otherwise false
      * @param {object}  result.retries   information about spec related retries, e.g. `{ attempts: 0, limit: 0 }`
      */
-    afterTest: async function(test, context, { error, result, duration, passed, retries }) {
+    afterTest: async function(_test, _context, { error }) {
         if (error) {
             allureReporter.addAttachment('Screenshot', Buffer.from(await browser.takeScreenshot(), 'base64'), 'image/png');
             try {
@@ -296,8 +329,8 @@ export const config: WebdriverIO.Config = {
                 if (logs) {
                     allureReporter.addAttachment('Extension Logs', logs, 'text/plain');
                 }
-            } catch {
-                console.warn('Failed to get extension logs', error);
+            } catch (logError) {
+                console.warn('Failed to get extension logs', logError);
             }
         }
     },

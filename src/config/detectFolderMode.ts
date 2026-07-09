@@ -1,31 +1,80 @@
 import * as vscode from 'vscode';
 import { generateUserAgent } from '../utils/userAgent';
 import { isPlaceholderConfig } from './configUtils';
+import type { CachedFolderMode } from './folderModeCache';
+
+export type FolderModeOutcome = 'success' | 'error' | 'skipped';
 
 /**
- * Detects if the cloud supports dynamic folders by making a request to the root folder API.
+ * Result of a folder-mode detection attempt.
+ * - `success`: credentials were accepted by the API (dynamicFolders is meaningful).
+ * - `error`: the API rejected the credentials or could not be reached.
+ * - `skipped`: detection was not attempted (missing or placeholder credentials).
+ */
+export interface FolderModeResult {
+  dynamicFolders: boolean;
+  outcome: FolderModeOutcome;
+  status?: number;
+  errorReason?: string;
+}
+
+export interface ResolvedFolderModeState {
+  dynamicFolders: boolean;
+  credentialsValid: boolean | undefined;
+}
+
+/**
+ * Converts a live detection result into extension state.
+ *
+ * A cached folder mode is only a fallback for UI folder-mode continuity. It is
+ * keyed by cloud name, not credentials, so it must never be treated as proof
+ * that the current API key and secret are valid.
+ */
+export function resolveFolderModeState(
+  result: FolderModeResult,
+  cached?: CachedFolderMode
+): ResolvedFolderModeState {
+  if (result.outcome === 'success') {
+    return { dynamicFolders: result.dynamicFolders, credentialsValid: true };
+  }
+
+  if (result.errorReason === 'unauthorized') {
+    return { dynamicFolders: result.dynamicFolders, credentialsValid: false };
+  }
+
+  if (cached) {
+    return { dynamicFolders: cached.value, credentialsValid: undefined };
+  }
+
+  return { dynamicFolders: result.dynamicFolders, credentialsValid: undefined };
+}
+
+/**
+ * Detects whether the product environment uses dynamic or fixed folders.
+ * The returned result also reflects whether the configured credentials are valid, so callers
+ * can report configuration success/error analytics.
  * @param cloudName - The cloud name.
  * @param apiKey - The API key.
  * @param apiSecret - The API secret.
- * @returns True if dynamic folders are supported, false otherwise.
+ * @returns A {@link FolderModeResult} describing the folder mode and validation outcome.
  */
-export default async function detectFolderMode(
+export async function detectFolderModeResult(
   cloudName: string,
   apiKey: string,
   apiSecret: string
-): Promise<boolean> {
+): Promise<FolderModeResult> {
   if (!cloudName || !apiKey || !apiSecret) {
-    vscode.window.showErrorMessage("❌ Cloud name, API key, and API secret are required.");
-    return false;
+    vscode.window.showErrorMessage("Cloud name, API key, and API secret are required.");
+    return { dynamicFolders: false, outcome: 'skipped', errorReason: 'missing_credentials' };
   }
 
   // Don't make API calls with placeholder credentials
   if (isPlaceholderConfig(cloudName, apiKey, apiSecret)) {
-    return false;
+    return { dynamicFolders: false, outcome: 'skipped', errorReason: 'placeholder' };
   }
 
   const authHeader = `Basic ${Buffer.from(`${apiKey}:${apiSecret}`).toString('base64')}`;
-  const url = `https://api.cloudinary.com/v1_1/${cloudName}/folders`;
+  const url = `https://api.cloudinary.com/v1_1/${cloudName}/config?settings=true`;
 
   try {
     const response = await fetch(url, {
@@ -36,15 +85,37 @@ export default async function detectFolderMode(
     });
 
     if (response.status === 200) {
-      return true; // Dynamic folders are supported
-    } else if (response.status === 420) {
-      return false; // Dynamic folders are not supported (fixed folder mode)
+      const body = await response.json().catch(() => null);
+      const folderMode = body?.settings?.folder_mode;
+      if (folderMode === 'dynamic' || folderMode === 'fixed') {
+        return { dynamicFolders: folderMode === 'dynamic', outcome: 'success', status: 200 };
+      }
+
+      return {
+        dynamicFolders: false,
+        outcome: 'error',
+        status: response.status,
+        errorReason: 'unexpected_response',
+      };
+    } else if (response.status === 401 || response.status === 403) {
+      // Credentials were rejected
+      return {
+        dynamicFolders: false,
+        outcome: 'error',
+        status: response.status,
+        errorReason: 'unauthorized',
+      };
     } else {
       // Fallback to fixed folder mode for other errors
-      return false;
+      return {
+        dynamicFolders: false,
+        outcome: 'error',
+        status: response.status,
+        errorReason: 'unexpected_status',
+      };
     }
   } catch (error) {
     // Default to fixed folder mode if the request fails
-    return false;
+    return { dynamicFolders: false, outcome: 'error', errorReason: 'network_error' };
   }
 }

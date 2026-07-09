@@ -9,9 +9,11 @@ import {
   truncateString,
   copyToClipboard,
 } from "./common";
+import { buildUploadPresetOptions } from "./uploadPresetOptions";
 
 interface UploadPreset {
   name: string;
+  signed?: boolean;
   settings?: Record<string, unknown>;
 }
 
@@ -24,6 +26,7 @@ interface AssetData {
   public_id: string;
   secure_url: string;
   resource_type: string;
+  type?: string;
   _uploadedToFolder?: string;
 }
 
@@ -35,16 +38,41 @@ interface UploadMessage {
   error?: string;
   folderPath?: string;
   folders?: Array<{ path: string; label: string }>;
+  preset?: string;
+  presets?: UploadPreset[];
 }
 
 // Configuration
 let cloudName = "";
 let presets: UploadPreset[] = [];
 
+function replaceSelectOptions(
+  select: HTMLSelectElement,
+  options: Array<{ value: string; label: string }>,
+  selectedValue: string
+): void {
+  const nextOptions = [...options];
+  if (selectedValue && !nextOptions.some((option) => option.value === selectedValue)) {
+    nextOptions.push({ value: selectedValue, label: selectedValue });
+  }
+
+  select.replaceChildren(
+    ...nextOptions.map((item) => {
+      const option = document.createElement("option");
+      option.value = item.value;
+      option.textContent = item.label;
+      option.selected = item.value === selectedValue;
+      return option;
+    })
+  );
+}
+
 /**
  * Initialize upload widget with configuration.
  */
 function initUploadWidget(config: UploadConfig): void {
+  initCommon();
+
   cloudName = config.cloudName || "";
   presets = config.presets || [];
 
@@ -53,6 +81,8 @@ function initUploadWidget(config: UploadConfig): void {
   initUrlUpload();
   initClearButton();
   initFolderChange();
+
+  getVSCode()?.postMessage({ command: "ready" });
 }
 
 /**
@@ -365,6 +395,10 @@ function getThumbnailUrl(asset: AssetData): string | null {
   const publicId = asset.public_id;
   const resourceType = asset.resource_type;
 
+  if (asset.type === "authenticated") {
+    return resourceType === "image" ? asset.secure_url : null;
+  }
+
   if (resourceType === "image") {
     return `https://res.cloudinary.com/${cloudName}/image/upload/w_130,h_100,c_fill,g_auto,f_auto,q_auto/${publicId}`;
   } else if (resourceType === "video") {
@@ -514,13 +548,33 @@ function handleUploadMessage(message: UploadMessage): void {
       if (message.folders) {
         const folderSelect = document.getElementById("folderSelect") as HTMLSelectElement | null;
         if (folderSelect) {
-          const currentValue = folderSelect.value;
-          folderSelect.innerHTML = message.folders
-            .map(
-              (f) =>
-                `<option value="${f.path}" ${f.path === currentValue ? "selected" : ""}>${f.label}</option>`
-            )
-            .join("");
+          const selectedValue = message.folderPath !== undefined ? message.folderPath : folderSelect.value;
+          replaceSelectOptions(
+            folderSelect,
+            message.folders.map((folder) => ({ value: folder.path, label: folder.label })),
+            selectedValue
+          );
+        }
+        // Folders have arrived (or failed back to root): drop the loading hint.
+        const loadingHint = document.getElementById("folderLoadingHint");
+        if (loadingHint) {
+          loadingHint.remove();
+        }
+      }
+      break;
+
+    case "updatePresets":
+      if (Array.isArray(message.presets)) {
+        presets = message.presets;
+        const presetSelect = document.getElementById("presetSelect") as HTMLSelectElement | null;
+        if (presetSelect) {
+          const selectedValue = message.preset !== undefined ? message.preset : presetSelect.value;
+          replaceSelectOptions(
+            presetSelect,
+            buildUploadPresetOptions(presets),
+            selectedValue
+          );
+          presetSelect.dispatchEvent(new Event("change"));
         }
       }
       break;
@@ -540,6 +594,3 @@ declare global {
 }
 
 window.initUploadWidget = initUploadWidget;
-
-// Also run initCommon when this script loads
-initCommon();

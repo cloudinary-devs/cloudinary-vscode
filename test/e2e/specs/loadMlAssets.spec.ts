@@ -4,6 +4,8 @@ import { activityBarUtils } from '../src/vscodeComponentsUtils/ActivityBarUtils.
 import { sideBarViewUtils } from '../src/vscodeComponentsUtils/SideBarViewUtils.js'
 import crypto from 'node:crypto';
 import { pathUtils } from '../src/utils/pathUtils.js';
+import { createHookError } from '../src/utils/errorUtils.js';
+import { libraryViewPage } from '../src/webViewTabs/LibraryViewPage.js';
 
 /**
  * Asset Explorer Tests: 
@@ -19,7 +21,7 @@ describe('Asset Explorer Tetsts', () => {
             await cloudinarySDK.V2.uploader.upload(path.join(pathUtils.getTestAssetsPath(), 'sample_png.png'), { public_id: firstAssetPublicID });
             await cloudinarySDK.V2.uploader.upload(path.join(pathUtils.getTestAssetsPath(), 'sample_png.png'), { public_id: secondAssetPublicID });
         } catch (error) {
-            throw new Error('Error uploading assets:', error);
+            throw createHookError('Error uploading assets', error);
         }
     });
 
@@ -27,7 +29,7 @@ describe('Asset Explorer Tetsts', () => {
         try {
             await cloudinarySDK.V2.api.delete_resources([firstAssetPublicID, secondAssetPublicID]);
         } catch (error) {
-            throw new Error('Error deleting assets:', error);
+            throw createHookError('Error deleting assets', error);
         }
     });
 
@@ -35,15 +37,12 @@ describe('Asset Explorer Tetsts', () => {
      * Validates that the title and content of the Cloudinary media library are loaded correctly.
      */
     it('should load cloudinary media library', async () => {
-        const expectedTitle = 'CLOUDINARY';
         const expectedItems = [firstAssetPublicID, secondAssetPublicID];
         
         await activityBarUtils.openView('Cloudinary');
         await sideBarViewUtils.homeScreenViewPage.clickBrowseLibraryButton();
 
-        await sideBarViewUtils.validateSideBarViewTitle(expectedTitle);
-
-        await sideBarViewUtils.validateContentItemsExist(expectedItems);
+        await libraryViewPage.waitForLoaded();
+        await libraryViewPage.validateAssetsExist(expectedItems);
     });
 });
-

@@ -17,7 +17,7 @@ export enum SideBarViewActions {
  */
 class SideBarViewUtils {
     public readonly homeScreenViewPage = new HomeScreenViewPage();
-    
+
     /**
      * Gets the Side Bar View instance.
      */

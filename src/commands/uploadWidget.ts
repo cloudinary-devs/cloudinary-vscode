@@ -1,5 +1,7 @@
 import * as vscode from "vscode";
-import { CloudinaryTreeDataProvider } from "../tree/treeDataProvider";
+import { AnalyticsService } from "../analytics/analyticsService";
+import { CloudinaryService } from "../cloudinary/cloudinaryService";
+import { UploadPreset } from "../cloudinary/types";
 import { v2 as cloudinary } from "cloudinary";
 import { Readable } from "stream";
 import {
@@ -14,6 +16,30 @@ import { escapeHtml } from "../webview/utils/helpers";
 interface FolderOption {
   path: string;
   label: string;
+}
+
+type UploadWidgetCloudinaryState = Pick<
+  CloudinaryService,
+  "cloudName" | "apiKey" | "apiSecret" | "uploadPresets" | "dynamicFolders"
+> & {
+  fetchUploadPresets(): Promise<UploadPreset[]>;
+  getCurrentUploadPreset(): string | null;
+  listAllFolders(maxDepth?: number): Promise<Array<{ path: string; name: string }>>;
+};
+
+type UploadWidgetCloudinaryStateTarget =
+  | UploadWidgetCloudinaryState
+  | {
+    service?: UploadWidgetCloudinaryState;
+  };
+
+function hasUploadWidgetCloudinaryState(
+  value: UploadWidgetCloudinaryStateTarget
+): value is UploadWidgetCloudinaryState {
+  return (
+    "fetchUploadPresets" in value &&
+    typeof value.fetchUploadPresets === "function"
+  );
 }
 
 /**
@@ -35,19 +61,103 @@ const CHUNKED_UPLOAD_THRESHOLD = 20 * 1024 * 1024;
  * Chunk size for chunked uploads (6 MB).
  */
 const UPLOAD_CHUNK_SIZE = 6 * 1024 * 1024;
+const FOLDER_LOAD_FALLBACK_MS = 4000;
+// Safety cap on waiting for the client's "ready" handshake. The handshake
+// normally resolves in tens of ms (as soon as the webview script loads); this
+// only prevents an indefinite hang if the message is somehow never received.
+const READY_HANDSHAKE_TIMEOUT_MS = 5000;
+const ROOT_FOLDER_OPTIONS: FolderOption[] = [{ path: "", label: "/ (root)" }];
+const folderOptionsCache = new Map<string, FolderOption[]>();
+
+function cloneFolderOptions(folders: FolderOption[]): FolderOption[] {
+  return folders.map((folder) => ({ ...folder }));
+}
+
+function getCachedFolderOptions(cloudName: string | null | undefined): FolderOption[] | undefined {
+  if (!cloudName) {
+    return undefined;
+  }
+
+  const cached = folderOptionsCache.get(cloudName);
+  return cached ? cloneFolderOptions(cached) : undefined;
+}
+
+function setCachedFolderOptions(cloudName: string | null | undefined, folders: FolderOption[]): void {
+  if (!cloudName) {
+    return;
+  }
+
+  folderOptionsCache.set(cloudName, cloneFolderOptions(folders));
+}
+
+function getInitialFolderOptions(cloudName: string | null | undefined): FolderOption[] {
+  return getCachedFolderOptions(cloudName) ?? cloneFolderOptions(ROOT_FOLDER_OPTIONS);
+}
+
+function clearFolderOptionsCache(): void {
+  folderOptionsCache.clear();
+}
+
+function getUploadAssetResourceType(asset: any): string {
+  return asset.resource_type || "raw";
+}
+
+function getSignedOriginalUrl(asset: any, resourceType: string): string | undefined {
+  if (asset.type !== "authenticated") {
+    return undefined;
+  }
+
+  return cloudinary.url(asset.public_id, {
+    resource_type: resourceType,
+    type: asset.type,
+    secure: true,
+    sign_url: true,
+    ...(resourceType !== "raw" && asset.format ? { format: asset.format } : {}),
+  });
+}
+
+function getOptimizedUrl(asset: any, resourceType: string): string {
+  const signedOriginalUrl = getSignedOriginalUrl(asset, resourceType);
+  if (signedOriginalUrl) {
+    return signedOriginalUrl;
+  }
+
+  return resourceType === "raw"
+    ? cloudinary.url(asset.public_id, { resource_type: "raw", type: asset.type, secure: true })
+    : cloudinary.url(asset.public_id, {
+      resource_type: resourceType,
+      type: asset.type,
+      secure: true,
+      transformation: [
+        { fetch_format: resourceType === "video" ? "auto:video" : "auto" },
+        { quality: "auto" },
+      ],
+    });
+}
+
+function withSignedAuthenticatedUrl(asset: any): any {
+  const resourceType = getUploadAssetResourceType(asset);
+  const signedOriginalUrl = getSignedOriginalUrl(asset, resourceType);
+  return signedOriginalUrl
+    ? { ...asset, secure_url: signedOriginalUrl }
+    : asset;
+}
 
 /**
  * Registers commands for the Cloudinary upload widget.
  */
 function registerUpload(
   context: vscode.ExtensionContext,
-  provider: CloudinaryTreeDataProvider
+  cloudinaryStateTarget: UploadWidgetCloudinaryStateTarget,
+  analytics?: AnalyticsService
 ) {
+  const cloudinaryState = getUploadCloudinaryState(cloudinaryStateTarget);
+
   context.subscriptions.push(
     vscode.commands.registerCommand("cloudinary.openUploadWidget", async () => {
       try {
-        await provider.fetchUploadPresets();
-        openOrRevealUploadPanel("", provider, context);
+        analytics?.track("upload_widget_opened", { entry_point: "command" });
+        await openOrRevealUploadPanel("", cloudinaryState, context, analytics);
       } catch (err: any) {
         vscode.window.showErrorMessage(
           `Failed to open upload widget: ${err.message}`
@@ -61,9 +171,12 @@ function registerUpload(
       "cloudinary.uploadToFolder",
       async (folderItem: { label: string; data: { path?: string } }) => {
         try {
-          await provider.fetchUploadPresets();
           const folderPath = folderItem.data.path || "";
-          openOrRevealUploadPanel(folderPath, provider, context);
+          analytics?.track("upload_widget_opened", {
+            entry_point: "folder_context",
+            folder_selected: !!folderPath,
+          });
+          await openOrRevealUploadPanel(folderPath, cloudinaryState, context, analytics);
         } catch (err: any) {
           vscode.window.showErrorMessage(
             `Failed to open upload widget: ${err.message}`
@@ -87,30 +200,61 @@ export function resetUploadPanel(): void {
   uploadPanel = undefined;
 }
 
+function getUploadCloudinaryState(
+  cloudinaryStateTarget: UploadWidgetCloudinaryStateTarget
+): UploadWidgetCloudinaryState {
+  if (hasUploadWidgetCloudinaryState(cloudinaryStateTarget)) {
+    return cloudinaryStateTarget;
+  }
+
+  const service = cloudinaryStateTarget.service;
+  if (!service) {
+    throw new Error("Cloudinary service is unavailable");
+  }
+
+  return service;
+}
+
 /**
  * Opens the upload panel or reveals it if already open.
  */
-function openOrRevealUploadPanel(
+async function openOrRevealUploadPanel(
   folderPath: string,
-  provider: CloudinaryTreeDataProvider,
-  context: vscode.ExtensionContext
-) {
+  cloudinaryState: UploadWidgetCloudinaryState,
+  context: vscode.ExtensionContext,
+  analytics?: AnalyticsService
+): Promise<void> {
   currentFolderPath = folderPath;
 
   if (uploadPanel) {
-    uploadPanel.reveal(vscode.ViewColumn.One);
-    uploadPanel.webview.postMessage({
-      command: "setFolder",
-      folderPath: folderPath,
-    });
-    return;
+    try {
+      uploadPanel.reveal(vscode.ViewColumn.One);
+      uploadPanel.webview.postMessage({
+        command: "setFolder",
+        folderPath: folderPath,
+      });
+      return;
+    } catch {
+      uploadPanel = undefined;
+    }
   }
 
-  uploadPanel = createUploadPanel(provider, context);
+  uploadPanel = await createUploadPanel(cloudinaryState, context, analytics);
 
   uploadPanel.onDidDispose(() => {
     uploadPanel = undefined;
   });
+}
+
+/**
+ * Posts a message to a webview panel, swallowing errors if the panel was disposed.
+ */
+function safePostToPanel(panel: vscode.WebviewPanel, message: unknown): void {
+  try {
+    panel.webview.postMessage(message);
+  } catch {
+    // Panel disposed between post calls; safe to ignore.
+  }
 }
 
 /**
@@ -129,12 +273,12 @@ async function uploadWithProgress(
   return new Promise((resolve, reject) => {
     const uploadStream = useChunkedUpload
       ? cloudinary.uploader.upload_chunked_stream(
-          { ...options, chunk_size: UPLOAD_CHUNK_SIZE },
-          (error, result) => (error ? reject(error) : resolve(result))
-        )
+        { ...options, chunk_size: UPLOAD_CHUNK_SIZE },
+        (error, result) => (error ? reject(error) : resolve(result))
+      )
       : cloudinary.uploader.upload_stream(options, (error, result) =>
-          error ? reject(error) : resolve(result)
-        );
+        error ? reject(error) : resolve(result)
+      );
 
     let uploaded = 0;
     const total = buffer.length;
@@ -146,7 +290,7 @@ async function uploadWithProgress(
         if (chunk.length > 0) {
           uploaded += chunk.length;
           const percent = Math.round((uploaded / total) * 100);
-          panel.webview.postMessage({
+          safePostToPanel(panel, {
             command: "uploadProgress",
             fileId,
             percent,
@@ -163,21 +307,46 @@ async function uploadWithProgress(
 }
 
 /**
- * Collects folder options from the provider's cache.
+ * Collects folder options from the Cloudinary service.
  */
-function collectFolderOptions(provider: CloudinaryTreeDataProvider): FolderOption[] {
-  const folders: FolderOption[] = [{ path: "", label: "/ (root)" }];
-  for (const folder of provider.getAvailableFolders()) {
-    folders.push({ path: folder.path, label: folder.path });
+async function collectFolderOptions(
+  cloudinaryState: UploadWidgetCloudinaryState
+): Promise<FolderOption[]> {
+  const folders: FolderOption[] = [...ROOT_FOLDER_OPTIONS];
+  const seenPaths = new Set<string>();
+  const cachedFolders = getCachedFolderOptions(cloudinaryState.cloudName);
+
+  try {
+    for (const folder of await cloudinaryState.listAllFolders()) {
+      if (!folder.path || seenPaths.has(folder.path)) {
+        continue;
+      }
+
+      seenPaths.add(folder.path);
+      folders.push({ path: folder.path, label: folder.path });
+    }
+  } catch {
+    return cachedFolders ?? folders;
   }
+
+  setCachedFolderOptions(cloudinaryState.cloudName, folders);
   return folders;
 }
+
+// Exported for the extension test harness; not part of the command surface.
+export const uploadWidgetTestApi = {
+  clearFolderOptionsCache,
+  collectFolderOptions,
+  getUploadOptions,
+  getInitialFolderOptions,
+  getUploadContent,
+};
 
 /**
  * Creates upload options for the Cloudinary API.
  */
 function getUploadOptions(
-  provider: CloudinaryTreeDataProvider,
+  cloudinaryState: UploadWidgetCloudinaryState,
   presetName: string | null | undefined,
   folder: string,
   publicId?: string,
@@ -191,7 +360,7 @@ function getUploadOptions(
   }
 
   if (folder) {
-    if (provider.dynamicFolders) {
+    if (cloudinaryState.dynamicFolders) {
       options.asset_folder = folder;
     } else {
       options.folder = folder;
@@ -200,7 +369,7 @@ function getUploadOptions(
 
   if (fileName) {
     options.filename_override = fileName;
-    if (provider.dynamicFolders) {
+    if (cloudinaryState.dynamicFolders) {
       options.display_name = fileName.replace(/\.[^/.]+$/, "");
     }
   }
@@ -222,11 +391,12 @@ function getUploadOptions(
 /**
  * Creates the webview panel with custom upload UI.
  */
-function createUploadPanel(
-  provider: CloudinaryTreeDataProvider,
-  context: vscode.ExtensionContext
-): vscode.WebviewPanel {
-  const cloudName = provider.cloudName!;
+async function createUploadPanel(
+  cloudinaryState: UploadWidgetCloudinaryState,
+  context: vscode.ExtensionContext,
+  analytics?: AnalyticsService
+): Promise<vscode.WebviewPanel> {
+  const cloudName = cloudinaryState.cloudName!;
   const panel = vscode.window.createWebviewPanel(
     "cloudinaryUploadWidget",
     `Upload — ${cloudName}`,
@@ -246,8 +416,17 @@ function createUploadPanel(
     "cloudinary_icon_blue.png"
   );
 
-  const currentPreset = provider.getCurrentUploadPreset() || "";
-  const folders = collectFolderOptions(provider);
+  const currentPreset = cloudinaryState.getCurrentUploadPreset() || "";
+  const initialFolders = getInitialFolderOptions(cloudName);
+
+  // The client posts "ready" once its message listener is attached. The deferred
+  // load below waits on this before posting folders/presets, so updates can't be
+  // dropped by landing before the listener exists (a fixed delay races the
+  // webview's load time and was the cause of the empty-dropdown bug).
+  let resolveClientReady: (() => void) | undefined;
+  const clientReady = new Promise<void>((resolve) => {
+    resolveClientReady = resolve;
+  });
 
   const uploadScriptUri = getScriptUri(
     panel.webview,
@@ -255,8 +434,9 @@ function createUploadPanel(
     "upload-widget.js"
   );
 
-  // Configuration to pass to the webview
-  const presetsJson = JSON.stringify(provider.uploadPresets);
+  // Configuration to pass to the webview. Render with cached presets/folders
+  // immediately; refresh asynchronously below to avoid blocking the panel open.
+  const presetsJson = JSON.stringify(cloudinaryState.uploadPresets);
   const initScript = `
     initUploadWidget({
       cloudName: ${JSON.stringify(cloudName)},
@@ -264,18 +444,14 @@ function createUploadPanel(
     });
   `;
 
-  panel.webview.html = createWebviewDocument({
-    title: "Upload to Cloudinary",
-    webview: panel.webview,
-    extensionUri: context.extensionUri,
-    bodyContent: getUploadContent(currentPreset, provider, currentFolderPath, folders),
-    bodyClass: "layout-centered",
-    additionalScripts: [uploadScriptUri],
-    inlineScript: initScript,
-  });
-
   // Handle messages from the webview
   panel.webview.onDidReceiveMessage(async (message: any) => {
+    if (message.command === "ready") {
+      resolveClientReady?.();
+      resolveClientReady = undefined;
+      return;
+    }
+
     if (message.command === "folderChanged" && message.folderPath !== undefined) {
       currentFolderPath = message.folderPath;
       return;
@@ -285,7 +461,7 @@ function createUploadPanel(
       const presetName = message.preset !== undefined ? message.preset : currentPreset;
       const folder = message.folderPath !== undefined ? message.folderPath : currentFolderPath;
       const options = getUploadOptions(
-        provider,
+        cloudinaryState,
         presetName,
         folder,
         message.publicId,
@@ -294,21 +470,40 @@ function createUploadPanel(
       );
 
       try {
-        panel.webview.postMessage({ command: "uploadStarted", fileId: message.fileId });
+        analytics?.track("upload_started", {
+          upload_source: "file",
+          folder_selected: !!folder,
+          preset_selected: !!presetName,
+        });
+        safePostToPanel(panel, { command: "uploadStarted", fileId: message.fileId });
 
-        const result = await uploadWithProgress(panel, message.dataUri, options, message.fileId);
+        const result = withSignedAuthenticatedUrl(
+          await uploadWithProgress(panel, message.dataUri, options, message.fileId)
+        );
         result._uploadedToFolder = folder || "(root)";
         result._originalFileName = message.fileName;
 
-        panel.webview.postMessage({
+        safePostToPanel(panel, {
           command: "uploadComplete",
           fileId: message.fileId,
           asset: result,
         });
+        analytics?.track("upload_succeeded", {
+          upload_source: "file",
+          resource_type: result.resource_type,
+          asset_type: result.type,
+          folder_selected: !!folder,
+          preset_selected: !!presetName,
+        });
 
         vscode.commands.executeCommand("cloudinary.refresh");
       } catch (err: any) {
-        panel.webview.postMessage({
+        analytics?.track("upload_failed", {
+          upload_source: "file",
+          folder_selected: !!folder,
+          preset_selected: !!presetName,
+        });
+        safePostToPanel(panel, {
           command: "uploadError",
           fileId: message.fileId,
           error: err.message || "Upload failed",
@@ -333,7 +528,7 @@ function createUploadPanel(
       }
 
       const options = getUploadOptions(
-        provider,
+        cloudinaryState,
         presetName,
         folder,
         message.publicId,
@@ -343,17 +538,36 @@ function createUploadPanel(
       const fileId = message.fileId || `url-${Date.now()}`;
 
       try {
-        panel.webview.postMessage({ command: "uploadStarted", fileId, fileName: message.url });
-        panel.webview.postMessage({ command: "uploadProgress", fileId, percent: 50 });
+        analytics?.track("upload_started", {
+          upload_source: "url",
+          folder_selected: !!folder,
+          preset_selected: !!presetName,
+        });
+        safePostToPanel(panel, { command: "uploadStarted", fileId, fileName: message.url });
+        safePostToPanel(panel, { command: "uploadProgress", fileId, percent: 50 });
 
-        const result = await cloudinary.uploader.upload(message.url, options);
+        const result = withSignedAuthenticatedUrl(
+          await cloudinary.uploader.upload(message.url, options)
+        );
         result._uploadedToFolder = folder || "(root)";
         result._originalFileName = urlFileName;
 
-        panel.webview.postMessage({ command: "uploadComplete", fileId, asset: result });
+        safePostToPanel(panel, { command: "uploadComplete", fileId, asset: result });
+        analytics?.track("upload_succeeded", {
+          upload_source: "url",
+          resource_type: result.resource_type,
+          asset_type: result.type,
+          folder_selected: !!folder,
+          preset_selected: !!presetName,
+        });
         vscode.commands.executeCommand("cloudinary.refresh");
       } catch (err: any) {
-        panel.webview.postMessage({
+        analytics?.track("upload_failed", {
+          upload_source: "url",
+          folder_selected: !!folder,
+          preset_selected: !!presetName,
+        });
+        safePostToPanel(panel, {
           command: "uploadError",
           fileId,
           error: err.message || "Upload failed",
@@ -364,28 +578,23 @@ function createUploadPanel(
 
     if (message.command === "copyToClipboard" && message.text) {
       await vscode.env.clipboard.writeText(message.text);
+      analytics?.track("copy_asset_url", { copy_type: "upload_result" });
     }
 
     if (message.command === "refreshFolders") {
-      const updatedFolders = collectFolderOptions(provider);
-      panel.webview.postMessage({ command: "updateFolders", folders: updatedFolders });
+      const updatedFolders = await collectFolderOptions(cloudinaryState);
+      safePostToPanel(panel, {
+        command: "updateFolders",
+        folderPath: currentFolderPath,
+        folders: updatedFolders,
+      });
     }
 
     if (message.command === "openAsset" && message.asset) {
       const asset = message.asset;
-      const assetType = asset.resource_type || "raw";
-
-      const optimizedUrl =
-        assetType === "raw"
-          ? cloudinary.url(asset.public_id, { resource_type: "raw", type: asset.type })
-          : cloudinary.url(asset.public_id, {
-              resource_type: assetType,
-              type: asset.type,
-              transformation: [
-                { fetch_format: assetType === "video" ? "auto:video" : "auto" },
-                { quality: "auto" },
-              ],
-            });
+      const assetType = getUploadAssetResourceType(asset);
+      const signedOriginalUrl = getSignedOriginalUrl(asset, assetType);
+      const optimizedUrl = getOptimizedUrl(asset, assetType);
 
       const filename =
         asset._originalFileName ||
@@ -393,14 +602,94 @@ function createUploadPanel(
         asset.public_id.split("/").pop() ||
         asset.public_id;
 
+      analytics?.track("asset_opened", {
+        entry_point: "upload_result",
+        resource_type: assetType,
+        asset_type: asset.type,
+      });
       vscode.commands.executeCommand("cloudinary.openAsset", {
         ...asset,
         displayType: assetType,
+        secure_url: signedOriginalUrl || asset.secure_url,
         optimized_url: optimizedUrl,
         filename,
       });
     }
   });
+
+  panel.webview.html = createWebviewDocument({
+    title: "Upload to Cloudinary",
+    webview: panel.webview,
+    extensionUri: context.extensionUri,
+    bodyContent: getUploadContent(
+      currentPreset,
+      cloudinaryState.uploadPresets,
+      currentFolderPath,
+      initialFolders
+    ),
+    bodyClass: "layout-centered",
+    additionalScripts: [uploadScriptUri],
+    inlineScript: initScript,
+  });
+
+  // Deferred load: fetch presets and folders in parallel without blocking the
+  // initial render. Posts updates to the client when each completes.
+  void (async () => {
+    // Wait for the client's "ready" handshake before posting, falling back to a
+    // short delay so a missed handshake can't hang the load indefinitely.
+    await Promise.race([
+      clientReady,
+      new Promise((resolve) => setTimeout(resolve, READY_HANDSHAKE_TIMEOUT_MS)),
+    ]);
+
+    const presetsTask = cloudinaryState
+      .fetchUploadPresets()
+      .then((presets) => {
+        safePostToPanel(panel, {
+          command: "updatePresets",
+          preset: cloudinaryState.getCurrentUploadPreset() || "",
+          presets,
+        });
+      })
+      .catch((err) => {
+        console.error("Failed to fetch upload presets:", err);
+      });
+
+    const postFolderOptions = (folders: FolderOption[]) => {
+      safePostToPanel(panel, {
+        command: "updateFolders",
+        folderPath: currentFolderPath,
+        folders,
+      });
+    };
+
+    let folderLoadSettled = false;
+    const folderLoadFallback = setTimeout(() => {
+      if (!folderLoadSettled) {
+        postFolderOptions(getInitialFolderOptions(cloudName));
+      }
+    }, FOLDER_LOAD_FALLBACK_MS);
+
+    const foldersTask = collectFolderOptions(cloudinaryState)
+      .then((folders) => {
+        folderLoadSettled = true;
+        clearTimeout(folderLoadFallback);
+        safePostToPanel(panel, {
+          command: "updateFolders",
+          folderPath: currentFolderPath,
+          folders,
+        });
+      })
+      .catch((err) => {
+        folderLoadSettled = true;
+        clearTimeout(folderLoadFallback);
+        console.error("Failed to load folders:", err);
+        // Clear the loading state and keep root usable even if the fetch failed.
+        postFolderOptions(ROOT_FOLDER_OPTIONS);
+      });
+
+    await Promise.all([presetsTask, foldersTask]);
+  })();
 
   return panel;
 }
@@ -410,7 +699,7 @@ function createUploadPanel(
  */
 function getUploadContent(
   currentPreset: string,
-  provider: CloudinaryTreeDataProvider,
+  uploadPresets: UploadPreset[],
   initialFolderPath: string,
   folders: FolderOption[]
 ): string {
@@ -420,7 +709,7 @@ function getUploadContent(
     )
     .join("");
 
-  const presetOptionsHtml = provider.uploadPresets
+  const presetOptionsHtml = uploadPresets
     .map(
       (p) => `<option value="${escapeHtml(p.name)}" ${p.name === currentPreset ? "selected" : ""}>${escapeHtml(p.name)} (${p.signed ? "Signed" : "Unsigned"})</option>`
     )
@@ -435,6 +724,7 @@ function getUploadContent(
           <div class="form-group">
             <label class="form-group__label" for="folderSelect">Destination Folder</label>
             <select id="folderSelect" class="select">${folderOptionsHtml}</select>
+            <div class="form-group__hint" id="folderLoadingHint">Loading folders…</div>
           </div>
         </div>
 
@@ -442,7 +732,7 @@ function getUploadContent(
           <div class="form-group">
             <div class="preset-toggle">
               <label class="form-group__label" for="presetSelect">Upload Preset <span style="opacity: 0.7; font-weight: normal;">(optional)</span></label>
-              ${provider.uploadPresets.length > 0 ? '<button class="preset-toggle__btn" id="presetDetailsToggle">Settings</button>' : ""}
+              ${uploadPresets.length > 0 ? '<button class="preset-toggle__btn" id="presetDetailsToggle">Settings</button>' : ""}
             </div>
             <select id="presetSelect" class="select">
               <option value="">No preset (signed upload)</option>
@@ -486,7 +776,7 @@ function getUploadContent(
                 <path d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z"/>
               </svg>
             </div>
-            <p class="drop-zone__text">Drag & drop files here</p>
+            <p class="drop-zone__text">Hold Shift, then drag & drop files here</p>
             <p class="drop-zone__hint">— or —</p>
             <button class="btn btn--primary drop-zone__button" id="browseBtn">Browse Files</button>
             <input type="file" id="fileInput" class="drop-zone__input" multiple />
