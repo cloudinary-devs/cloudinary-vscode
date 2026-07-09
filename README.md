@@ -1,6 +1,6 @@
 # Cloudinary VS Code Extension
 
-Easily explore, search, preview, and upload Cloudinary assets directly inside Visual Studio Code or supported IDE.
+Explore, search, preview, and upload Cloudinary assets directly inside Visual Studio Code or supported IDE, with a built-in Docs AI assistant for Cloudinary documentation.
 
 **General availability release**: Please report any problems or feedback by opening an issue.
 
@@ -8,11 +8,14 @@ Easily explore, search, preview, and upload Cloudinary assets directly inside Vi
 
 ## Features
 
+- **Home Screen** – Search your media library, ask the Docs AI assistant, and access all extension features from one sidebar view
+- **Docs AI Assistant** – Chat with Cloudinary documentation without leaving your editor. Includes source citations, follow-up suggestions, and chat history
 - **Asset Explorer** – View Cloudinary folders and assets in the sidebar media library
 - **Search & Filter** – Quickly locate assets by public ID or type
 - **Optimized Preview** – Preview images/videos with Cloudinary transformations applied (`f_auto`, `q_auto`)
 - **Right-click Actions** – Copy Public ID or URL instantly
 - **Custom Upload Panel** – Upload files via drag-and-drop, file browser, or remote URL with progress tracking
+- **Configure AI Tools** – One-click install of Cloudinary skills and MCP servers for Cursor, GitHub Copilot, Windsurf, Claude Code, and more
 - **Environment Switching** – Switch between different product environments defined in config
 - **Status Bar Indicator** – Shows the active Cloudinary environment
 
@@ -63,10 +66,19 @@ Once a valid configuration has been added, the active environment will be shown 
 
 ## Usage
 
-![Opening and browsing assets](https://res.cloudinary.com/demo/video/upload/w_1200/f_auto:animated/q_auto/du_41/e_accelerate:100/e_loop/docs/vscode-video-1)
+![Cloudinary VS Code extension overview](https://cloudinary-res.cloudinary.com/video/upload/w_900,fps_15,e_accelerate:100,e_loop/v1783427465/kuzfjl95kyrcsgn3axh4.gif)
+
+### Open the Home Screen
+- Click the **Cloudinary** icon in the Activity Bar
+- Search your library, open the media library, upload assets, or ask the Docs AI assistant
+
+### Ask the Docs AI Assistant
+- Type a question in the **Ask Cloudinary AI** box on the home screen, or run `Cloudinary: Open Docs AI` from the command palette
+- Answers stream in with citations linking to the relevant Cloudinary docs
+- Start new chats in tabs and revisit past conversations from the history menu
 
 ### Open the Media Library
-- Click the **Cloudinary** icon in the Activity Bar
+- Click **Browse Library** on the home screen
 - Browse folders and assets from your connected environment
 
 ### Switch Environments
@@ -79,7 +91,7 @@ Once a valid configuration has been added, the active environment will be shown 
 - Alternatively, run `Cloudinary: Upload` from the command palette.
 
 **Upload Panel Features:**
-- **Drag & Drop** – Drag files directly onto the drop zone
+- **Drag & Drop** – Drag files directly onto the drop zone (in VS Code, hold **Shift** while dropping)
 - **File Browser** – Click "Browse Files" to select files from your system
 - **Remote URL** – Paste a URL to upload from a remote source
 - **Folder Selection** – Choose the destination folder from a dropdown
@@ -114,6 +126,12 @@ Once a valid configuration has been added, the active environment will be shown 
 - **URLs** – Copy original or optimized URLs with one click
 - **Type Icons** – Tab icons indicate asset type (image, video, or file)
 - **Authenticated Assets** – Authenticated delivery assets are marked with a lock and use a signed original URL for preview/copy actions
+
+### Configure AI Tools
+- Click **Configure AI Tools** on the home screen
+- Pick your platform (Cursor, GitHub Copilot, Windsurf, Claude Code, and more) and scope (project or global)
+- Select the Cloudinary skills and MCP servers to install, then click **Apply**
+- After installing an MCP server, reload your editor and start a new chat to activate it
 
 ### Refresh Library
 - Click **Refresh** to reload the media library
