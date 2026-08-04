@@ -104,7 +104,7 @@ function registerAllCommands(
   registerClipboard(context, analytics);
   registerSwitchEnv(context, environmentTarget, statusBar, analytics);
   registerWelcomeScreen(context, cloudinaryService);
-  registerConfigureAiTools(context);
+  registerConfigureAiTools(context, analytics);
 }
 
 export { registerAllCommands };

@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { AnalyticsService } from "../analytics/analyticsService";
 import {
   EditorType,
   McpServerDef,
@@ -20,12 +21,16 @@ import {
 
 // ── MCP Config (QuickPick flow) ───────────────────────────────────────────────
 
+/**
+ * Returns how many MCP servers the user selected and how many were written, so
+ * the caller can report install outcomes without duplicating the QuickPick.
+ */
 async function createMcpConfig(
   rootUri: vscode.Uri,
   editor: EditorType,
   mcpFilePath: string,
   createdFiles: string[]
-): Promise<void> {
+): Promise<{ requested: number; installed: number }> {
   const configuredKeys = await readConfiguredMcpServerKeys(rootUri, mcpFilePath, getMcpRootKey(editor));
 
   const selected = await vscode.window.showQuickPick(
@@ -37,7 +42,7 @@ async function createMcpConfig(
     })),
     { canPickMany: true, placeHolder: "Select MCP servers to configure" }
   );
-  if (!selected || selected.length === 0) { return; }
+  if (!selected || selected.length === 0) { return { requested: 0, installed: 0 }; }
 
   const selectedKeys = selected
     .map((item) => MCP_SERVERS.find((s) => s.label === item.label))
@@ -45,15 +50,33 @@ async function createMcpConfig(
     .map((s) => s.key);
 
   await installMcpServers(rootUri, editor, selectedKeys, createdFiles);
+  return { requested: selectedKeys.length, installed: selectedKeys.length };
 }
+
+// Analytics platform ids for the QuickPick's IDE labels. Kept separate from the
+// status-only map below, which intentionally omits Cursor.
+const ANALYTICS_PLATFORM_BY_IDE_LABEL: Record<string, string> = {
+  "Claude Code": "claude-code",
+  "Cursor": "cursor",
+  "VS Code (Copilot)": "vscode-copilot",
+};
 
 // ── Command registration ──────────────────────────────────────────────────────
 
-function registerConfigureAiTools(context: vscode.ExtensionContext): void {
+function registerConfigureAiTools(
+  context: vscode.ExtensionContext,
+  analytics?: AnalyticsService
+): void {
   context.subscriptions.push(
     vscode.commands.registerCommand("cloudinary.configureAiTools", async () => {
+      analytics?.track("ai_tools_opened", { entry_point: "command" });
+
       const workspaceFolders = vscode.workspace.workspaceFolders;
       if (!workspaceFolders || workspaceFolders.length === 0) {
+        analytics?.track("ai_tools_open_failed", {
+          entry_point: "command",
+          failure_reason: "no_workspace",
+        });
         vscode.window.showErrorMessage("Please open a workspace folder first.");
         return;
       }
@@ -71,6 +94,15 @@ function registerConfigureAiTools(context: vscode.ExtensionContext): void {
 
       const createdFiles: string[] = [];
       const errors: string[] = [];
+      // Unlike the homescreen panel, this flow interleaves selection and
+      // installation across several QuickPicks, so there is no single
+      // pre-install moment to report. Only the terminal outcome is tracked,
+      // which is what apply success rate is measured on.
+      let skillsRequested = 0;
+      let skillsInstalled = 0;
+      let mcpRequested = 0;
+      let mcpInstalled = 0;
+      let analyticsPlatform: string | undefined;
 
       // ── Step 2: skills flow ────────────────────────────────────────────────
       if (options.some((o) => o.label === "Skills")) {
@@ -78,6 +110,10 @@ function registerConfigureAiTools(context: vscode.ExtensionContext): void {
         try {
           skills = await fetchSkillList();
         } catch (err: any) {
+          analytics?.track("ai_tools_open_failed", {
+            entry_point: "command",
+            failure_reason: "skill_list_unavailable",
+          });
           vscode.window.showErrorMessage(`Failed to fetch skills: ${err.message}`);
           return;
         }
@@ -127,6 +163,9 @@ function registerConfigureAiTools(context: vscode.ExtensionContext): void {
         );
         if (!pickedSkills || pickedSkills.length === 0) { return; }
 
+        analyticsPlatform = ANALYTICS_PLATFORM_BY_IDE_LABEL[ideTarget.label];
+        skillsRequested = pickedSkills.length;
+
         for (const item of pickedSkills) {
           const skill = skills.find((s) => s.name === item.label);
           if (!skill) { continue; }
@@ -137,6 +176,8 @@ function registerConfigureAiTools(context: vscode.ExtensionContext): void {
             errors.push(`${skill.dirName}: ${err.message}`);
             continue;
           }
+
+          const errorsBefore = errors.length;
 
           if (ideTarget.label === "Claude Code") {
             await installForClaudeCode(rootUri, skill.dirName, content, createdFiles, errors);
@@ -153,14 +194,36 @@ function registerConfigureAiTools(context: vscode.ExtensionContext): void {
               errors.push(`${skill.name}: ${err instanceof Error ? err.message : String(err)}`);
             }
           }
+
+          if (errors.length === errorsBefore) { skillsInstalled++; }
         }
       }
 
       // ── Step 3: MCP config flow ────────────────────────────────────────────
       if (options.some((o) => o.label === "MCP Config")) {
         const editor = detectEditor();
-        await createMcpConfig(rootUri, editor, getMcpFilePath(editor), createdFiles);
+        try {
+          const mcpResult = await createMcpConfig(rootUri, editor, getMcpFilePath(editor), createdFiles);
+          mcpRequested = mcpResult.requested;
+          mcpInstalled = mcpResult.installed;
+        } catch (err: any) {
+          errors.push(`MCP: ${err.message ?? String(err)}`);
+        }
       }
+
+      analytics?.track(
+        errors.length === 0 ? "ai_tools_install_succeeded" : "ai_tools_install_failed",
+        {
+          entry_point: "command",
+          platform: analyticsPlatform,
+          scope: "project",
+          skills_requested: skillsRequested,
+          skills_installed: skillsInstalled,
+          mcp_requested: mcpRequested,
+          mcp_installed: mcpInstalled,
+          error_count: errors.length,
+        }
+      );
 
       // ── Step 4: feedback ───────────────────────────────────────────────────
       if (errors.length > 0) {

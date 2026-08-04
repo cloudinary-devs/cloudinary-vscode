@@ -166,6 +166,13 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
             // First open: auto-detect the user's editor as the default platform.
             this._currentPlatform = detectEditorPlatform();
             this._currentScope = "project";
+            // Tracked here rather than in _handleAiToolsExpanded, which also
+            // serves in-place refreshes and would inflate the open count.
+            this._analytics?.track("ai_tools_opened", {
+              entry_point: "homescreen",
+              platform: this._currentPlatform,
+              scope: this._currentScope,
+            });
             await this._handleAiToolsExpanded();
             break;
           case "aiToolsRefresh":
@@ -176,12 +183,20 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
           case "changePlatform":
             if (message.platform) {
               this._currentPlatform = message.platform;
+              this._analytics?.track("ai_tools_platform_changed", {
+                platform: this._currentPlatform,
+                scope: this._currentScope,
+              });
               await this._handleAiToolsExpanded();
             }
             break;
           case "changeScope":
             if (message.scope) {
               this._currentScope = message.scope;
+              this._analytics?.track("ai_tools_scope_changed", {
+                platform: this._currentPlatform,
+                scope: this._currentScope,
+              });
               await this._handleAiToolsExpanded();
             }
             break;
@@ -491,6 +506,7 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
 
     const workspaceFolders = vscode.workspace.workspaceFolders;
     if (!workspaceFolders || workspaceFolders.length === 0) {
+      this._trackAiToolsOpenFailed("no_workspace");
       this._safePost({ command: "aiToolsData", error: "Please open a workspace folder first." });
       return;
     }
@@ -504,6 +520,7 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
 
       const platform = getPlatformEntry(this._currentPlatform);
       if (!platform) {
+        this._trackAiToolsOpenFailed("unknown_platform");
         this._safePost({ command: "aiToolsData", error: `Unknown platform: ${this._currentPlatform}` });
         return;
       }
@@ -545,8 +562,21 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
         mcpEditorLabel,
       });
     } catch (err: any) {
+      this._trackAiToolsOpenFailed("skill_list_unavailable");
       this._safePost({ command: "aiToolsData", error: err.message ?? String(err) });
     }
+  }
+
+  /**
+   * A panel that cannot render is a silent dead end for AI tool installs, so we
+   * record why rather than only counting the opens that worked.
+   */
+  private _trackAiToolsOpenFailed(reason: string): void {
+    this._analytics?.track("ai_tools_open_failed", {
+      failure_reason: reason,
+      platform: this._currentPlatform,
+      scope: this._currentScope,
+    });
   }
 
   private async _handleInstallAiTools(
@@ -558,8 +588,26 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
     const view = this._webviewView;
     if (!view) { return; }
 
+    // Requested counts are captured up front so a mid-flow failure still
+    // reports what the user was trying to install.
+    const installContext = {
+      entry_point: "homescreen",
+      platform: platformId,
+      scope,
+      skills_requested: skills.length,
+      mcp_requested: mcpServers.length,
+    };
+    this._analytics?.track("ai_tools_install_started", installContext);
+
     const workspaceFolders = vscode.workspace.workspaceFolders;
     if (!workspaceFolders || workspaceFolders.length === 0) {
+      this._analytics?.track("ai_tools_install_failed", {
+        ...installContext,
+        failure_reason: "no_workspace",
+        skills_installed: 0,
+        mcp_installed: 0,
+        error_count: 1,
+      });
       this._safePost({ command: "aiToolsResult", errors: ["No workspace folder open."] });
       return;
     }
@@ -571,6 +619,13 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
     const platform = getPlatformEntry(platformId);
 
     if (!platform) {
+      this._analytics?.track("ai_tools_install_failed", {
+        ...installContext,
+        failure_reason: "unknown_platform",
+        skills_installed: 0,
+        mcp_installed: 0,
+        error_count: 1,
+      });
       this._safePost({ command: "aiToolsResult", errors: [`Unknown platform: ${platformId}`] });
       return;
     }
@@ -622,6 +677,19 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
         }
       }
     }
+
+    // Exactly one terminal event per apply, so apply success rate is
+    // succeeded / (succeeded + failed). A partial install counts as failed, with
+    // the installed counts in the payload to show how far it got.
+    this._analytics?.track(
+      errors.length === 0 ? "ai_tools_install_succeeded" : "ai_tools_install_failed",
+      {
+        ...installContext,
+        skills_installed: installedSkillsCount,
+        mcp_installed: installedMcp.length,
+        error_count: errors.length,
+      }
+    );
 
     this._safePost({ command: "aiToolsResult", errors });
     this._showAiToolsNextSteps(installedSkillsCount, installedMcp, mcpEditorLabel);
