@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { AnalyticsService } from "../analytics/analyticsService";
 import { CloudinaryService } from "../cloudinary/cloudinaryService";
 import {
   createWebviewDocument,
@@ -15,22 +16,43 @@ type WelcomeScreenCloudinaryState = Pick<
 let welcomePanel: vscode.WebviewPanel | undefined;
 let welcomeContext: vscode.ExtensionContext | undefined;
 let welcomeCloudinaryState: WelcomeScreenCloudinaryState | undefined;
+let welcomeAnalytics: AnalyticsService | undefined;
 
 /**
  * Registers the welcome screen command.
  */
 function registerWelcomeScreen(
   context: vscode.ExtensionContext,
-  cloudinaryState: WelcomeScreenCloudinaryState
+  cloudinaryState: WelcomeScreenCloudinaryState,
+  analytics?: AnalyticsService
 ) {
   welcomeContext = context;
   welcomeCloudinaryState = cloudinaryState;
+  welcomeAnalytics = analytics;
 
   context.subscriptions.push(
-    vscode.commands.registerCommand("cloudinary.openWelcomeScreen", () => {
-      createWelcomePanel(context, cloudinaryState);
+    vscode.commands.registerCommand("cloudinary.openWelcomeScreen", (entryPoint?: string) => {
+      // The first-run auto-open passes its own entry point, so organic opens
+      // can be told apart from the one we trigger on install.
+      createWelcomePanel(context, cloudinaryState, entryPoint ?? "command");
     })
   );
+}
+
+/**
+ * The welcome screen is the one surface we push at people on install, so what
+ * they do next (or that they do nothing) is the signal worth having.
+ */
+function trackWelcomeAction(action: string, target?: string): void {
+  welcomeAnalytics?.track("welcome_action", { action, target });
+}
+
+function safeHost(url: string): string | undefined {
+  try {
+    return new URL(url).host;
+  } catch {
+    return undefined;
+  }
 }
 
 export function refreshWelcomePanel(): void {
@@ -46,13 +68,26 @@ export function refreshWelcomePanel(): void {
  */
 function createWelcomePanel(
   context: vscode.ExtensionContext,
-  cloudinaryState: WelcomeScreenCloudinaryState
+  cloudinaryState: WelcomeScreenCloudinaryState,
+  entryPoint: string = "command"
 ): vscode.WebviewPanel {
+  const trackOpen = (reopened: boolean): void => {
+    welcomeAnalytics?.track("welcome_opened", {
+      entry_point: entryPoint,
+      reopened,
+      // Whether the welcome screen is doing setup work or being revisited.
+      connection_status: getConnectionStatus(cloudinaryState),
+    });
+  };
+
   if (welcomePanel) {
+    trackOpen(true);
     welcomePanel.reveal(vscode.ViewColumn.One);
     renderWelcomePanel(welcomePanel, context, cloudinaryState);
     return welcomePanel;
   }
+
+  trackOpen(false);
 
   const panel = vscode.window.createWebviewPanel(
     "cloudinaryWelcome",
@@ -83,21 +118,27 @@ function createWelcomePanel(
   panel.webview.onDidReceiveMessage((message: { command: string; data?: string; text?: string }) => {
     switch (message.command) {
       case "openGlobalConfig":
+        trackWelcomeAction("open_config");
         vscode.commands.executeCommand("cloudinary.openGlobalConfig");
         break;
       case "copyToClipboard": {
         const text = message.text ?? message.data;
         if (text) {
+          trackWelcomeAction("copy_snippet");
           vscode.env.clipboard.writeText(text);
         }
         break;
       }
       case "openExternal":
         if (message.data) {
+          // Host only, never the full URL: enough to tell docs from console
+          // without logging what the user was reading.
+          trackWelcomeAction("open_external", safeHost(message.data));
           vscode.env.openExternal(vscode.Uri.parse(message.data));
         }
         break;
       case "focusDashboard":
+        trackWelcomeAction("focus_dashboard");
         vscode.commands.executeCommand("cloudinary.showHomescreen");
         break;
     }

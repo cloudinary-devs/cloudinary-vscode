@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { AnalyticsService } from "../analytics/analyticsService";
 import { LibraryWebviewViewProvider } from "../webview/libraryView";
 
 type ResourceType = "all" | "image" | "video" | "raw";
@@ -25,7 +26,8 @@ interface ViewOption {
  */
 function registerViewOptions(
   context: vscode.ExtensionContext,
-  libraryWebview?: LibraryWebviewViewProvider
+  libraryWebview?: LibraryWebviewViewProvider,
+  analytics?: AnalyticsService
 ) {
   context.subscriptions.push(
     vscode.commands.registerCommand(
@@ -68,12 +70,23 @@ function registerViewOptions(
           },
         ];
 
+        analytics?.track("library_view_options_opened");
+
         const selected = await vscode.window.showQuickPick(options, {
           placeHolder: "Select view option",
           matchOnDescription: true,
         });
 
         if (selected?.viewState) {
+          // Filter and sort are tracked as separate events rather than one
+          // "changed" event, so each can be read without unpacking a payload.
+          const { resourceTypeFilter, sortDirection } = selected.viewState;
+          if (resourceTypeFilter) {
+            analytics?.track("library_filter_changed", { resource_type: resourceTypeFilter });
+          }
+          if (sortDirection) {
+            analytics?.track("library_sort_changed", { sort_direction: sortDirection });
+          }
           await (libraryWebview as ViewAwareLibraryWebview | undefined)?.applyView?.(selected.viewState);
         }
       }

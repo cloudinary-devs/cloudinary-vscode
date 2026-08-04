@@ -144,7 +144,7 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
             vscode.commands.executeCommand("cloudinary.openUploadWidget");
             break;
           case "openWelcomeScreen":
-            vscode.commands.executeCommand("cloudinary.openWelcomeScreen");
+            vscode.commands.executeCommand("cloudinary.openWelcomeScreen", "homescreen");
             break;
           case "searchAssets":
             if (message.data?.trim()) {
@@ -160,7 +160,7 @@ export class HomescreenViewProvider implements vscode.WebviewViewProvider {
             await this._libraryWebview?.setSearch(null);
             break;
           case "switchEnvironment":
-            vscode.commands.executeCommand("cloudinary.switchEnvironment");
+            vscode.commands.executeCommand("cloudinary.switchEnvironment", "homescreen");
             break;
           case "aiToolsExpanded":
             // First open: auto-detect the user's editor as the default platform.

@@ -82,14 +82,28 @@ function registerSwitchEnv(
   context.subscriptions.push(
     vscode.commands.registerCommand(
       "cloudinary.switchEnvironment",
-      async () => {
+      async (entryPoint?: string) => {
+        // Callers pass their own entry point (status bar, homescreen); a bare
+        // invocation is the command palette.
+        const entry_point = entryPoint ?? "command";
         const environments = await loadEnvironments();
         const cloudNames = Object.keys(environments);
 
         if (cloudNames.length === 0) {
+          analytics?.track("environment_switch_failed", {
+            entry_point,
+            failure_reason: "no_environments",
+          });
           vscode.window.showErrorMessage("No Cloudinary environments found in config.");
           return;
         }
+
+        // Environment count is the shape of the config, and tells us whether
+        // multi-environment switching is a real workflow or a rare one.
+        analytics?.track("environment_switch_opened", {
+          entry_point,
+          environment_count: cloudNames.length,
+        });
 
         const selected = await vscode.window.showQuickPick(cloudNames, {
           placeHolder: "Select a Cloudinary environment",
@@ -132,6 +146,15 @@ function registerSwitchEnv(
 
           statusBar.text = getStatusBarText(selected, dynamicFolders, credentialsValid);
           statusBar.tooltip = getStatusBarTooltip(dynamicFolders, credentialsValid);
+
+          // cloud_name is already common context, so the payload only needs the
+          // outcome: a switch onto invalid credentials is a dead end worth seeing.
+          analytics?.track("environment_switched", {
+            entry_point,
+            environment_count: cloudNames.length,
+            credentials_valid: credentialsValid !== false,
+            folder_mode: dynamicFolders ? "dynamic" : "fixed",
+          });
 
           if (credentialsValid === false) {
             vscode.window.showWarningMessage(

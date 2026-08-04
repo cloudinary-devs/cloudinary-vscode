@@ -245,7 +245,7 @@ export async function activate(context: vscode.ExtensionContext) {
       return;
     }
     await context.globalState.update('cloudinary.firstRun', false);
-    await vscode.commands.executeCommand("cloudinary.openWelcomeScreen");
+    await vscode.commands.executeCommand("cloudinary.openWelcomeScreen", "first_run");
   };
 
   statusBar = vscode.window.createStatusBarItem(
@@ -296,7 +296,13 @@ export async function activate(context: vscode.ExtensionContext) {
 
     statusBar.text = getStatusBarText(cloudName, dynamicFolders, credentialsValid);
     statusBar.tooltip = getStatusBarTooltip(dynamicFolders, credentialsValid);
-    statusBar.command = "cloudinary.switchEnvironment";
+    // Command object rather than a bare id so the status bar reports itself as
+    // the entry point, which is how most switches actually start.
+    statusBar.command = {
+      title: "Switch Cloudinary environment",
+      command: "cloudinary.switchEnvironment",
+      arguments: ["status_bar"],
+    };
 
     await refreshEnvironmentViews();
   };

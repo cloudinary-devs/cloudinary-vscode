@@ -98,12 +98,12 @@ function registerAllCommands(
 
   registerSearch(context, homescreenProvider);
   registerClearSearch(context, libraryWebview);
-  registerViewOptions(context, libraryWebview);
+  registerViewOptions(context, libraryWebview, analytics);
   registerPreview(context, analytics);
   registerUpload(context, cloudinaryService, analytics);
   registerClipboard(context, analytics);
   registerSwitchEnv(context, environmentTarget, statusBar, analytics);
-  registerWelcomeScreen(context, cloudinaryService);
+  registerWelcomeScreen(context, cloudinaryService, analytics);
   registerConfigureAiTools(context, analytics);
 }
 
