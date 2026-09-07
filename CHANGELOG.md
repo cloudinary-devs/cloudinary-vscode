@@ -7,8 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.0.2] - 2026-09-07
 
+### Added
+- **Analytics for more surfaces** - Usage events for the environment switcher, welcome screen, library view, and Configure AI Tools.
+
 ### Changed
 - **Docs AI usage counted per user** - Chat requests now carry the anonymous session id the extension already persists for analytics, so Docs AI usage can be reported per user rather than per conversation. No new data is collected.
+
+### Fixed
+- **Tests run on current VS Code** - Repaired the test runner and moved CI to Node 24.
 
 ## [1.0.1] - 2026-07-09
 
