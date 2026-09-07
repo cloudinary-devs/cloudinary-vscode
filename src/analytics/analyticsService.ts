@@ -113,6 +113,20 @@ export class AnalyticsService {
   private readonly fetchFn: (url: string, init: { method: "POST" }) => Promise<unknown>;
   private readonly now: () => Date;
   private readonly createSessionId: () => string;
+  /**
+   * In-memory copy of the session id.
+   *
+   * Both `getSessionId` and `peekSessionId` can be the first to need one, and
+   * `track()` is fire-and-forget at activation, so neither can rely on the
+   * other having already written storage. Caching the value here is what keeps
+   * the two paths from minting different ids for the same install.
+   */
+  private cachedSessionId: string | undefined;
+  /**
+   * The in-flight write of a newly minted session id, so the async path can
+   * await durability even though the sync path cannot.
+   */
+  private sessionIdWrite: Promise<void> | undefined;
 
   constructor(options: AnalyticsServiceOptions) {
     this.extensionVersion = options.extensionVersion;
@@ -174,14 +188,53 @@ export class AnalyticsService {
     }
   }
 
+  /**
+   * The client id used to attribute analytics events, exposed so the Docs AI
+   * webview can send it with chat requests and have turns counted per user.
+   *
+   * Synchronous because the caller is building webview HTML. It mints an id
+   * when none exists rather than returning "": activation fires `track()`
+   * without awaiting it, so on a fresh install the stored id may not have been
+   * written yet, and returning "" here would leave that webview unattributed
+   * for its entire lifetime (the HTML is built once). The write is not awaited,
+   * but `cachedSessionId` means any concurrent `getSessionId` sees the same
+   * value instead of generating a second one.
+   */
+  public peekSessionId(): string {
+    return this.resolveSessionId();
+  }
+
   private async getSessionId(): Promise<string> {
+    const id = this.resolveSessionId();
+    // Unlike the webview path, an event send can afford to wait for the write,
+    // so a crash right after first activation does not lose the id and mint a
+    // second one on the next launch.
+    await this.sessionIdWrite;
+    return id;
+  }
+
+  /**
+   * Returns this install's session id, creating and persisting one on first
+   * call. Safe to call from either the sync or async path.
+   */
+  private resolveSessionId(): string {
+    if (this.cachedSessionId) {
+      return this.cachedSessionId;
+    }
+
     const existing = this.storage.get<string>(SESSION_STORAGE_KEY, "");
     if (existing) {
+      this.cachedSessionId = existing;
       return existing;
     }
 
     const created = this.createSessionId();
-    await this.storage.update(SESSION_STORAGE_KEY, created);
+    this.cachedSessionId = created;
+    this.sessionIdWrite = Promise.resolve(this.storage.update(SESSION_STORAGE_KEY, created)).then(
+      () => undefined,
+      // A failed write costs a re-minted id next launch, never a broken event.
+      () => undefined
+    );
     return created;
   }
 }

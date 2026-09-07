@@ -90,6 +90,76 @@ suite("AnalyticsService", () => {
     assert.strictEqual(new URL(urls[1]).searchParams.get("event"), "home_opened");
   });
 
+  test("peekSessionId mints an id before any event has been sent", () => {
+    // The Docs AI webview builds its HTML synchronously and only once, and
+    // activation fires track() without awaiting it. If peek returned "" here,
+    // that webview would send unattributed chat turns for its whole lifetime.
+    const storage = new FakeStorage();
+    let createCount = 0;
+    const service = new AnalyticsService({
+      extensionVersion: "1.2.3",
+      storage,
+      createSessionId: () => `session-${++createCount}`,
+      fetchFn: async () => {},
+    });
+
+    const first = service.peekSessionId();
+    assert.ok(first, "expected a session id without waiting for an event");
+    assert.strictEqual(createCount, 1);
+    assert.strictEqual(service.peekSessionId(), first, "peek must be stable");
+  });
+
+  test("peekSessionId and events agree on one id", async () => {
+    // Two code paths can each be the first to need an id. Minting separately
+    // would split one install into two clients and inflate unique users.
+    const storage = new FakeStorage();
+    const urls: string[] = [];
+    let createCount = 0;
+    const service = new AnalyticsService({
+      extensionVersion: "1.2.3",
+      storage,
+      createSessionId: () => `session-${++createCount}`,
+      fetchFn: async (url) => {
+        urls.push(url);
+      },
+    });
+
+    const peeked = service.peekSessionId();
+    await service.send("docs_ai_opened");
+
+    assert.strictEqual(createCount, 1, "only one id should ever be created");
+    assert.strictEqual(new URL(urls[0]).searchParams.get("session_id"), peeked);
+  });
+
+  test("peekSessionId reuses an id already in storage", () => {
+    const storage = new FakeStorage();
+    void storage.update("cloudinary.analyticsSessionId", "existing-session");
+    let createCount = 0;
+    const service = new AnalyticsService({
+      extensionVersion: "1.2.3",
+      storage,
+      createSessionId: () => `session-${++createCount}`,
+      fetchFn: async () => {},
+    });
+
+    assert.strictEqual(service.peekSessionId(), "existing-session");
+    assert.strictEqual(createCount, 0, "must not mint over a stored id");
+  });
+
+  test("a send after peek persists the id", async () => {
+    const storage = new FakeStorage();
+    const service = new AnalyticsService({
+      extensionVersion: "1.2.3",
+      storage,
+      createSessionId: () => "session-1",
+      fetchFn: async () => {},
+    });
+
+    const peeked = service.peekSessionId();
+    await service.send("extension_activated");
+    assert.strictEqual(storage.get("cloudinary.analyticsSessionId", ""), peeked);
+  });
+
   test("drops unsafe event names and sensitive payload fields", async () => {
     const urls: string[] = [];
     const service = new AnalyticsService({

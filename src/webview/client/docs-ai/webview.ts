@@ -6,7 +6,7 @@ import {
   API_BASE, API_URL, vscode, state, tabMessagesCache, tabStreamState,
   $, conversationEl, inputEl, scrollToBottom, normalizeSources,
   getSourceUrl, getSourceLabel, escapeHtml, pickStarters,
-  uid, convId, timeAgo, callbacks, IDE_PLATFORM, INITIAL_PROMPT, INITIAL_CONVERSATION_ID,
+  uid, convId, timeAgo, callbacks, IDE_PLATFORM, CLIENT_ID, INITIAL_PROMPT, INITIAL_CONVERSATION_ID,
 } from "./state"
 import {
   persistMessage, updateConversationTimestamp, persistTabState, loadConversations,
@@ -626,7 +626,7 @@ async function ask(text) {
     const res = await fetch(API_URL, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ messages: historyForRequest, conversationId: state.currentConversationId || '', platform: IDE_PLATFORM }),
+      body: JSON.stringify({ messages: historyForRequest, conversationId: state.currentConversationId || '', platform: IDE_PLATFORM, userKey: CLIENT_ID }),
       signal: askAbortController.signal,
     })
 
@@ -733,7 +733,7 @@ async function askFromEdit(text) {
     const res = await fetch(API_URL, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ messages: historyForRequest, conversationId: state.currentConversationId || '', platform: IDE_PLATFORM }),
+      body: JSON.stringify({ messages: historyForRequest, conversationId: state.currentConversationId || '', platform: IDE_PLATFORM, userKey: CLIENT_ID }),
       signal: askAbortController.signal,
     })
 

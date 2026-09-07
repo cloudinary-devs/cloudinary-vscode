@@ -25,6 +25,16 @@ export const vscode = acquireVsCodeApi()
 
 const rawIdeName = (typeof window !== 'undefined' && window.__IDE_NAME__) || 'vscode'
 export const IDE_PLATFORM = rawIdeName.toLowerCase().replace(/\s+/g, '-')
+/**
+ * The extension's analytics client id, forwarded with each chat request so the
+ * dashboard can count unique users instead of unique conversations. Empty when
+ * analytics has not yet minted one, in which case the turn is logged
+ * unattributed rather than failing.
+ */
+export const CLIENT_ID =
+  typeof window !== 'undefined' && typeof window.__DOCS_AI_CLIENT_ID__ === 'string'
+    ? window.__DOCS_AI_CLIENT_ID__.trim()
+    : ''
 export const INITIAL_PROMPT =
   typeof window !== 'undefined' && typeof window.__INITIAL_PROMPT__ === 'string'
     ? window.__INITIAL_PROMPT__.trim()

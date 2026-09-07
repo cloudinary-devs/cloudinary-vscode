@@ -193,6 +193,9 @@ export class DocsAiViewProvider implements vscode.WebviewViewProvider {
     const initialConversationIdJson = JSON.stringify(initialConversationId ?? "");
     const apiBase = getDocsAiApiBase();
     const apiBaseJson = JSON.stringify(apiBase);
+    // The analytics client id, so chat requests can be counted per user rather
+    // than per conversation. Empty when analytics is disabled or has not run yet.
+    const clientIdJson = JSON.stringify(this._analytics?.peekSessionId() ?? "");
 
     const csp = [
       "default-src 'none'",
@@ -252,6 +255,7 @@ export class DocsAiViewProvider implements vscode.WebviewViewProvider {
     window.__INITIAL_PROMPT__ = ${initialPromptJson};
     window.__INITIAL_CONVERSATION_ID__ = ${initialConversationIdJson};
     window.__DOCS_AI_API_BASE__ = ${apiBaseJson};
+    window.__DOCS_AI_CLIENT_ID__ = ${clientIdJson};
   </script>
   <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>
