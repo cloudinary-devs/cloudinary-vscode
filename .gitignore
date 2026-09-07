@@ -65,3 +65,6 @@ test/e2e/.wdio-vscode-service/
 test/e2e/.env
 test/e2e/videos/
 test/e2e/_results_/
+
+# Local Cloudinary credentials, never commit
+environments.json

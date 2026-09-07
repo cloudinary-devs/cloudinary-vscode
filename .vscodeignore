@@ -57,3 +57,8 @@ CLAUDE.md
 
 # Development documentation
 docs/**
+
+# Local credentials scratch file. The extension reads ~/.cloudinary/environments.json
+# and <workspace>/.cloudinary/environments.json, never this one, so it is only ever a
+# developer's local copy. It holds apiKey/apiSecret fields, so it must never ship.
+environments.json

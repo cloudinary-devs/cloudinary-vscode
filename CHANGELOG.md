@@ -5,6 +5,11 @@ All notable changes to the Cloudinary VS Code extension will be documented in th
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.2] - 2026-09-07
+
+### Changed
+- **Docs AI usage counted per user** - Chat requests now carry the anonymous session id the extension already persists for analytics, so Docs AI usage can be reported per user rather than per conversation. No new data is collected.
+
 ## [1.0.1] - 2026-07-09
 
 ### Changed
