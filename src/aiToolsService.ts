@@ -538,6 +538,12 @@ export const MCP_SERVERS: McpServerDef[] = [
     config: { url: "https://analysis.mcp.cloudinary.com/sse" },
   },
   {
+    label: "Cloudinary Video",
+    description: "Live streams, image-to-video, and video analysis",
+    key: "cloudinary-video",
+    config: { url: "https://video.mcp.cloudinary.com/mcp" },
+  },
+  {
     label: "MediaFlows",
     description: "AI-powered media workflows and automation",
     key: "mediaflows",
