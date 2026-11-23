@@ -5,6 +5,11 @@ All notable changes to the Cloudinary VS Code extension will be documented in th
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.3] - 2026-11-23
+
+### Fixed
+- **Skills missing from Configure AI Tools** - The Cloudinary skills catalog moved its skills into category folders, so Configure AI Tools showed no skills to install. It now reads skills from the category folders again.
+
 ## [1.0.2] - 2026-09-07
 
 ### Added
