@@ -158,18 +158,50 @@ export function toMdcContent(content: string): string {
 
 // ── Skill fetching ────────────────────────────────────────────────────────────
 
-export async function fetchSkillList(): Promise<SkillInfo[]> {
+// Repo path of each skill folder, keyed by its folder name. Skills sit in
+// category folders (skills/platform/<name>, skills/frameworks/<name>), and a
+// folder directly under skills/ that has its own SKILL.md is a skill too.
+const skillPaths = new Map<string, string>();
+
+async function listSkillDirs(): Promise<Array<{ name: string; path: string }>> {
   const entries = await githubFetchJson<GitHubEntry[]>(`${SKILLS_BASE}/skills`);
   const dirs = entries.filter((e) => e.type === "dir");
+
+  const nested = await Promise.all(
+    dirs.map(async (dir) => {
+      try {
+        const children = await githubFetchJson<GitHubEntry[]>(`${SKILLS_BASE}/skills/${dir.name}`);
+        if (children.some((c) => c.type === "file" && c.name === "SKILL.md")) {
+          return [{ name: dir.name, path: `skills/${dir.name}` }];
+        }
+        return children
+          .filter((c) => c.type === "dir")
+          .map((c) => ({ name: c.name, path: `skills/${dir.name}/${c.name}` }));
+      } catch {
+        return [];
+      }
+    })
+  );
+  return nested.flat();
+}
+
+async function skillPath(skillName: string): Promise<string> {
+  if (!skillPaths.has(skillName)) {
+    await fetchSkillList();
+  }
+  return skillPaths.get(skillName) ?? `skills/${skillName}`;
+}
+
+export async function fetchSkillList(): Promise<SkillInfo[]> {
+  const dirs = await listSkillDirs();
 
   const results = await Promise.all(
     dirs.map(async (dir): Promise<SkillInfo | null> => {
       try {
-        const file = await githubFetchJson<GitHubFile>(
-          `${SKILLS_BASE}/skills/${dir.name}/SKILL.md`
-        );
+        const file = await githubFetchJson<GitHubFile>(`${SKILLS_BASE}/${dir.path}/SKILL.md`);
         const content = decodeBase64(file.content);
         const fm = parseFrontmatter(content);
+        skillPaths.set(dir.name, dir.path);
         return { name: fm.name || dir.name, description: fm.description || "", dirName: dir.name };
       } catch {
         return null;
@@ -182,7 +214,7 @@ export async function fetchSkillList(): Promise<SkillInfo[]> {
 
 export async function fetchSkillContent(skillName: string): Promise<string> {
   const file = await githubFetchJson<GitHubFile>(
-    `${SKILLS_BASE}/skills/${skillName}/SKILL.md`
+    `${SKILLS_BASE}/${await skillPath(skillName)}/SKILL.md`
   );
   return decodeBase64(file.content);
 }
@@ -190,11 +222,10 @@ export async function fetchSkillContent(skillName: string): Promise<string> {
 export async function fetchReferenceFiles(
   skillName: string
 ): Promise<Array<{ name: string; content: string }>> {
+  const base = await skillPath(skillName);
   let entries: GitHubEntry[];
   try {
-    entries = await githubFetchJson<GitHubEntry[]>(
-      `${SKILLS_BASE}/skills/${skillName}/references`
-    );
+    entries = await githubFetchJson<GitHubEntry[]>(`${SKILLS_BASE}/${base}/references`);
   } catch {
     return [];
   }
@@ -205,7 +236,7 @@ export async function fetchReferenceFiles(
       .map(async (e) => {
         try {
           const file = await githubFetchJson<GitHubFile>(
-            `${SKILLS_BASE}/skills/${skillName}/references/${e.name}`
+            `${SKILLS_BASE}/${base}/references/${e.name}`
           );
           return { name: e.name, content: decodeBase64(file.content) };
         } catch {
