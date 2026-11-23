@@ -539,7 +539,7 @@ export const MCP_SERVERS: McpServerDef[] = [
   },
   {
     label: "Cloudinary Video",
-    description: "Live streams, image-to-video, and video analysis",
+    description: "Live streams, Image to Video, video analysis, and Video Canvas",
     key: "cloudinary-video",
     config: { url: "https://video.mcp.cloudinary.com/mcp" },
   },
